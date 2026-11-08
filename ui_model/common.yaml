@@ -1,0 +1,10 @@
+# Общий словарь UI-модели: варианты элементов, роли, грамматики OCR.
+# Формат: см. FORMAT.md. Это не модель окна — обязательные секции окон
+# (window/elements/states/transitions/ocr_regions) здесь не нужны.
+
+variants: [normal, hover, pressed, disabled, active, placeholder, focused, filled]
+roles: [click_target, ocr_region, state_signature, icon_sample]
+grammars:
+  digits: {kind: digits}
+  price: {kind: price, separators: [",", "."], suffixes: {"к": 1000, "кк": 1000000}}
+  text: {kind: text}

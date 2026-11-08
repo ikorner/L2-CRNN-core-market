@@ -1,0 +1,88 @@
+# Минимальный валидный пример модели окна (формат-образец для задачи 2.1).
+# Реальная разметка — задача 2.2 (конвертер), семантика переходов — 2.5.
+# Формат: см. FORMAT.md.
+
+window:
+  id: market
+  title: "Обзор лавок"
+  size: [804, 598]
+
+elements:
+  tab_home:
+    rect: [10, 40, 142, 42]
+    role: click_target
+    variants:
+      normal: {template: market/tab_home_normal.png}
+      active: {template: market/tab_home_active.png, click_point: [81, 61]}
+  tab_equipment:
+    rect: [152, 40, 142, 42]
+    role: click_target
+    variants:
+      normal: {template: market/tab_equipment_normal.png}
+      active: {template: market/tab_equipment_active.png, click_point: [223, 61]}
+  market_main_button:
+    rect: [10, 8, 120, 26]
+    role: state_signature
+    variants:
+      active: {template: market/main_button_active.png}
+  market_pic:
+    role: icon_sample
+    hud: true
+    search_area: [1000, 420, 200, 160]
+    variants:
+      normal: {template: hud/market_pic.png, click_point: [14, 11]}
+
+states:
+  list_home:
+    params:
+      tab: home
+    signatures:
+      - {kind: pixel_probe, points: [{at: [20, 20], color: [255, 220, 120]}]}
+      - {kind: template, element: tab_home, variant: active}
+      - {kind: ocr, region: window_title, expect: "Обзор лавок"}
+  list_equipment:
+    params:
+      tab: equipment
+      global_filter: all
+      filter: all
+    signatures:
+      - {kind: template, element: tab_equipment, variant: active}
+      - {kind: ocr, region: window_title, expect: "Обзор лавок"}
+
+transitions:
+  - from: list_home
+    action: click
+    element: tab_equipment
+    expected: list_equipment
+    timeout: 5.0
+    verify:
+      - {kind: template, element: tab_equipment, variant: active}
+    on_fail: [press_esc, reopen_market]
+  - from: list_equipment
+    action: key
+    key: escape
+    expected: closed
+    verify:
+      - {kind: pixel_probe, points: [{at: [20, 20], color: [0, 0, 0]}]}
+    on_fail: [reopen_market]
+
+ocr_regions:
+  window_title:
+    rect: [40, 8, 200, 24]
+    grammar: text
+  price_cell:
+    rect: [300, 100, 120, 20]
+    grammar: price
+
+table_geometry:
+  col_seps: [12, 240, 372, 500, 640, 780]
+  row_y0: 96
+  row_pitch: 24
+  max_rows: 18
+  columns:
+    item:
+      zone: [4, 2, 220, 20]
+      grammar: text
+    price:
+      zone: [4, 2, 120, 20]
+      grammar: price
