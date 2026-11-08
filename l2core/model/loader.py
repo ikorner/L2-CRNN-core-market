@@ -328,10 +328,11 @@ def _parse_variants(
 
 def _parse_states(file: Path, raw: Any) -> dict:
     section = "states"
-    if not isinstance(raw, dict) or not raw:
-        raise ModelFormatError(
-            file, section, "ожидается непустой mapping id: состояние"
-        )
+    if not isinstance(raw, dict):
+        raise ModelFormatError(file, section, "ожидается mapping id: состояние")
+    if not raw:
+        # Пусто допустимо: начальный импорт конвертером (2.2) до разметки.
+        return {}
 
     states = {}
     for state_id, spec in raw.items():
@@ -444,8 +445,11 @@ def _parse_transitions(file: Path, raw: Any) -> tuple:
 
 def _parse_ocr_regions(file: Path, raw: Any, common: CommonDicts) -> dict:
     section = "ocr_regions"
-    if not isinstance(raw, dict) or not raw:
-        raise ModelFormatError(file, section, "ожидается непустой mapping id: регион")
+    if not isinstance(raw, dict):
+        raise ModelFormatError(file, section, "ожидается mapping id: регион")
+    if not raw:
+        # Пусто допустимо: начальный импорт конвертером (2.2) до разметки.
+        return {}
 
     regions = {}
     for region_id, spec in raw.items():

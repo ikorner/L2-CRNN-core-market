@@ -69,6 +69,11 @@ pip install -e ".[dev]"
 # Тесты (единственная проверяемая команда на текущем этапе)
 python -m pytest
 
+# Конвертер meta.json → UI-модель: импорт кропов в assets/, карточки
+# элементов/состояний, diff-отчёт на stdout. Ручные правки в ui_model/*.yaml
+# и файлы в assets/ не перезаписываются (ручное побеждает, отчёт фиксирует).
+python -m l2core.model.converter
+
 # Валидация config.yaml против схемы l2core/config.py
 python -c "from l2core.config import load_config; load_config('config.yaml')"
 

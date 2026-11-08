@@ -19,6 +19,10 @@ from l2core.model import (
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 UI_MODEL = REPO_ROOT / "ui_model"
+# Формат-образец из задачи 2.1 (вымышленная разметка, все конструкции
+# формата). Мутационные тесты диагностики опираются на него, чтобы не
+# зависеть от эволюции реальных моделей (результата импорта 2.2).
+SAMPLE_MODEL = Path(__file__).resolve().parent / "fixtures" / "market_sample.yaml"
 
 
 def test_load_common_dictionary():
@@ -39,9 +43,71 @@ def test_load_common_dictionary():
 
 
 def test_load_shipped_market_model_round_trip():
-    """Поставляемый пример загружается; объектная модель отражает YAML."""
+    """Поставляемая модель (реальный импорт конвертера 2.2) загружается."""
     common = load_common(UI_MODEL / "common.yaml")
     model = load_model(UI_MODEL / "market.yaml", common)
+
+    # window: размер от кропа-примера открытого окна.
+    assert model.window.id == "market"
+    assert model.window.title == "Обзор лавок"
+    assert model.window.size == (1008, 674)
+
+    # элемент из меты: rect от якоря окна, кроп-шаблон из assets/.
+    button = model.elements["market_main_button_active"]
+    assert button.role == "click_target"
+    assert button.rect == (12, 155, 137, 42)
+    assert button.variants["active"].template == (
+        "market/scr_153551_market_main_button_active.png"
+    )
+
+    # HUD-элемент: не вписался в окно геометрически (окно на скриншоте
+    # закрыто) -> search_area.
+    opener = model.elements["open_buy_trade"]
+    assert opener.hud
+    assert opener.search_area == (751, 920, 34, 24)
+    assert opener.rect is None
+
+    # market_pic: ручная правка поверх импорта (HUD по спеке ui-model),
+    # конвертер её не перезаписывает.
+    pic = model.elements["market_pic"]
+    assert pic.hud
+    assert pic.search_area == (1000, 420, 200, 160)
+    assert pic.variants["normal"].click_point == (86, 64)
+
+    # состояние из меты: params + template-сигнатуры фактов наблюдения.
+    home = model.states["list__tab_home"]
+    assert home.params == {"tab": "home"}
+    assert [(s.kind, s.element) for s in home.signatures] == [
+        ("template", "market_main_button_active")
+    ]
+
+    # мета transitions/ocr_regions/table_geometry не знает — пусто.
+    assert model.transitions == ()
+    assert model.ocr_regions == {}
+    assert model.table_geometry is None
+
+
+def test_empty_states_and_ocr_regions_are_valid(tmp_path):
+    """Начальный импорт (2.2) до ручной разметки: пустые секции валидны."""
+    path = tmp_path / "market.yaml"
+    path.write_text(
+        "window: {id: market, title: Обзор лавок, size: [100, 100]}\n"
+        "elements:\n"
+        "  e: {rect: [0, 0, 1, 1], role: icon_sample}\n"
+        "states: {}\n"
+        "transitions: []\n"
+        "ocr_regions: {}\n",
+        encoding="utf-8",
+    )
+    model = load_model(path)
+    assert model.states == {}
+    assert model.ocr_regions == {}
+
+
+def test_load_sample_fixture_round_trip():
+    """Формат-образец 2.1 загружается; объектная модель отражает YAML."""
+    common = load_common(UI_MODEL / "common.yaml")
+    model = load_model(SAMPLE_MODEL, common)
 
     # window
     assert model.window.id == "market"
@@ -120,7 +186,7 @@ def test_model_without_table_geometry_loads(tmp_path):
     """Окон без списка table_geometry нет; парсер такую модель принимает."""
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         drop_section="table_geometry",
     )
     common = load_common(UI_MODEL / "common.yaml")
@@ -128,11 +194,19 @@ def test_model_without_table_geometry_loads(tmp_path):
     assert model.table_geometry is None
 
 
+def test_shipped_models_have_no_table_geometry_yet():
+    """Реальный импорт (2.2) table_geometry не знает — секции нет."""
+    common = load_common(UI_MODEL / "common.yaml")
+    for window in ("market", "shop_buy", "shop_sell"):
+        model = load_model(UI_MODEL / f"{window}.yaml", common)
+        assert model.table_geometry is None
+
+
 def test_load_model_with_default_common():
     """common не передан — встроенный словарь (совпадает с поставляемым)."""
-    default_model = load_model(UI_MODEL / "market.yaml")
+    default_model = load_model(SAMPLE_MODEL)
     common = load_common(UI_MODEL / "common.yaml")
-    explicit_model = load_model(UI_MODEL / "market.yaml", common)
+    explicit_model = load_model(SAMPLE_MODEL, common)
 
     assert default_model.ocr_regions["price_cell"].grammar == (
         explicit_model.ocr_regions["price_cell"].grammar
@@ -151,7 +225,7 @@ def test_unknown_top_level_section_rejected(tmp_path):
 def test_missing_required_section_diagnosed(tmp_path, section):
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         drop_section=section,
     )
     with pytest.raises(ModelFormatError) as excinfo:
@@ -177,7 +251,7 @@ def test_missing_required_section_diagnosed(tmp_path, section):
 def test_invalid_rect_diagnosed(tmp_path, rect_yaml):
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         replace="rect: [10, 40, 142, 42]",
         with_text=f"rect: {rect_yaml}",
     )
@@ -190,7 +264,7 @@ def test_invalid_rect_diagnosed(tmp_path, rect_yaml):
 def test_unknown_role_diagnosed(tmp_path):
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         replace="role: click_target",
         with_text="role: blinking_thing",
     )
@@ -202,7 +276,7 @@ def test_unknown_role_diagnosed(tmp_path):
 def test_unknown_variant_diagnosed(tmp_path):
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         replace="normal: {template: market/tab_home_normal.png}",
         with_text="nomral: {template: market/tab_home_normal.png}",
     )
@@ -214,7 +288,7 @@ def test_unknown_variant_diagnosed(tmp_path):
 def test_unknown_grammar_reference_diagnosed(tmp_path):
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         replace="grammar: price",
         with_text="grammar: hex_number",
     )
@@ -226,7 +300,7 @@ def test_unknown_grammar_reference_diagnosed(tmp_path):
 def test_unknown_check_kind_diagnosed(tmp_path):
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         replace="{kind: template, element: tab_home, variant: active}",
         with_text="{kind: magic, element: tab_home}",
     )
@@ -239,7 +313,7 @@ def test_check_missing_required_field_diagnosed(tmp_path):
     """template-проверка без variant — поле обязательно для вида."""
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         replace="{kind: template, element: tab_home, variant: active}",
         with_text="{kind: template, element: tab_home}",
     )
@@ -251,7 +325,7 @@ def test_check_missing_required_field_diagnosed(tmp_path):
 def test_hud_element_requires_search_area(tmp_path):
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         replace="search_area: [1000, 420, 200, 160]",
         with_text="rect: [1000, 420, 200, 160]",
     )
@@ -264,7 +338,7 @@ def test_hud_element_requires_search_area(tmp_path):
 def test_plain_element_rejects_search_area(tmp_path):
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         replace="rect: [10, 40, 142, 42]",
         with_text="search_area: [10, 40, 142, 42]",
     )
@@ -296,7 +370,7 @@ def test_missing_file_raises(tmp_path):
 def test_unknown_key_inside_element_diagnosed(tmp_path):
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         replace="role: click_target",
         with_text="role: click_target\n    color: red",
     )
@@ -323,7 +397,7 @@ def test_bad_price_suffix_diagnosed(tmp_path):
 def test_error_message_contains_file_and_section(tmp_path):
     path = _write_model(
         tmp_path,
-        base=UI_MODEL / "market.yaml",
+        base=SAMPLE_MODEL,
         replace="role: click_target",
         with_text="role: blinking_thing",
     )
@@ -346,7 +420,7 @@ def _write_model(tmp_path, *, base=None, replace=None, with_text=None,
     диагностики. base по умолчанию — поставляемый пример.
     """
     if base is None:
-        base = UI_MODEL / "market.yaml"
+        base = SAMPLE_MODEL
     text = base.read_text(encoding="utf-8")
 
     if drop_section is not None:

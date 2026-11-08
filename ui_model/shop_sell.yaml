@@ -1,0 +1,257 @@
+# UI-модель окна shop_sell. Импорт конвертером (l2core.model.converter) из base_screenshot/scr/meta.json.
+# Политика слияния: ручные правки побеждают, машинное дополняет; diff-отчёт — `python -m l2core.model.converter`.
+# Сигнатуры состояний, verify/on_fail, OCR-регионы и table_geometry доразмечаются вручную (задачи 2.3-2.5).
+window:
+  id: shop_sell
+  title: Торговая лавка (Продажа)
+  size: [520, 421]
+elements:
+  acc:
+    rect: [66, 249, 108, 30]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_acc.png}
+  all:
+    rect: [409, 249, 66, 30]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_all.png}
+  bc:
+    rect: [477, 147, 31, 64]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_bc.png}
+  c:
+    rect: [478, 214, 30, 66]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_c.png}
+  cansel_sell_button:
+    rect: [158, 383, 99, 26]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_cansel_sell_button.png}
+  clear:
+    rect: [249, 207, 26, 24]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_clear.png}
+  close_sell_button:
+    rect: [488, 9, 26, 25]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_close_sell_button.png}
+  decl:
+    rect: [185, 250, 109, 28]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_decl.png}
+  el_0:
+    rect: [375, 248, 31, 32]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_0.png}
+  el_1:
+    rect: [376, 147, 31, 31]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_1.png}
+  el_2:
+    rect: [409, 146, 32, 31]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_2.png}
+  el_3:
+    rect: [444, 148, 31, 30]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_3.png}
+  el_364_418_137_19:
+    rect: [210, 195, 137, 19]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154318_364_418_137_19.png}
+  el_3end:
+    role: click_target
+    hud: true
+    search_area: [348, 690, 101, 22]
+    variants:
+      normal: {template: shop_sell/scr_154318_3end.png}
+  el_4:
+    rect: [376, 180, 31, 31]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_4.png}
+  el_5:
+    rect: [410, 181, 30, 31]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_5.png}
+  el_6:
+    rect: [443, 181, 32, 31]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_6.png}
+  el_7:
+    rect: [376, 216, 31, 30]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_7.png}
+  el_8:
+    rect: [410, 214, 30, 32]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_8.png}
+  el_9:
+    rect: [444, 214, 31, 31]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_9.png}
+  history:
+    role: click_target
+    hud: true
+    search_area: [515, 689, 97, 25]
+    variants:
+      normal: {template: shop_sell/scr_154318_history.png}
+  history_button:
+    rect: [398, 384, 100, 23]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_history_button.png}
+  jak1:
+    rect: [81, 204, 14, 31]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154244_jak1.png}
+  jak_start:
+    rect: [152, 133, 76, 24]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154318_jak_start.png}
+  jakor_sell:
+    rect: [156, 9, 208, 26]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_jakor_sell.png}
+  jakor_strelka_sell:
+    rect: [246, 174, 23, 40]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_jakor_strelka_sell.png}
+  kol-vo:
+    rect: [478, 43, 32, 21]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_kol-vo.png}
+  obshaya_pribil:
+    role: click_target
+    hud: true
+    search_area: [72, 657, 92, 20]
+    variants:
+      normal: {template: shop_sell/scr_154318_obshaya_pribil.png}
+  ostalos:
+    rect: [126, 194, 81, 21]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154318_ostalos.png}
+  ozhidaemaya_pribil:
+    role: click_target
+    hud: true
+    search_area: [350, 657, 111, 21]
+    variants:
+      normal: {template: shop_sell/scr_154318_ozhidaemaya_pribil.png}
+  predm:
+    role: click_target
+    hud: true
+    search_area: [71, 416, 208, 23]
+    variants:
+      normal: {template: shop_sell/scr_154318_predm.png}
+  pribil:
+    rect: [353, 194, 106, 21]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154318_pribil.png}
+  price_sell_button:
+    rect: [271, 332, 99, 29]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_price_sell_button.png}
+  prodazha_window:
+    role: click_target
+    hud: true
+    search_area: [152, 357, 523, 158]
+    variants:
+      normal: {template: shop_sell/scr_154244_prodazha_window.png}
+  razdelitel:
+    rect: [343, 192, 15, 23]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154318_razdelitel.png}
+  redakt:
+    role: click_target
+    hud: true
+    search_area: [236, 688, 103, 25]
+    variants:
+      normal: {template: shop_sell/scr_154318_redakt.png}
+  sell_start_button:
+    rect: [261, 382, 101, 27]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_sell_start_button.png}
+  tcena_jakor:
+    rect: [368, 334, 11, 27]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_tcena_jakor.png}
+  trade_window_sell_all:
+    rect: [0, 0, 520, 421]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_trade_window_sell_all.png}
+  viveska2:
+    rect: [439, 166, 17, 16]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154318_viveska2.png}
+  viveska_active_sell:
+    rect: [13, 384, 80, 23]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154222_viveska_active_sell.png}
+  viveska_button:
+    rect: [14, 384, 79, 24]
+    role: click_target
+    variants:
+      normal: {template: shop_sell/scr_154213_viveska_button.png}
+states:
+  open:
+    params: {}
+    signatures:
+    - {kind: template, element: el_364_418_137_19, variant: normal}
+    - {kind: template, element: el_3end, variant: normal}
+    - {kind: template, element: history, variant: normal}
+    - {kind: template, element: jak_start, variant: normal}
+    - {kind: template, element: obshaya_pribil, variant: normal}
+    - {kind: template, element: ostalos, variant: normal}
+    - {kind: template, element: ozhidaemaya_pribil, variant: normal}
+    - {kind: template, element: predm, variant: normal}
+    - {kind: template, element: pribil, variant: normal}
+    - {kind: template, element: razdelitel, variant: normal}
+    - {kind: template, element: redakt, variant: normal}
+    - {kind: template, element: viveska2, variant: normal}
+  opening:
+    params: {}
+    signatures:
+    - {kind: template, element: cansel_sell_button, variant: normal}
+    - {kind: template, element: close_sell_button, variant: normal}
+    - {kind: template, element: history_button, variant: normal}
+    - {kind: template, element: jakor_sell, variant: normal}
+    - {kind: template, element: jakor_strelka_sell, variant: normal}
+    - {kind: template, element: kol-vo, variant: normal}
+    - {kind: template, element: price_sell_button, variant: normal}
+    - {kind: template, element: sell_start_button, variant: normal}
+    - {kind: template, element: tcena_jakor, variant: normal}
+    - {kind: template, element: trade_window_sell_all, variant: normal}
+    - {kind: template, element: viveska_button, variant: normal}
+transitions: []
+ocr_regions: {}

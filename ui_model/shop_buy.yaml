@@ -1,0 +1,229 @@
+# UI-модель окна shop_buy. Импорт конвертером (l2core.model.converter) из base_screenshot/scr/meta.json.
+# Политика слияния: ручные правки побеждают, машинное дополняет; diff-отчёт — `python -m l2core.model.converter`.
+# Сигнатуры состояний, verify/on_fail, OCR-регионы и table_geometry доразмечаются вручную (задачи 2.3-2.5).
+window:
+  id: shop_buy
+  title: Торговая лавка (Купить)
+  size: [519, 421]
+elements:
+  bye_all_window:
+    rect: [0, 0, 519, 421]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154330_bye_all_window.png}
+  cansel:
+    rect: [157, 383, 98, 23]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154330_cansel.png}
+  el_153_358_520_157:
+    role: click_target
+    hud: true
+    search_area: [153, 358, 520, 157]
+    variants:
+      normal: {template: shop_buy/scr_154355_153_358_520_157.png}
+  el_187_654_10_25:
+    role: click_target
+    hud: true
+    search_area: [187, 654, 10, 25]
+    variants:
+      normal: {template: shop_buy/scr_154424_187_654_10_25.png}
+  el_218_471_109_27:
+    rect: [63, 247, 109, 27]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_218_471_109_27.png}
+  el_236_426_12_30:
+    rect: [81, 202, 12, 30]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_236_426_12_30.png}
+  el_237_690_102_23:
+    role: click_target
+    hud: true
+    search_area: [237, 690, 102, 23]
+    variants:
+      normal: {template: shop_buy/scr_154424_237_690_102_23.png}
+  el_308_358_71_21:
+    rect: [153, 134, 71, 21]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154424_308_358_71_21.png}
+  el_339_473_110_28:
+    rect: [184, 249, 110, 28]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_339_473_110_28.png}
+  el_345_689_105_24:
+    role: click_target
+    hud: true
+    search_area: [345, 689, 105, 24]
+    variants:
+      normal: {template: shop_buy/scr_154424_345_689_105_24.png}
+  el_351_656_109_22:
+    role: click_target
+    hud: true
+    search_area: [351, 656, 109, 22]
+    variants:
+      normal: {template: shop_buy/scr_154424_351_656_109_22.png}
+  el_404_431_24_22:
+    rect: [249, 207, 24, 22]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_404_431_24_22.png}
+  el_431_560_91_20:
+    rect: [276, 336, 91, 20]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154330_431_560_91_20.png}
+  el_462_654_15_26:
+    role: click_target
+    hud: true
+    search_area: [462, 654, 15, 26]
+    variants:
+      normal: {template: shop_buy/scr_154424_462_654_15_26.png}
+  el_514_689_98_24:
+    role: click_target
+    hud: true
+    search_area: [514, 689, 98, 24]
+    variants:
+      normal: {template: shop_buy/scr_154424_514_689_98_24.png}
+  el_523_557_8_27:
+    rect: [368, 333, 8, 27]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154330_523_557_8_27.png}
+  el_529_404_32_31:
+    rect: [374, 180, 32, 31]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_529_404_32_31.png}
+  el_529_471_33_32:
+    rect: [374, 247, 33, 32]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_529_471_33_32.png}
+  el_530_369_31_31:
+    rect: [375, 145, 31, 31]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_530_369_31_31.png}
+  el_530_439_32_30:
+    rect: [375, 215, 32, 30]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_530_439_32_30.png}
+  el_563_368_33_32:
+    rect: [408, 144, 33, 32]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_563_368_33_32.png}
+  el_564_404_31_30:
+    rect: [409, 180, 31, 30]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_564_404_31_30.png}
+  el_564_471_66_33:
+    rect: [409, 247, 66, 33]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_564_471_66_33.png}
+  el_565_439_30_30:
+    rect: [410, 215, 30, 30]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_565_439_30_30.png}
+  el_594_388_17_18:
+    rect: [439, 164, 17, 18]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154424_594_388_17_18.png}
+  el_597_368_33_32:
+    rect: [442, 144, 33, 32]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_597_368_33_32.png}
+  el_597_437_33_32:
+    rect: [442, 213, 33, 32]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_597_437_33_32.png}
+  el_598_404_31_30:
+    rect: [443, 180, 31, 30]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_598_404_31_30.png}
+  el_630_438_34_65:
+    rect: [475, 214, 34, 65]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_630_438_34_65.png}
+  el_633_369_32_65:
+    rect: [478, 145, 32, 65]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154355_633_369_32_65.png}
+  el_73_657_79_19:
+    role: click_target
+    hud: true
+    search_area: [73, 657, 79, 19]
+    variants:
+      normal: {template: shop_buy/scr_154424_73_657_79_19.png}
+  history:
+    rect: [397, 383, 100, 23]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154330_history.png}
+  jak:
+    rect: [160, 8, 198, 29]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154330_jak.png}
+  kol-vo:
+    rect: [476, 40, 32, 24]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154330_kol-vo.png}
+  start:
+    rect: [261, 383, 100, 23]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154330_start.png}
+  strelka:
+    rect: [240, 173, 28, 38]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154330_strelka.png}
+  viveska:
+    rect: [13, 381, 78, 27]
+    role: click_target
+    variants:
+      normal: {template: shop_buy/scr_154330_viveska.png}
+states:
+  open:
+    params: {}
+    signatures:
+    - {kind: template, element: el_187_654_10_25, variant: normal}
+    - {kind: template, element: el_237_690_102_23, variant: normal}
+    - {kind: template, element: el_308_358_71_21, variant: normal}
+    - {kind: template, element: el_345_689_105_24, variant: normal}
+    - {kind: template, element: el_351_656_109_22, variant: normal}
+    - {kind: template, element: el_462_654_15_26, variant: normal}
+    - {kind: template, element: el_514_689_98_24, variant: normal}
+    - {kind: template, element: el_594_388_17_18, variant: normal}
+    - {kind: template, element: el_73_657_79_19, variant: normal}
+  opening:
+    params: {}
+    signatures:
+    - {kind: template, element: el_431_560_91_20, variant: normal}
+    - {kind: template, element: el_523_557_8_27, variant: normal}
+    - {kind: template, element: bye_all_window, variant: normal}
+    - {kind: template, element: cansel, variant: normal}
+    - {kind: template, element: history, variant: normal}
+    - {kind: template, element: jak, variant: normal}
+    - {kind: template, element: kol-vo, variant: normal}
+    - {kind: template, element: start, variant: normal}
+    - {kind: template, element: strelka, variant: normal}
+    - {kind: template, element: viveska, variant: normal}
+transitions: []
+ocr_regions: {}
