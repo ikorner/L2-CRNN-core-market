@@ -326,6 +326,44 @@ recover.
 - Джиттер/hold_ms из behavior-профиля через инъецируемый rng (детерминизм
   с seed, инвариант 7) — вендорный random HidDevice.click не используется.
 
+### enter_text / enter_price (задача 5.4, spec action-primitives)
+
+`l2core/primitives/enter.py` — ввод текста/цены: пролог (как в 5.3:
+activate OK + статус found, иначе EnterPreconditionError/ActivateGameError,
+HID не трогается) → выбор способа ввода по профилю → фокус → набор →
+OCR verify → восстановление раскладки → submit → retry (1 +
+timing.click_retry_count) → on_fail[] → сигнал recover (EnterResult,
+без трёхзначной обёртки — 5.7, YAGNI).
+
+- Способ ввода (клавиатура/экранный нумпад) — по behavior.numpad_fraction
+  через rng (детерминизм с seed). Клавиатура: символ → HID keycode (usage
+  table: цифры 0x1E..0x27, a-z → 0x04.., пробел 0x2C; константа LEFT_CTRL
+  0xE0 задана локально — в вендорном hid.py её нет) через key_press с паузой
+  key_delay_min/max_ms (wait_until по инъецированным часам — инвариант 1).
+  Нумпад: клики по элементам модели через click_element (маппинг символов —
+  параметр numpad_map; семантика экранной клавиатуры сырьём не подтверждена
+  — KNOWN_GAPS, Q25). Не-ASCII (кириллица) вне 1-байтного протокола вендора
+  — fail fast (инъекция key_tap для расширения).
+- Фокус поля — клик по элементу модели (field_element_id) через
+  click_element с присутствие-верификацией; без него фокус-клика нет (поле
+  сфокусировано вызывающим слоем).
+- Verify содержимого: read_stable (4.5) по OCR-региону поля (rect от якоря
+  на свежем кадре) до submit; enter_price сравнивает значение, разобранное
+  грамматикой price, с ожидаемой ценой (OCR «1,500,000» == введённые
+  «1500000»).
+- Восстановление раскладки (spec): несовпадение OCR → backspace ×len(text)
+  + switch_layout + повтор ввода + повторная OCR-проверка (раз на попытку).
+  switch_layout — инъекция, дефолт Ctrl+Shift (key_down/press/up), сочетание
+  подтверждается у владельца (Q25).
+- Submit: Enter (KEY_ENTER) или кнопка «Поиск» (элемент модели, клик через
+  click_element) — выбор по behavior.enter_fraction через rng; submit=False
+  — ввод без отправки. Verify submit: присутствие кнопки после клика; у
+  Enter наблюдаемого признака в модели нет (список обновился — Q25, задача
+  модели/стратегии). OCR verify идёт до submit (после Enter поле может
+  очиститься).
+- Ограничения (R4, честно паркуется — Q25): семантика нумпада, сочетание
+  раскладки, признак результата поиска, кириллица.
+
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
 `l2core/primitives/wait.py` — единственная sanctioned-точка блокирующего
