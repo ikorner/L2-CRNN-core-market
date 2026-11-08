@@ -128,7 +128,9 @@ def load_common(path: Union[str, Path]) -> CommonDicts:
 def _parse_grammar(file: Path, section: str, name: str, raw: Any) -> GrammarSpec:
     if not isinstance(raw, dict):
         raise ModelFormatError(file, section, "ожидается mapping ключ: значение")
-    _reject_unknown(file, section, raw, {"kind", "separators", "suffixes"})
+    _reject_unknown(
+        file, section, raw, {"kind", "separators", "suffixes", "min", "max", "units"}
+    )
 
     kind = raw.get("kind")
     if kind not in GRAMMAR_KINDS:
@@ -138,6 +140,9 @@ def _parse_grammar(file: Path, section: str, name: str, raw: Any) -> GrammarSpec
 
     separators = frozenset()
     suffixes: tuple = ()
+    min_value = None
+    max_value = None
+    units: tuple = ()
     if kind == "price":
         if "separators" in raw:
             separators = frozenset(
@@ -167,7 +172,49 @@ def _parse_grammar(file: Path, section: str, name: str, raw: Any) -> GrammarSpec
                 pairs.append((suffix, multiplier))
             suffixes = tuple(pairs)
 
-    return GrammarSpec(name=name, kind=kind, separators=separators, suffixes=suffixes)
+    if kind in ("price", "digits"):
+        min_value = _parse_range_bound(file, f"{section}.min", raw.get("min"), "min")
+        max_value = _parse_range_bound(file, f"{section}.max", raw.get("max"), "max")
+        if min_value is not None and max_value is not None and min_value > max_value:
+            raise ModelFormatError(
+                file,
+                section,
+                f"min ({min_value}) больше max ({max_value})",
+            )
+    elif "min" in raw or "max" in raw:
+        raise ModelFormatError(
+            file, section, f"диапазон min/max неприменим к грамматике вида {kind!r}"
+        )
+
+    if kind == "price" and "units" in raw:
+        units = tuple(
+            _string_list(file, f"{section}.units", raw["units"])
+        )
+    elif "units" in raw:
+        raise ModelFormatError(
+            file, section, f"units неприменимы к грамматике вида {kind!r}"
+        )
+
+    return GrammarSpec(
+        name=name,
+        kind=kind,
+        separators=separators,
+        suffixes=suffixes,
+        min_value=min_value,
+        max_value=max_value,
+        units=units,
+    )
+
+
+def _parse_range_bound(file: Path, section: str, raw: Any, bound: str) -> Optional[int]:
+    """Целое неотрицательное значение границы диапазона или None (не задано)."""
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        raise ModelFormatError(
+            file, section, f"{bound}: ожидается целое неотрицательное (получено {raw!r})"
+        )
+    return raw
 
 
 # --- Модель окна ---

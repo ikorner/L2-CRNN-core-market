@@ -102,7 +102,15 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
 (MssScreen/ReplayScreen, TemplateMatcher, TorchOcr, HidArduino).
 
 - `l2core/model/` — интерпретатор UI-модели (YAML: окна, элементы, состояния,
-  переходы, OCR-регионы, table_geometry).
+  переходы, OCR-регионы, table_geometry). Грамматики OCR-регионов (4.4,
+  grammars.py): чистые функции разбора значений по грамматике (`digits`,
+  `price` с разделителями `,`/`.` и суффиксами `к`/`кк`, `text`), валидация
+  по диапазону (дефолт price 1..2^63-1, digits 0..2^63-1; опциональные
+  `min`/`max`/`units` в грамматике — FORMAT.md) и механизм перечитывания
+  при несовпадении: `read_region(ocr, frame, rect, grammar)` через контракт
+  OcrClient — одно перечитывание с увеличением региона, при повторе —
+  статус `invalid`, `confidence=0.0` (сигнал «не сошлось»). Цикл из N
+  перечитываний и порог confidence — 4.5, не здесь.
 - `l2core/detector/` — детекция окна и состояний, статусы окна
   (`not_found / occluded_or_unstable / found`), перехватчик модалок.
   Детектор якоря (3.3, anchor.py): numpy-only `detect_window()` (яркие

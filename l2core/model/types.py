@@ -28,12 +28,21 @@ class ProbePoint(NamedTuple):
 
 @dataclass(frozen=True)
 class GrammarSpec:
-    """Грамматика OCR-региона: вид и правила разбора."""
+    """Грамматика OCR-региона: вид и правила разбора.
+
+    min_value/max_value — опциональный диапазон допустимых значений
+    (видов digits и price; None — дефолт диапазона вида, применяется
+    при разборе, задача 4.4). units — опциональные суффиксы-единицы
+    измерения, отсекаемые перед разбором (только price).
+    """
 
     name: str
     kind: str  # digits | price | text
     separators: frozenset = frozenset()  # разделители разрядов (price)
     suffixes: Tuple[Tuple[str, int], ...] = ()  # суффикс -> множитель (price)
+    min_value: Optional[int] = None  # None — дефолт диапазона вида
+    max_value: Optional[int] = None  # None — дефолт диапазона вида
+    units: Tuple[str, ...] = ()  # единицы измерения, отсекаются (price)
 
 
 @dataclass(frozen=True)
