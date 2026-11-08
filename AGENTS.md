@@ -552,6 +552,52 @@ needs_recover примитивов 5.1–5.6 поверх существующи
   Исполнение сценариями — 6.4; YAGNI: никакого event dispatcher/API/
   kill switch.
 
+### scan_market и чтение строк таблицы (задача 6.1, spec market-scenarios,
+spec ocr-reading «Чтение строк таблицы с Row и дедупликацией»)
+
+`l2core/model/rows.py` — чтение строк списка (слой модели, как reading.py):
+`Row` (frozen: cells по именам колонок модели [CellValue: text +
+разобранное value по грамматике колонки], screen_y — y кромки строки в
+КООРДИНАТАХ ОКНА от якоря [дедуп между кадрами в координатах окна: окно
+может сдвинуться, слот — нет; абсолютный y = anchor.y + screen_y],
+icon_hash — pHash иконки предмета, partial — краевые слоты вьюпорта [0 и
+max_rows−1] потенциально обрезаны: без позиции скролла консервативно);
+`read_rows(frame, ...)` → `RowsResult(rows, snapshot_id)`: нарезка
+TableSegmentation (4.3), непустые ячейки — read_confident (4.5) с
+грамматикой колонки, пустая ячейка — честный CellValue("", None) без OCR,
+иконка — pHash левой части ячейки item до зоны текста; snapshot_id —
+детерминированный id кадра (sha1 по байтам, идентичные кадры → тот же
+id; рынок меняется — стратегия сверяет). pHash — numpy-only DCT (схема
+imagehash.phash: серый BT.601 -> 32x32 ближайший сосед -> DCT-II -> низкие
+8x8 -> биты >= медианы -> int64), сравнение — Хэмминг, дефолтный порог
+DEFAULT_HAMMING_THRESHOLD=6/64 (допуск к мелким пережаткам отрисовки,
+пины tests/test_rows.py; threshold=0 — строгое равенство). Дедуп между
+кадрами скролла — `dedup_rows(rows, price_column="price",
+hamming_threshold=...)`: ключ icon_hash (по Хэммингу) + цена + y, порядок
+первого появления; колонки цены нет — ключом служат тексты всех ячеек.
+read_rows ТОЛЬКО читает кадр: ни HID, ни скролла (обзор — разведка цен).
+
+`l2core/scenarios/scan.py` — `scan_market(points, ...)`: КОМПОЗИЦИЯ
+примитивов 5.x без внутреннего состояния (spec: состояние — у детектора
+через инъекции, не в «голове» сценария). Обход параметризуется списком
+точек `ScanPoint(verify, tab=None, filters=(), search=None)` извне (params
+табов/фильтров частично не размечены — KNOWN_GAPS): открытие обзора
+(клик по market_pic, verify из перехода модели recover_closed ->
+list__tab_home; перехода нет — ScanError, открытие вслепую запрещено) ->
+для каждой точки: таб -> фильтры (click_element, verify точки) -> поиск
+(enter_text; OCR-регион поля в market.yaml не размечен — search_region/
+search_field_element/search_button_element передаются снаружи, подшиваются
+в копию модели; точка с search без search_region — ScanError) -> цикл
+чтения: read_rows -> дедуп -> scroll_position (5.5) -> scroll_list вниз
+до признака конца из модели (disabled-стрелка «вниз»), предохранитель
+max_scrolls. Результат: ScanResult(points: PointScan[агрегат строк +
+снимки RowsResult], cancelled, failures): needs_recover примитива фиксирует
+отказ обхода (исполнение recover — 6.4, вызывающий слой), отмена — флаг.
+ОТКРЫТИЕ ЧУЖИХ ЛАВОК ОТСУТСТВУЕТ (non-goal): guard-тесты
+tests/test_scan_market.py::TestNoLavkaOpeningGuard следят, что код
+сценария не содержит иконок открытия лавок и прямых hid.click; клики
+только по element id точек обхода (табы/фильтры/поиск/HUD-открытие).
+
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
 `l2core/primitives/wait.py` — единственная sanctioned-точка блокирующего

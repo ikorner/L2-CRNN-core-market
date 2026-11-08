@@ -38,6 +38,10 @@ ALLOWLIST = frozenset(
         (REPO_ROOT / "tests" / "test_table_segmentation.py").resolve(),
         (REPO_ROOT / "tests" / "test_scroll.py").resolve(),
         (REPO_ROOT / "tests" / "test_outcome.py").resolve(),
+        # Снапшот/восстановление module-level констант вендора (autouse
+        # fixture vendor_state — та же механика, что в test_scroll.py):
+        (REPO_ROOT / "tests" / "test_rows.py").resolve(),
+        (REPO_ROOT / "tests" / "test_scan_market.py").resolve(),
     }
 )
 
