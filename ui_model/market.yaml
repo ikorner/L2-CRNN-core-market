@@ -465,7 +465,7 @@ table_geometry:
   row_pitch: 56
   max_rows: 8
   columns:
-    item: {zone: [195, 10, 222, 38], grammar: text}
-    price: {zone: [437, 10, 170, 38], grammar: price}
+    item: {zone: [161, 10, 256, 38], grammar: text}
+    price: {zone: [437, 10, 181, 38], grammar: price}
     seller: {zone: [655, 10, 118, 38], grammar: text}
     deal: {zone: [790, 10, 140, 38], grammar: text}
