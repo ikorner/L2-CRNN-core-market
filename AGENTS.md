@@ -152,8 +152,28 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
 - `l2core/scenarios/` — сценарии (scan_market, setup_sell, monitor_shop).
 - `l2core/adapters/` — MssScreen/ReplayScreen/RecordingScreen (screen.py,
   формат сессии — session.py), win32-шлюз и находилка окна игры (win32.py,
-  DPI-aware объявление процесса), TemplateMatcher (template.py), TorchOcr/RemoteOcr(позже),
+  DPI-aware объявление процесса), TemplateMatcher (template.py),
+  вендоренная копия OCR-кода (ocr_vendor/, задача 4.1), TorchOcr/RemoteOcr(позже),
   HidArduino.
+
+### Вендоринг OCR-кода (задача 4.1, инвариант 5)
+
+Байт-идентичная копия обучающего кода CRNN-OCR — `l2core/adapters/ocr_vendor/`
+(`crnn_train.py`: константы 32×320/BLANK, `preprocess` с хелперами, `CRNN`,
+`ctc_greedy_decode` из L2-CRNN-MODEL-TRAIN/train.py; `model_io.py`:
+`load_model` — загрузчик чекпоинта/алфавита из autolabel.py). Источник —
+коммит e720a8df8078337740df5c3ad8dc2b1eb4387529, зафиксирован в шапках
+файлов. Единственная адаптация тел — квалификация `train.CRNN` → `CRNN`
+в `load_model`; всё остальное — импортный уровень (см. шапки). Правки
+вендоренного кода запрещены: менять в источнике, затем перевендоривать.
+
+Guard-тесты `tests/test_ocr_vendor.py` сравнивают вендор с эталонными
+векторами `tests/fixtures/ocr_vendor/` (exact-сравнение: эталоны
+сгенерированы тем же окружением, операции детерминированы). Эталоны
+генерирует оригинальным кодом `tools/gen_ocr_vendor_fixtures.py` (вручную,
+вне CI; проверяет коммит-источник). Для запуска guard-тестов исходный
+репозиторий не нужен. Обёртка инференса (TorchOcr/OcrClient) — задача 4.2,
+сюда не входит.
 
 ### Template matching (задача 3.3, решение 13)
 
