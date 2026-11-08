@@ -370,6 +370,37 @@ timing.click_retry_count) → on_fail[] → сигнал recover (EnterResult,
 - Ограничения (R4, честно паркуется — Q25): семантика нумпада, сочетание
   раскладки, признак результата поиска, кириллица.
 
+### scroll_list / scroll_position (задача 5.5, spec market-scenarios)
+
+`l2core/primitives/scroll.py` — скролл списка и чтение позиции скролла.
+
+- **Механика**: wheel есть в протоколе вендора (`HidDevice.scroll`,
+  CMD_SCROLL) — fallback на клики по стрелкам не нужен; единица n = один
+  щелчок колеса = HID-команда `scroll(1, ±1, delay)` (вниз +1, вверх −1).
+- **Пролог** — как в 5.3/5.4: activate OK + статус found, иначе
+  ScrollPreconditionError/ActivateGameError, HID не трогается (инвариант 9).
+- **Область списка**: элемент-область в модели отсутствует (KNOWN_GAPS) —
+  курсор наводится на центр таблицы по table_geometry (середина
+  col_seps[0]..[-1] × row_y0..row_y0+max_rows·pitch от якоря).
+- **Verify каждой итерации** (инвариант 2): wait_until по свежим кадрам
+  (refresh транзакции 3.6) до смены хэша нижней видимой строки ИЛИ признака
+  края по направлению; таймаут/интервал — timing.wait_default_timeout /
+  verify_interval; sleep нет (инвариант 1). retry = 1 + click_retry_count,
+  затем повторный пролог → on_fail[] (те же шаги, что в 5.3) → needs_recover.
+- **Признак конца из модели** (предпочтителен по спеке): disabled-стрелки
+  `prokrutka_vverh_not_active` / `prokrutka_vniz_not_active` (кропы
+  scr_153722_*_not_active, вариант записи «active»), оценка template-проверок
+  через инъекцию run_checks (matcher/assets — слой детекции). Элементов нет —
+  at_start/at_end = None, честный fallback на сравнение строк (зафиксировано
+  в KNOWN_GAPS): замкнутый список всё равно закрыт стрелкой.
+- **Позиция**: `scroll_position(frame, ...)` → ScrollPosition{at_start,
+  at_end, bottom_row_hash}; хэш — sha1 по обрезанным ячейкам последней
+  непустой строки нарезки TableSegmentation (4.3) на константах модели,
+  байтовое сравнение между кадрами, не OCR; None — строк нет/окно вне кадра.
+- **Результат**: ScrollResult(requested/scrolled/reached_end/position/
+  wheels/cancelled/on_fail_executed/failures), success = всё n проскроллено
+  ИЛИ край достигнут; трёхзначная обёртка — 5.7 (YAGNI).
+
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
 `l2core/primitives/wait.py` — единственная sanctioned-точка блокирующего

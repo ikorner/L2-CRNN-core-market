@@ -12,7 +12,9 @@ wrapper (TableSegmentation из l2core.adapters.table_segmentation). Прямо�
 (ALLOWLIST): tests/test_table_segmentation_vendor.py — guard самого вендора;
 tests/test_table_segmentation.py — тест wrapper'а, проверяющий подмену
 module-level констант вендора (снапшот/возврат дефолтов) — без прямого
-доступа к модулю не пишется.
+доступа к модулю не пишется; tests/test_scroll.py — тесты примитива 5.5:
+синтетическая table_geometry теста мутирует те же глобалы процесс-wide,
+фикстура делает снапшот/возврат (та же механика, что у теста wrapper'а).
 """
 from pathlib import Path
 
@@ -31,6 +33,7 @@ ALLOWLIST = frozenset(
     {
         (REPO_ROOT / "tests" / "test_table_segmentation_vendor.py").resolve(),
         (REPO_ROOT / "tests" / "test_table_segmentation.py").resolve(),
+        (REPO_ROOT / "tests" / "test_scroll.py").resolve(),
     }
 )
 
