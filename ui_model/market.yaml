@@ -107,13 +107,13 @@ elements:
     variants:
       normal: {template: market/scr_153600_filter_button_sell_passive.png}
   game_window_active:
-    role: click_target
+    role: icon_sample
     hud: true
     search_area: [9, 7, 89, 22]
     variants:
       active: {template: market/scr_153527_game_window_active.png}
   game_window_not_active:
-    role: click_target
+    role: icon_sample
     hud: true
     search_area: [10, 6, 83, 25]
     variants:
@@ -179,13 +179,13 @@ elements:
     variants:
       normal: {template: market/scr_153600_market_update_button.png}
   open_buy_trade:
-    role: click_target
+    role: icon_sample
     hud: true
     search_area: [751, 920, 34, 24]
     variants:
       normal: {template: market/scr_153511_open_buy_trade.png}
   open_sale_trade:
-    role: click_target
+    role: icon_sample
     hud: true
     search_area: [751, 871, 34, 24]
     variants:

@@ -275,6 +275,103 @@ def test_raw_meta_roles_are_not_imported(workspace):
     assert any("decor_line" in issue for issue in report.issues)
 
 
+def test_hud_element_keeps_own_role():
+    """HUD-классификация не должна затирать роль элемента ролью последнего
+    по сортировке кропа окна (латентный дефект: `role` протухал между
+    циклами)."""
+    import json
+    import tempfile
+
+    # Собираем свой workspace: кроп HUD с icon_sample идёт в сортировке
+    # раньше кропа click_target внутри окна — последний обработанный
+    # кроп окна имеет click_target.
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        scr = make_scr(root)
+        meta_path = scr / "meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["screenshots"]["s3"] = {
+            "file": "s3.png",
+            "window": "market",
+            "state": None,
+            "state_params": {},
+            "resolution": [1920, 1080],
+            "description": "",
+            "crops": ["s9_last"],
+        }
+        meta["crops"]["s9_last"] = _crop(
+            "s9_last",
+            "crops/obzor_lavok/s9_last.png",
+            "s3",
+            "obzor_lavok.last_tab",
+            [120, 200, 30, 30],  # внутри окна [100, 100, 400, 300]
+            ["click_target"],
+        )
+        (scr / "crops" / "obzor_lavok" / "s9_last.png").write_bytes(PNG_BYTES)
+        meta_path.write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        model_dir = root / "ui_model"
+        assets = root / "assets"
+        convert(meta_path, scr, model_dir, assets)
+
+        common = load_common(UI_MODEL / "common.yaml")
+        model = load_model(model_dir / "market.yaml", common)
+        # s2_pic (icon_sample) — HUD и сохраняет СВОЮ роль, а не роль
+        # последнего по сортировке кропа окна (click_target).
+        assert model.elements["pic"].hud
+        assert model.elements["pic"].role == "icon_sample"
+
+
+def test_manual_wins_reports_state_conflict(workspace):
+    """Состояние с тем же id, но расходящимся содержимым: ручное побеждает
+    и конфликт фиксируется в diff-отчёте (по аналогии с элементами)."""
+    scr, model_dir, assets = workspace
+    model_dir.mkdir()
+    manual = {
+        "window": {"id": "market", "title": "Обзор лавок", "size": [1008, 674]},
+        "elements": {
+            "tab": {"rect": [77, 77, 50, 20], "role": "click_target"},
+        },
+        "states": {
+            # То же id, что у машинного list__tab_home, но другое содержимое.
+            "list__tab_home": {
+                "params": {"tab": "home"},
+                "signatures": [
+                    {"kind": "ocr", "region": "title", "expect": "Обзор лавок"}
+                ],
+            }
+        },
+        "transitions": [],
+        "ocr_regions": {},
+    }
+    # Мета даёт окну market: заменяем rect якоря на большой, чтобы
+    # совпала window-секция и не мешал issue о расхождении window.
+    import json
+
+    meta_path = scr / "meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta["crops"]["s1_win"]["rect"] = [0, 0, 1008, 674]
+    meta_path.write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (model_dir / "market.yaml").write_text(
+        yaml.safe_dump(manual, allow_unicode=True), encoding="utf-8"
+    )
+
+    report = convert(meta_path, scr, model_dir, assets)
+
+    common = load_common(UI_MODEL / "common.yaml")
+    model = load_model(model_dir / "market.yaml", common)
+
+    # Ручное содержимое состояния на месте.
+    assert [s.kind for s in model.states["list__tab_home"].signatures] == ["ocr"]
+    # Конфликт зафиксирован — неотличимым от полного совпадения не остался.
+    assert "list__tab_home" in report.states_conflicts["market"]
+    assert "list__tab_home" not in report.states_kept.get("market", [])
+
+
 def test_shipped_models_generated_by_converter_parse():
     """Поставляемые модели (результат импорта настоящей меты) парсятся."""
     common = load_common(UI_MODEL / "common.yaml")

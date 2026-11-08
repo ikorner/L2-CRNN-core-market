@@ -107,6 +107,7 @@ class DiffReport:
     elements_conflicts: dict = field(default_factory=dict)  # window -> [id]
     states_added: dict = field(default_factory=dict)  # window -> [id]
     states_kept: dict = field(default_factory=dict)  # window -> [id]
+    states_conflicts: dict = field(default_factory=dict)  # window -> [id]
     written_models: list = field(default_factory=list)
     issues: list = field(default_factory=list)  # неоднозначности сырья
 
@@ -134,10 +135,13 @@ class DiffReport:
                 lines.append(f"  ! {element_id} (ручное побеждает)")
             states_added = self.states_added.get(window, [])
             states_kept = self.states_kept.get(window, [])
+            states_conflicts = self.states_conflicts.get(window, [])
             lines.append(
                 f"Состояния {window}: добавлено {len(states_added)}, "
-                f"уже было {len(states_kept)}"
+                f"уже было {len(states_kept)}, конфликтов {len(states_conflicts)}"
             )
+            for state_id in states_conflicts:
+                lines.append(f"  ! состояние {state_id} (ручное побеждает)")
         if self.written_models:
             lines.append("Записаны модели: " + ", ".join(self.written_models))
         if self.issues:
@@ -275,9 +279,10 @@ def build_window_model(window: str, meta: dict) -> tuple:
         if card["rect"] == window_rect and element["rect"] == [0, 0, aw, ah]:
             continue  # сам кроп-пример окна — не HUD
         if not _contains(window_rect, card["rect"]):
+            own_role = element["role"]  # роль элемента, а не последнего кропа
             variants = element["variants"]
             element.clear()
-            element["role"] = role
+            element["role"] = own_role
             element["hud"] = True
             element["search_area"] = list(card["rect"])
             element["variants"] = variants
@@ -416,10 +421,13 @@ def merge_window_model(window: str, machine: dict, existing: dict, report: DiffR
     report.elements_conflicts[window] = conflicts
 
     existing_states = existing.get("states", {})
-    added_states, kept_states = [], []
+    added_states, kept_states, conflict_states = [], [], []
     for state_id in sorted(machine["states"]):
         if state_id in existing_states:
-            kept_states.append(state_id)
+            if existing_states[state_id] == machine["states"][state_id]:
+                kept_states.append(state_id)
+            else:
+                conflict_states.append(state_id)
         else:
             added_states.append(state_id)
     merged_states = dict(existing_states)
@@ -427,6 +435,7 @@ def merge_window_model(window: str, machine: dict, existing: dict, report: DiffR
     merged["states"] = merged_states
     report.states_added[window] = added_states
     report.states_kept[window] = kept_states
+    report.states_conflicts[window] = conflict_states
     return merged
 
 
