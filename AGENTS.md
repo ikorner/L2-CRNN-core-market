@@ -105,13 +105,30 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
   переходы, OCR-регионы, table_geometry).
 - `l2core/detector/` — детекция окна и состояний, статусы окна
   (`not_found / occluded_or_unstable / found`), перехватчик модалок.
+  Детектор якоря (3.3, anchor.py): numpy-only `detect_window()` (яркие
+  линии рамки — первый дешёвый этап для «Обзора лавок», ~27 мс/кадр) +
+  подтверждение/поиск template matching'ом (заголовок лавок, целое окно
+  обзора); кэша позиции между кадрами нет — свежий поиск на каждом grab.
 - `l2core/primitives/` — примитивы действий (wait_until, activate_game,
   click_element, enter_text/enter_price, scroll_list, drag_item).
 - `l2core/scenarios/` — сценарии (scan_market, setup_sell, monitor_shop).
 - `l2core/adapters/` — MssScreen/ReplayScreen/RecordingScreen (screen.py,
   формат сессии — session.py), win32-шлюз и находилка окна игры (win32.py,
-  DPI-aware объявление процесса), TemplateMatcher, TorchOcr/RemoteOcr(позже),
+  DPI-aware объявление процесса), TemplateMatcher (template.py), TorchOcr/RemoteOcr(позже),
   HidArduino.
+
+### Template matching (задача 3.3, решение 13)
+
+Вид поиска — NCC, эквивалент OpenCV `TM_CCOEFF_NORMED`. Реализация по
+умолчанию — `OpenCvTemplateMatcher` (`default_matcher()`): замер на всех 39
+скриншотах `base_screenshot/scr/` показал полную эквивалентность решений с
+numpy-only альтернативой (0 расхождений find_anchor по 3 окнам × 39 кадров),
+но numpy-only в 2.3–4 раза медленнее на кадре 1920x1080 (jak 198x29:
+~237 мс против ~58 мс; целое окно 1008x674: ~183 мс против ~80 мс;
+полный проход детекции: 26.7 с против 9.8 с; CPU, один поток) — ощутимо
+хуже на горячем пути. `NumpyTemplateMatcher` остаётся встроенной
+альтернативой (FFT + интегральные изображения), guard-тесты следят за
+паритетом решений и score. Числа и протокол — в отчёте 3.3.
 
 ### Формат файла сессии (контракт replay, задача 9.2)
 
