@@ -92,17 +92,20 @@ def test_read_deterministic_across_calls():
         assert ocr.read(np.load(FIXTURES / "model_in.npy")) == first
 
 
-def test_model_loaded_once():
+def test_model_loaded_once(monkeypatch):
     # Модель загружается один раз при создании; повторные read не перегружают.
-    from l2core.adapters.ocr_vendor import load_model
-
+    # Считаем вызовы torch.load вендоренным загрузчиком: инъекция loader'ом
+    # потребовала бы импорта ocr_vendor в тест — guard R13 это запрещает.
+    torch = _torch()
     calls = []
+    real_load = torch.load
 
-    def counting_loader(path):
-        calls.append(path)
-        return load_model(path)
+    def counting_load(*args, **kwargs):
+        calls.append(args[0])
+        return real_load(*args, **kwargs)
 
-    ocr = TorchOcr(FAKE_CKPT, device="cpu", loader=counting_loader)
+    monkeypatch.setattr(torch, "load", counting_load)
+    ocr = TorchOcr(FAKE_CKPT, device="cpu")
     for _ in range(3):
         ocr.read(np.load(FIXTURES / "model_in.npy"))
     assert len(calls) == 1

@@ -192,6 +192,16 @@ Confidence — средняя max-softmax по таймстепам, round 4 (ф
 Грамматики (4.4), перечитывания (4.5), бенчмарк (4.6) — не здесь (YAGNI).
 Тесты: `tests/test_ocr.py` (фейковый чекпоинт fake_crnn.pt, exact-пины).
 
+Guard-тест запрета прямых импортов вендора (4.2b, ruling R13, spec
+ocr-reading требование 2): `tests/test_ocr_contract.py` — AST-проход по
+l2core/ (кроме самого ocr_vendor/), tests/ и tools/; импорт
+`l2core.adapters.ocr_vendor` разрешён только внутри `l2core/adapters/`
+(сейчас — только `ocr.py`), иначе тест падает с именем файла и строки
+(абсолютные, from-import и относительные формы; строки/комментарии
+с текстом «ocr_vendor» ложных срабатываний не дают). Единственное
+исключение — `tests/test_ocr_vendor.py` (guard самого вендора, задача 4.1),
+зафиксировано явным allowlist'ом.
+
 ### Template matching (задача 3.3, решение 13)
 
 Вид поиска — NCC, эквивалент OpenCV `TM_CCOEFF_NORMED`. Реализация по
