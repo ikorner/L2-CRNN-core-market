@@ -64,9 +64,25 @@ HID_DIGITS = {"1": 0x1E, "2": 0x1F, "3": 0x20}
 
 
 def hid_code(ch: str) -> int:
+    """Базовый HID keycode символа (для заглавных печать оборачивается в
+    SHIFT: key_down/key_press/key_up — см. expected_key_events)."""
     if ch.isdigit():
-        return 0x1E + (ord(ch) - ord("0"))
+        return 0x1E + ((ord(ch) - ord("0") - 1) % 10)
     return 0x04 + (ord(ch.lower()) - ord("a"))
+
+
+def expected_key_events(text, final=()):
+    """Эталонная последовательность клавиатурных HID-событий для текста:
+    заглавные буквы — с SHIFT-модификатором (key_down/press/up)."""
+    events = []
+    for ch in text:
+        if ch.isalpha() and ch.isupper():
+            events += [("key_down", KEY_LEFT_SHIFT),
+                       ("key_press", hid_code(ch)),
+                       ("key_up", KEY_LEFT_SHIFT)]
+        else:
+            events.append(("key_press", hid_code(ch)))
+    return events + list(final)
 
 
 class FakeClock:
@@ -282,12 +298,28 @@ class TestMethodChoice:
         assert result.layout_recovered is False
         assert result.needs_recover is False
 
-        presses = [args[0] for _, a, args in hid.log if a == "key_press"]
-        assert presses == [hid_code(c) for c in "Sword"] + [KEY_ENTER]
-        # Пауза между клавишами (key_delay из профиля) — по фейковым часам.
+        key_events = [(a, args[0]) for _, a, args in hid.log
+                      if a in ("key_press", "key_down", "key_up")]
+        # 'S' печатается с SHIFT (key_down/press/up), далее строчные;
+        # последний key_press — Enter.
+        assert key_events == expected_key_events("Sword", final=[("key_press", KEY_ENTER)])
+        # Пауза между клавишами (key_delay из профиля) — по фейковым часам:
+        # время каждой следующей клавиши не раньше key_delay после предыдущей
+        # (события SHIFT-модификатора 'S' — в один момент).
         times = [t for t, a, _ in hid.log if a == "key_press"]
         for prev, nxt in zip(times, times[1:]):
             assert nxt - prev >= 0.05 - 1e-9  # float-дрейф фейковых часов
+
+    def test_uppercase_uses_shift_modifier(self):
+        # Ревью-фикс: заглавная 'S' печатается как key_down(SHIFT) +
+        # key_press('s') + key_up(SHIFT) — иначе поле получило бы «sword»
+        # и verify гарантированно не сошёлся бы.
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        FakeCursor().track(hid)
+        run_enter(hid, clock, FakeChecker(), text="Sword")
+        mods = [(a, args[0]) for _, a, args in hid.log if a in ("key_down", "key_up")]
+        assert mods == [("key_down", KEY_LEFT_SHIFT), ("key_up", KEY_LEFT_SHIFT)]
 
     def test_numpad_input_clicks_key_elements(self):
         # Экранный нумпад: каждый символ — клик по элементу клавиши модели.
@@ -403,11 +435,12 @@ class TestLayoutRecovery:
         assert codes.count(hid_code("S")) == 2  # набор выполнен дважды
         assert codes[-1] == KEY_ENTER
         # Механика switch_layout зафиксирована в HID-логе: key_down(CTRL)
-        # -> key_press(SHIFT) -> key_up(CTRL).
+        # -> key_press(SHIFT) -> key_up(CTRL); SHIFT также держался при
+        # печати заглавной 'S' в каждом из двух наборов.
         downs = [args[0] for _, a, args in hid.log if a == "key_down"]
         ups = [args[0] for _, a, args in hid.log if a == "key_up"]
-        assert downs == [KEY_LEFT_CTRL]
-        assert ups == [KEY_LEFT_CTRL]
+        assert downs == [KEY_LEFT_SHIFT, KEY_LEFT_CTRL, KEY_LEFT_SHIFT]
+        assert ups == [KEY_LEFT_SHIFT, KEY_LEFT_CTRL, KEY_LEFT_SHIFT]
 
     def test_recovery_reverify_fails_attempt(self):
         # Повторная проверка после восстановления тоже не сошлась — попытка
@@ -426,6 +459,52 @@ class TestLayoutRecovery:
         assert result.layout_recovered is False
         assert result.on_fail_executed is True
         assert result.needs_recover is True
+
+
+class TestEraseObserved:
+    def test_recovery_erases_observed_not_typed(self):
+        # Ревью-фикс: стирание — по НАБЛЮДАЕМОМУ OCR-содержимому, а не по
+        # длине введённого текста: OCR увидел 4 символа из 5 набранных ->
+        # ровно 4 backspace перед повторным вводом.
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        FakeCursor().track(hid)
+        ocr = FakeOcr([("Ckjd", 0.9), ("Ckjd", 0.9),
+                       ("Sword", 0.9), ("Sword", 0.9)])
+        result = run_enter(hid, clock, FakeChecker(), text="Sword", ocr=ocr)
+
+        assert result.success is True
+        assert result.layout_recovered is True
+        presses = [args[0] for _, a, args in hid.log if a == "key_press"]
+        assert presses.count(KEY_BACKSPACE) == 4  # len("Ckjd"), не len(text)
+
+    def test_retry_erases_observed_content(self):
+        # Ревью-фикс: повторная попытка стирает наблюдаемое содержимое
+        # поля (попытка 1 оставила «Swor») перед повторным набором —
+        # иначе попытка 2 печатала бы поверх и verify не сошёлся бы.
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        FakeCursor().track(hid)
+        ocr = FakeOcr([("Swor", 0.9), ("Swor", 0.9),
+                       ("Sword", 0.9), ("Sword", 0.9)])
+        result = run_enter(
+            hid, clock, FakeChecker(), text="Sword", ocr=ocr,
+            recover_layout=False,
+            config=make_config(click_retry_count=1),
+        )
+
+        assert result.success is True
+        assert result.attempts == 2
+        key_events = [(a, args[0]) for _, a, args in hid.log
+                      if a in ("key_press", "key_down", "key_up")]
+        # Первый набор «Sword» (без backspace), затем блок из 4 backspace
+        # (стёрто наблюдаемое «Swor»), затем повторный набор «Sword».
+        first = expected_key_events("Sword")
+        assert key_events[:len(first)] == first
+        erase = [("key_press", KEY_BACKSPACE)] * 4
+        assert key_events[len(first):len(first) + 4] == erase
+        second = expected_key_events("Sword", final=[("key_press", KEY_ENTER)])
+        assert key_events[len(first) + 4:] == second
 
 
 class TestSubmitChoice:

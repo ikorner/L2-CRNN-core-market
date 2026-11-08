@@ -31,12 +31,18 @@ a-z -> 0x04.., пробел 0x2C) через key_press с паузой key_delay
 
 ВОССТАНОВЛЕНИЕ РАСКЛАДКИ (spec: «при транслите SHALL выполняться backspace +
 switch_layout + повтор ввода»): OCR поля (read_stable) после набора;
-несовпадение -> backspace x len(text) + switch_layout + повтор ввода +
-повторная OCR-проверка. switch_layout — сочетание клавиш переключения
+несовпадение -> backspace x len(наблюденного OCR текста) + switch_layout +
+повтор ввода + повторная OCR-проверка. Та же семантика «стереть-видимое-
+и-набрать» у retry-попытки: перед повторным набором стирается содержимое,
+видимое OCR в конце предыдущей попытки (иначе печать поверх делает verify
+несходимым принципиально). switch_layout — сочетание клавиш переключения
 раскладки: дефолт Ctrl+Shift через key_down/key_press/key_up (константы
 LEFT_CTRL в вендорном hid.py нет — 0xE0 по HID usage table задан локально
 с комментарием; сочетание подтверждается у владельца, Q25). Точка инъекции
-switch_layout — заменяемая callable (тесты/другая раскладка).
+switch_layout — заменяемая callable (тесты/другая раскладка). Чего OCR не
+видит (placeholder/invalid), стирание физически не достаёт — честная
+граница (очистка поля целиком и select-on-focus сырьём не смоделированы,
+Q8/Q25, досъёмка модели).
 
 SUBMIT (поисковое поле): Enter (KEY_ENTER) или кнопка «Поиск» (элемент
 модели, клик через click_element) — выбор по behavior.enter_fraction через
@@ -50,10 +56,9 @@ rng. ВЕРНОСТЬ SUBMIT: клик по кнопке верифицируе�
 ОГРАНИЧЕНИЯ (R4, честно паркуется): семантика экранного нумпада (раскладка
 клавиш, точка/запятая, backspace-клавиша) не подтверждена сырьём;
 сочетание переключения раскладки; влияние submit на список; OCR verify
-до submit, а не после (после Enter поле может очиститься); повтор попытки
-набирает текст заново поверх текущего содержимого поля — фокус-клик не
-очищает поле (очистка/выделение текста полем — Q8/Q25, досъёмка модели).
-Детали — в отчёте task-5.4-report.md и docs/OWNER_QUESTIONS.md (Q25).
+до submit, а не после (после Enter поле может очиститься); стирание поля —
+по наблюдаемому OCR содержимому (см. выше). Детали — в отчёте
+task-5.4-report.md и docs/OWNER_QUESTIONS.md (Q25).
 """
 from __future__ import annotations
 
@@ -177,6 +182,21 @@ def _ascii_to_hid(ch: str) -> int:
         f"Q25)")
 
 
+def _default_key_tap(hid):
+    """Печать символа клавиатурой: заглавные — с SHIFT (key_down/press/up,
+    та же схема, что у _default_switch_layout для Ctrl), строчные/цифры/
+    пробел — один key_press базового keycode."""
+    def tap(ch: str) -> None:
+        code = _ascii_to_hid(ch)
+        if ch.isalpha() and ch.isupper():
+            hid.key_down(KEY_LEFT_SHIFT)
+            hid.key_press(code)
+            hid.key_up(KEY_LEFT_SHIFT)
+        else:
+            hid.key_press(code)
+    return tap
+
+
 def _default_switch_layout(hid) -> None:
     """Переключение раскладки: Ctrl+Shift (key_down/up вокруг нажатия).
 
@@ -222,6 +242,17 @@ def _click_element(element_id: str, *, model, run_checks, screen, hid,
 
 class _TypeFailed(Exception):
     """Внутренний сигнал: набор текста прерван (клавиша не подтверждена)."""
+
+
+def _erase_observed(hid, observed: str) -> None:
+    """Стереть наблюдаемое OCR содержимое поля: backspace x len(наблюденного).
+
+    Стирается то, что реально видит OCR, а не len вводимого текста: OCR
+    может увидеть меньше набранного. Чего OCR не видит (статус placeholder/
+    invalid), физически не стирается — честная граница (очистка поля целиком
+    и select-on-focus сырьём не смоделированы, Q8/Q25)."""
+    for _ in observed:
+        hid.key_press(KEY_BACKSPACE)
 
 
 def _read_field(ocr, screen, find_anchor, region, region_id) -> StableReadResult:
@@ -311,7 +342,7 @@ def enter_text(
 
     rng = rng or random.Random()
     default_key_tap = key_tap is None
-    key_tap = key_tap or (lambda ch: hid.key_press(_ascii_to_hid(ch)))
+    key_tap = key_tap or _default_key_tap(hid)
     switch_layout = switch_layout or _default_switch_layout
 
     # Способ ввода — распределение профиля (решение 14); маппинг нумпада
@@ -356,6 +387,11 @@ def enter_text(
 
     max_attempts = 1 + config.timing.click_retry_count
     failures: list = []
+    # Наблюдаемое OCR-содержимое поля: перед повторным набором (retry-попытка
+    # или восстановление раскладки) стираем ЕГО — backspace x len(наблюденного),
+    # не len(text): OCR мог увидеть меньше набранного, а печать поверх
+    # нестёртого содержимого делает verify несходимым принципиально.
+    observed_text: Optional[str] = None
     for attempt in range(1, max_attempts + 1):
         if cancelled is not None and cancelled():
             return EnterResult(region_id, success=False, attempts=attempt - 1,
@@ -374,6 +410,9 @@ def enter_text(
                         f"попытка {attempt}: фокус {field_element_id!r} не "
                         f"подтверждён ({'; '.join(focus.failures) or 'присутствие не сошлось'})")
                     continue
+            if attempt > 1 and observed_text:
+                # Стираем содержимое, оставшееся от предыдущей попытки.
+                _erase_observed(hid, observed_text)
             _type(text, input_method=input_method, numpad_map=numpad_map,
                   model=model, run_checks=run_checks, screen=screen, hid=hid,
                   cursor_pos=cursor_pos, activate=activate,
@@ -381,6 +420,7 @@ def enter_text(
                   config=config, rng=rng, key_tap=key_tap, clock=clock,
                   sleep=sleep)
             stable = _read_field(ocr, screen, find_anchor, region, region_id)
+            observed_text = stable.text
             layout_recovered = False
             if not _matches(stable, text, expected_value):
                 if not recover_layout:
@@ -388,11 +428,11 @@ def enter_text(
                         f"попытка {attempt}: OCR поля {stable.text!r} != "
                         f"ожидаемому {text!r}")
                     continue
-                # Восстановление раскладки: стираем набранное (backspace x N —
-                # сколько набрали, очистка поля целиком не смоделирована,
-                # Q8/Q25), переключаем раскладку, повторяем ввод, проверяем.
-                for _ in text:
-                    hid.key_press(KEY_BACKSPACE)
+                # Восстановление раскладки: стираем наблюдаемое содержимое
+                # (backspace x len(stable.text) — очистка поля целиком и
+                # select-on-focus сырьём не смоделированы, Q8/Q25),
+                # переключаем раскладку, повторяем ввод, проверяем.
+                _erase_observed(hid, stable.text)
                 switch_layout(hid)
                 _type(text, input_method=input_method, numpad_map=numpad_map,
                       model=model, run_checks=run_checks, screen=screen, hid=hid,
@@ -401,6 +441,7 @@ def enter_text(
                       config=config, rng=rng, key_tap=key_tap, clock=clock,
                       sleep=sleep)
                 stable = _read_field(ocr, screen, find_anchor, region, region_id)
+                observed_text = stable.text
                 layout_recovered = _matches(stable, text, expected_value)
                 if not layout_recovered:
                     failures.append(
