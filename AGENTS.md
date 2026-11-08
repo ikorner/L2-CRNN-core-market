@@ -401,6 +401,51 @@ timing.click_retry_count) → on_fail[] → сигнал recover (EnterResult,
   wheels/cancelled/on_fail_executed/failures), success = всё n проскроллено
   ИЛИ край достигнут; трёхзначная обёртка — 5.7 (YAGNI).
 
+### drag_item (задача 5.6, spec action-primitives, инварианты 1/2/9)
+
+`l2core/primitives/drag.py` — drag-перенос предметов (в лавку и обратно);
+оркестратор по паттерну 5.3-5.5, общие хелперы — из click.py
+(CheckRunner/JitterRng/VerifySpec/_fixed_pause/_move_to/_run_on_fail).
+
+- **Граница ответственности**: drag_item принимает ГОТОВЫЕ экранные точки
+  `source_point`/`target_point` — координаты ячеек сеток инвентаря/лавки
+  генерируются из геометрии сетки вызывающим слоем (контракт design.md:
+  «slot: координаты ячейки генерируются из геометрии сетки лавки, не
+  размечаются вручную» — 6.2), якорь вызывающий берёт свежий непосредственно
+  перед вызовом; drag точки внутри попытки пересчитать не может (курсор уже
+  тащит предмет) — сдвиг окна между расчётом точек и drop ловит verify,
+  retry со свежими точками — решение вызывающего слоя. Verify — обязательная
+  типизированная VerifySpec (guard-тест TestVerifyContract следит за
+  сигнатурой), оценка через инъекцию run_checks.
+- **HID-drag собран из низкоуровневых примитивов вендора** (готовой команды
+  drag в протоколе нет, вендорить нельзя): move_rel к source →
+  mouse_down (BTN_LEFT) → удержание → пакетная траектория traj
+  ((dx, dy, delay_ms) за точку, исполнение на плате, один пакет CMD_TRAJ)
+  → пауза на цели → mouse_up. Отмена между press и release отпускает
+  кнопку (mouse_up) до возврата — мышь зажатой не остаётся.
+- **Траектория (behavior-профиль)**: source/target + джиттер
+  click_jitter_px; 1..3 промежуточные точки (drag_midpoints_min/max) с
+  джиттером move_jitter_px; последний шаг — ровно в target; пауза шага —
+  move_step_delay_min/max_ms через rng (детерминизм с seed; порядок
+  rng-розыгрышей зафиксирован пинами tests/test_drag.py::planned).
+  Число точек сверх ёмкости пакета HID-протокола (TRAJ_MAX_POINTS) —
+  DragElementError до HID (fail fast).
+- **Пролог** — как 5.3-5.5: activate OK + статус found, иначе
+  DragPreconditionError/ActivateGameError, HID не трогается (инвариант 9);
+  перед press каждой попытки — свежий якорь, якоря нет — попытка потрачена
+  без press.
+- **Паузы без sleep (инвариант 1)**: удержание после press (press_delay
+  профиля, мс→сек) и пауза на цели перед release (timing.hover_pause) —
+  _fixed_pause по инъецированным часам.
+- **Обратимость/re-verify (3.6)**: перенос обратим (предмет можно
+  перетащить обратно) — re-verify «перед необратимым» применяется к
+  start_sell (6.2), НЕ к drag; drag обязан verify ПОСЛЕ release и не мешает
+  reverify сценария (транзакция кадра не вложенная: drag открывает свою
+  FrameTransaction, reverify start_sell — вне примитива).
+- on_fail[] — общая механика 5.3 (press_esc / click_free_area) с повторным
+  прологом перед шагами; при деградации окна on_fail пропускается →
+  needs_recover=True. Результат DragResult (без трёхзначной обёртки — 5.7).
+
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
 `l2core/primitives/wait.py` — единственная sanctioned-точка блокирующего

@@ -23,6 +23,10 @@ behavior:
   press_delay_max_ms: 120  # ... макс
   key_delay_min_ms: 60  # пауза между клавишами, мин
   key_delay_max_ms: 180  # ... макс
+  move_step_delay_min_ms: 8  # пауза между шагами траектории drag, мин
+  move_step_delay_max_ms: 24  # ... макс
+  drag_midpoints_min: 1  # промежуточные точки траектории drag (прямая + середины), мин
+  drag_midpoints_max: 3  # ... макс
 
 paths:
   model: crnn_best.pt  # чекпоинт CRNN (файл вне git, рядом с корнем репо)

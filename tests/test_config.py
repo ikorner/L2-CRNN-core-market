@@ -30,6 +30,10 @@ behavior:
   press_delay_max_ms: 90
   key_delay_min_ms: 50
   key_delay_max_ms: 150
+  move_step_delay_min_ms: 6
+  move_step_delay_max_ms: 18
+  drag_midpoints_min: 0
+  drag_midpoints_max: 2
 
 paths:
   model: /opt/models/crnn_best.pt
@@ -64,6 +68,8 @@ def test_defaults_without_file():
     assert 0.0 <= config.behavior.enter_fraction <= 1.0
     assert config.behavior.press_delay_min_ms <= config.behavior.press_delay_max_ms
     assert config.behavior.key_delay_min_ms <= config.behavior.key_delay_max_ms
+    assert config.behavior.move_step_delay_min_ms <= config.behavior.move_step_delay_max_ms
+    assert config.behavior.drag_midpoints_min <= config.behavior.drag_midpoints_max
     assert config.kill_switch.inactivity_timeout > 0
     assert config.dry_run is False
 
@@ -87,6 +93,10 @@ def test_load_full_yaml(tmp_path):
     assert config.behavior.press_delay_max_ms == 90
     assert config.behavior.key_delay_min_ms == 50
     assert config.behavior.key_delay_max_ms == 150
+    assert config.behavior.move_step_delay_min_ms == 6
+    assert config.behavior.move_step_delay_max_ms == 18
+    assert config.behavior.drag_midpoints_min == 0
+    assert config.behavior.drag_midpoints_max == 2
     assert config.paths.model == "/opt/models/crnn_best.pt"
     assert config.paths.arduino_port == "COM7"
     assert config.kill_switch.hotkey == "ctrl+alt+p"
@@ -149,6 +159,15 @@ def test_empty_file_gives_defaults(tmp_path):
         (
             "behavior:\n  key_delay_min_ms: 300\n  key_delay_max_ms: 50\n",
             "behavior.key_delay_",
+        ),
+        # Нарушен порядок min/max траектории drag
+        (
+            "behavior:\n  move_step_delay_min_ms: 40\n  move_step_delay_max_ms: 10\n",
+            "behavior.move_step_delay_",
+        ),
+        (
+            "behavior:\n  drag_midpoints_min: 5\n  drag_midpoints_max: 2\n",
+            "behavior.drag_midpoints_",
         ),
         # Не-числовое значение там, где ждём число
         ("timing:\n  wait_default_timeout: abc\n", "timing.wait_default_timeout"),

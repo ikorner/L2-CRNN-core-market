@@ -60,6 +60,10 @@ class BehaviorConfig:
     press_delay_max_ms: int = 120  # ... макс
     key_delay_min_ms: int = 60  # пауза между клавишами, мин
     key_delay_max_ms: int = 180  # ... макс
+    move_step_delay_min_ms: int = 8  # пауза между шагами траектории drag, мин
+    move_step_delay_max_ms: int = 24  # ... макс
+    drag_midpoints_min: int = 1  # промежуточные точки траектории drag, мин
+    drag_midpoints_max: int = 3  # ... макс
 
 
 @dataclass(frozen=True)
@@ -193,8 +197,12 @@ def _build_section(
 
 
 def _check_min_max(cfg: BehaviorConfig) -> None:
-    """Пары min/max человеческих таймингов: min не больше max."""
-    for lo, hi in (("press_delay", "нажатия"), ("key_delay", "между клавишами")):
+    """Пары min/max человеческих таймингов и траектории: min не больше max."""
+    for lo, hi in (
+        ("press_delay", "нажатия"),
+        ("key_delay", "между клавишами"),
+        ("move_step_delay", "между шагами траектории"),
+    ):
         low = getattr(cfg, f"{lo}_min_ms")
         high = getattr(cfg, f"{lo}_max_ms")
         if low > high:
@@ -203,6 +211,13 @@ def _check_min_max(cfg: BehaviorConfig) -> None:
                 high,
                 f"не меньше behavior.{lo}_min_ms ({low}, задержка {hi})",
             )
+    if cfg.drag_midpoints_min > cfg.drag_midpoints_max:
+        raise _fail(
+            "behavior.drag_midpoints_max",
+            cfg.drag_midpoints_max,
+            "не меньше behavior.drag_midpoints_min "
+            f"({cfg.drag_midpoints_min}, число промежуточных точек)",
+        )
 
 
 def _build_paths(raw: dict[str, Any]) -> PathsConfig:
@@ -272,6 +287,10 @@ def load_config(path: str | Path | None = None) -> CoreConfig:
             "press_delay_max_ms": _nonnegative_int,
             "key_delay_min_ms": _nonnegative_int,
             "key_delay_max_ms": _nonnegative_int,
+            "move_step_delay_min_ms": _nonnegative_int,
+            "move_step_delay_max_ms": _nonnegative_int,
+            "drag_midpoints_min": _nonnegative_int,
+            "drag_midpoints_max": _nonnegative_int,
         },
     )
     _check_min_max(behavior)
