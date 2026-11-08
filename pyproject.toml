@@ -13,6 +13,7 @@ dependencies = [
     "mss>=9.0.1",
     "torch>=2.0",
     "pygetwindow>=0.0.9",
+    "pyserial>=3.5",
     "pywin32>=306",
     "PyYAML>=6.0",
 ]
