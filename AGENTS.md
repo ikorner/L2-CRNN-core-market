@@ -289,6 +289,40 @@ ruling R6).
 Реальные числа и досъёмка числовых кропов (цены, «0 из N», адена) —
 на машине владельца с crnn_best.pt (docs/OWNER_QUESTIONS.md Q24).
 
+### wait_until и запрет sleep (задача 5.1, инвариант 1)
+
+`l2core/primitives/wait.py` — единственная sanctioned-точка блокирующего
+ожидания в ядре (инвариант 1: «Никаких sleep — только
+wait_until(predicate, timeout)»). Сигнатура:
+`wait_until(predicate, *, timeout=None, interval=None, config=None,
+cancelled=None, clock=time.monotonic, sleep=time.sleep) -> WaitResult`.
+
+- Подстановка таймингов (договорённость 4.5, защита от рассинхрона
+  дефолтов): явные `timeout`/`interval` побеждают; если None — значения
+  из переданного `config` (timing.wait_default_timeout /
+  timing.verify_interval); литеральных дефолтов в модуле нет, оба отсутствуют
+  → ValueError. Подставляет вызывающий слой.
+- Семантика: первый poll немедленно, дальше poll каждые `interval`;
+  сон перед poll урезан остатком до дедлайна — последний poll не позже
+  timeout, дольше не ждёт. Elapsed на таймауте — ровно timeout. `cancelled`
+  (точка инъекции kill switch 8.1, сам kill switch не здесь) проверяется
+  до первого poll'а и после каждого неуспешного; отмена — результат с
+  флагом `cancelled=True`, не исключение.
+- Возврат `WaitResult(success, cancelled, polls, elapsed, last_value)` —
+  факты и диагностика; обёртка в трёхзначный OK/FAILED/UNKNOWN — задача 5.7
+  (здесь не строится, структура не мешает).
+- Часы и сон — инъекции (`clock`, `sleep`), в проде time.monotonic /
+  time.sleep; тесты на фейковом времени без реального ожидания
+  (инвариант 7).
+
+Guard-тест запрета sleep — `tests/test_sleep_contract.py` (по аналогии с
+R13/4.2b): AST-проход по l2core/ ищет вызовы `.sleep(...)` (time/asyncio),
+`sleep(...)` (from-import) и `.wait(...)` на threading.Event/Condition;
+сообщение — файл:строка. Ссылка `time.sleep` без вызова не нарушение
+(инъекция sleeper'а). Allowlist явный: `adapters/hid.py` (сон у железа —
+перезагрузка Arduino), `adapters/ocr_vendor/`, `adapters/table_segmentation/`
+(байт-идентичный вендор), `primitives/wait.py` (sanctioned-точка ожидания).
+
 ### Template matching (задача 3.3, решение 13)
 
 Вид поиска — NCC, эквивалент OpenCV `TM_CCOEFF_NORMED`. Реализация по
