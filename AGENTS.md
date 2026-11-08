@@ -109,7 +109,8 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
   click_element, enter_text/enter_price, scroll_list, drag_item).
 - `l2core/scenarios/` — сценарии (scan_market, setup_sell, monitor_shop).
 - `l2core/adapters/` — MssScreen/ReplayScreen/RecordingScreen (screen.py,
-  формат сессии — session.py), TemplateMatcher, TorchOcr/RemoteOcr(позже),
+  формат сессии — session.py), win32-шлюз и находилка окна игры (win32.py,
+  DPI-aware объявление процесса), TemplateMatcher, TorchOcr/RemoteOcr(позже),
   HidArduino.
 
 ### Формат файла сессии (контракт replay, задача 9.2)

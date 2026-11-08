@@ -11,6 +11,7 @@
 - paths — пути (чекпоинт CRNN, порт arduino);
 - kill_switch — хоткей и глобальный таймаут неактивности;
 - resolution — референсное разрешение клиентской области;
+- window — критерии поиска окна игры (заголовок/класс, задача 3.2);
 - dry_run — режим без HID (действия только логируются).
 
 Частичный YAML накладывается поверх дефолтов (dataclass-поля);
@@ -80,6 +81,14 @@ class ResolutionConfig:
 
 
 @dataclass(frozen=True)
+class WindowConfig:
+    """Критерии поиска окна игры (задача 3.2)."""
+
+    title: str = "Lineage II"  # точный заголовок окна игры (уточняется у владельца)
+    class_name: str | None = None  # опциональный класс окна для фильтрации
+
+
+@dataclass(frozen=True)
 class CoreConfig:
     """Корневой конфиг ядра."""
 
@@ -89,6 +98,7 @@ class CoreConfig:
     paths: PathsConfig = field(default_factory=PathsConfig)
     kill_switch: KillSwitchConfig = field(default_factory=KillSwitchConfig)
     resolution: ResolutionConfig = field(default_factory=ResolutionConfig)
+    window: WindowConfig = field(default_factory=WindowConfig)
     dry_run: bool = False  # действия только логируются, без HID
 
 
@@ -151,6 +161,7 @@ _SECTION_FIELDS = {
         ("paths", PathsConfig),
         ("kill_switch", KillSwitchConfig),
         ("resolution", ResolutionConfig),
+        ("window", WindowConfig),
     )
 }
 
@@ -276,6 +287,17 @@ def load_config(path: str | Path | None = None) -> CoreConfig:
         _section(data.get("resolution"), "resolution"),
         {"width": _positive_int, "height": _positive_int},
     )
+    window = _build_section(
+        "window",
+        WindowConfig,
+        _section(data.get("window"), "window"),
+        {
+            "title": _nonempty_str,
+            "class_name": lambda key, value: None
+            if value is None
+            else _nonempty_str(key, value),
+        },
+    )
     dry_run = data.get("dry_run", False)
     if not isinstance(dry_run, bool):
         raise _fail("dry_run", dry_run, "ожидается true/false")
@@ -287,5 +309,6 @@ def load_config(path: str | Path | None = None) -> CoreConfig:
         paths=_build_paths(_section(data.get("paths"), "paths")),
         kill_switch=kill_switch,
         resolution=resolution,
+        window=window,
         dry_run=dry_run,
     )
