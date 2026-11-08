@@ -14,7 +14,10 @@ tests/test_table_segmentation.py — тест wrapper'а, проверяющий
 module-level констант вендора (снапшот/возврат дефолтов) — без прямого
 доступа к модулю не пишется; tests/test_scroll.py — тесты примитива 5.5:
 синтетическая table_geometry теста мутирует те же глобалы процесс-wide,
-фикстура делает снапшот/возврат (та же механика, что у теста wrapper'а).
+фикстура делает снапшот/возврат (та же механика, что у теста wrapper'а);
+tests/test_outcome.py — тесты UNKNOWN скролла (5.7) переиспользуют harness
+test_scroll.py: та же снапшот-фикстура глобалов вендора (копия из
+test_scroll.py — без прямого доступа к модулю не пишется).
 """
 from pathlib import Path
 
@@ -34,6 +37,7 @@ ALLOWLIST = frozenset(
         (REPO_ROOT / "tests" / "test_table_segmentation_vendor.py").resolve(),
         (REPO_ROOT / "tests" / "test_table_segmentation.py").resolve(),
         (REPO_ROOT / "tests" / "test_scroll.py").resolve(),
+        (REPO_ROOT / "tests" / "test_outcome.py").resolve(),
     }
 )
 

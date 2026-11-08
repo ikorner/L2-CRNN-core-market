@@ -79,7 +79,8 @@ press поймает verify (см. границу ответственности
 в failures, needs_recover=True).
 
 РЕЗУЛЬТАТ: DragResult (source_point/target_point/success/attempts/cancelled/
-on_fail_executed/failures) — без трёхзначной обёртки (5.7, YAGNI).
+unconfirmed/on_fail_executed/failures); трёхзначная обёртка OK/FAILED/
+UNKNOWN — адаптер outcome.py (5.7) поверх success/unconfirmed.
 needs_recover — сигнал общего recover (5.8).
 """
 from __future__ import annotations
@@ -119,12 +120,16 @@ __all__ = [
 
 @dataclass(frozen=True)
 class DragResult:
-    """Итог drag (обёртка OK/FAILED/UNKNOWN — задача 5.7, YAGNI).
+    """Итог drag; трёхзначная обёртка OK/FAILED/UNKNOWN — адаптер
+    outcome.py (5.7) поверх полей success/unconfirmed.
 
     success — verify подтверждён; attempts — число потраченных попыток;
     cancelled — прервано через cancelled (kill switch 8.1), verify не
-    подтверждён; on_fail_executed — шаги on_fail[] исполнены; failures —
-    диагностика провалов по попыткам.
+    подтверждён; unconfirmed — HID-эффект, скорее всего, уже применён
+    (drag отпущен / состояние кнопки или траектории неизвестно после
+    HID-сбоя), но подтвердить его невозможно — итог UNKNOWN в адаптере
+    outcome.py (5.7); on_fail_executed — шаги on_fail[] исполнены; failures
+    — диагностика провалов по попыткам.
     """
 
     source_point: Tuple[int, int]
@@ -132,6 +137,7 @@ class DragResult:
     success: bool
     attempts: int
     cancelled: bool = False
+    unconfirmed: bool = False
     on_fail_executed: bool = False
     failures: Tuple[str, ...] = ()
 
@@ -269,6 +275,10 @@ def drag_item(
             raise DragPreconditionError(source_point, target_point, status)
 
         max_attempts = 1 + config.timing.click_retry_count
+        # Эффект неподтверждён: механика drag ушла в HID (press/traj/release
+        # или их сбой — состояние неизвестно), но verify оказался невозможен
+        # — итог UNKNOWN в адаптере outcome.py (5.7), не FAILED.
+        effect_unconfirmed = False
         for attempt in range(1, max_attempts + 1):
             if cancelled is not None and cancelled():
                 return DragResult(source_point, target_point, success=False,
@@ -308,6 +318,9 @@ def drag_item(
                         drag_cancelled = True
             except HidError as exc:
                 failures.append(f"попытка {attempt}: HID-сбой drag ({exc})")
+                # Транспортный сбой: команда могла уйти, могла нет — эффект
+                # неизвестен, retry обратим только пока кнопка освобождена.
+                effect_unconfirmed = True
                 drag_failed = True
             finally:
                 try:
@@ -316,6 +329,8 @@ def drag_item(
                     failures.append(
                         f"попытка {attempt}: mouse_up после сбоя не подтверждён "
                         f"({release_exc}) — состояние кнопки неизвестно")
+                    # Состояние кнопки неизвестно — эффект неподтверждён.
+                    effect_unconfirmed = True
                     drag_failed = True
             if drag_cancelled:
                 return DragResult(source_point, target_point, success=False,
@@ -327,6 +342,7 @@ def drag_item(
             verify_anchor = find_anchor(verify_frame)
             if verify_anchor is None:
                 failures.append(f"попытка {attempt}: якорь потерян перед verify")
+                effect_unconfirmed = True  # drag отпущен, подтвердить нельзя
                 continue
             report = run_checks(verify.checks, verify_frame, verify_anchor)
             if report.passed:
@@ -351,7 +367,8 @@ def drag_item(
                 f"({status.reason or status.content_detail}) — слепые "
                 f"HID-шаги запрещены")
             return DragResult(source_point, target_point, success=False,
-                              attempts=max_attempts, on_fail_executed=False,
+                              attempts=max_attempts, unconfirmed=effect_unconfirmed,
+                              on_fail_executed=False,
                               failures=tuple(failures))
         try:
             _run_on_fail(on_fail, hid=hid, cursor_pos=cursor_pos,
@@ -361,5 +378,7 @@ def drag_item(
             # ошибка модели (например, неизвестный шаг on_fail).
             raise DragElementError(exc.detail) from exc
         return DragResult(source_point, target_point, success=False,
-                          attempts=max_attempts, on_fail_executed=bool(on_fail),
+                          attempts=max_attempts,
+                          unconfirmed=effect_unconfirmed,
+                          on_fail_executed=bool(on_fail),
                           failures=tuple(failures))

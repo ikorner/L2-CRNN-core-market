@@ -55,10 +55,11 @@ config.resolution — честное допущение: свободная об
 пропускается, результат сразу needs_recover=True с причиной в failures.
 Неизвестный шаг — ошибка модели (ClickElementError, fail fast).
 
-РЕЗУЛЬТАТ: ClickResult (success/attempts/cancelled/on_fail_executed/
-failures) — без трёхзначной обёртки (задача 5.7, YAGNI). Отмена (kill
-switch 8.1, инъекция cancelled) — флаг в результате, не исключение
-(консистентно с wait.py/activate.py). Эскалации предусловий — исключениями
+РЕЗУЛЬТАТ: ClickResult (success/attempts/cancelled/unconfirmed/
+on_fail_executed/failures). Отмена (kill switch 8.1, инъекция cancelled) —
+флаг в результате, не исключение (консистентно с wait.py/activate.py);
+трёхзначная обёртка OK/FAILED/UNKNOWN — адаптер outcome.py (5.7) поверх
+полей success/unconfirmed. Эскалации предусловий — исключениями
 (инвариант 9).
 
 ГРАНИЦЫ: детекции тултипа из кадра нет (см. выше); перекрытие окном игры
@@ -151,19 +152,23 @@ class JitterRng(Protocol):
 
 @dataclass(frozen=True)
 class ClickResult:
-    """Итог клика (успех/отмена/сигнал recover; обёртка OK/FAILED/UNKNOWN
-    — задача 5.7, здесь не строится).
+    """Итог клика (успех/отмена/сигнал recover); трёхзначная обёртка
+    OK/FAILED/UNKNOWN — адаптер outcome.py (5.7) поверх полей
+    success/unconfirmed.
 
     success — verify подтверждён; attempts — число потраченных попыток;
     cancelled — прервано через cancelled (kill switch 8.1), verify не
-    подтверждён; on_fail_executed — шаги on_fail[] исполнены; failures —
-    диагностика провалов по попыткам.
+    подтверждён; unconfirmed — HID-эффект, скорее всего, уже применён (клик
+    ушёл), но подтвердить его невозможно (якорь потерян после действия) —
+    итог UNKNOWN в адаптере outcome.py (5.7); on_fail_executed — шаги
+    on_fail[] исполнены; failures — диагностика провалов по попыткам.
     """
 
     element_id: str
     success: bool
     attempts: int
     cancelled: bool = False
+    unconfirmed: bool = False
     on_fail_executed: bool = False
     failures: Tuple[str, ...] = ()
 
@@ -340,6 +345,10 @@ def click_element(
             raise ClickPreconditionError(element_id, status)
 
         max_attempts = 1 + config.timing.click_retry_count
+        # Эффект неподтверждён: клик ушёл в HID, но verify оказался
+        # невозможен (якорь потерян на свежем кадре после клика) — итог
+        # UNKNOWN в адаптере outcome.py (5.7), не FAILED.
+        effect_unconfirmed = False
         for attempt in range(1, max_attempts + 1):
             if cancelled is not None and cancelled():
                 return ClickResult(element_id, success=False,
@@ -409,6 +418,7 @@ def click_element(
             verify_anchor = find_anchor(verify_frame)
             if verify_anchor is None:
                 failures.append(f"попытка {attempt}: якорь потерян перед verify")
+                effect_unconfirmed = True  # клик ушёл, подтвердить нельзя
                 continue
             report = run_checks(verify.checks, verify_frame, verify_anchor)
             if report.passed:
@@ -433,9 +443,11 @@ def click_element(
                 f"({status.reason or status.content_detail}) — слепые "
                 f"HID-шаги запрещены")
             return ClickResult(element_id, success=False, attempts=max_attempts,
+                               unconfirmed=effect_unconfirmed,
                                on_fail_executed=False, failures=tuple(failures))
         _run_on_fail(on_fail, hid=hid, cursor_pos=cursor_pos,
                      free_area_point=free_area_point, config=config, rng=rng)
         return ClickResult(element_id, success=False, attempts=max_attempts,
+                           unconfirmed=effect_unconfirmed,
                            on_fail_executed=bool(on_fail),
                            failures=tuple(failures))

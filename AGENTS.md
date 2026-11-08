@@ -332,8 +332,8 @@ recover.
 activate OK + статус found, иначе EnterPreconditionError/ActivateGameError,
 HID не трогается) → выбор способа ввода по профилю → фокус → набор →
 OCR verify → восстановление раскладки → submit → retry (1 +
-timing.click_retry_count) → on_fail[] → сигнал recover (EnterResult,
-без трёхзначной обёртки — 5.7, YAGNI).
+timing.click_retry_count) → on_fail[] → сигнал recover (EnterResult;
+трёхзначная обёртка OK/FAILED/UNKNOWN — адаптер outcome.py, 5.7).
 
 - Способ ввода (клавиатура/экранный нумпад) — по behavior.numpad_fraction
   через rng (детерминизм с seed). Клавиатура: символ → HID keycode (usage
@@ -398,8 +398,8 @@ timing.click_retry_count) → on_fail[] → сигнал recover (EnterResult,
   непустой строки нарезки TableSegmentation (4.3) на константах модели,
   байтовое сравнение между кадрами, не OCR; None — строк нет/окно вне кадра.
 - **Результат**: ScrollResult(requested/scrolled/reached_end/position/
-  wheels/cancelled/on_fail_executed/failures), success = всё n проскроллено
-  ИЛИ край достигнут; трёхзначная обёртка — 5.7 (YAGNI).
+  wheels/cancelled/unconfirmed/on_fail_executed/failures), success = всё n
+  проскроллено ИЛИ край достигнут; трёхзначная обёртка — outcome.py (5.7).
 
 ### drag_item (задача 5.6, spec action-primitives, инварианты 1/2/9)
 
@@ -449,7 +449,50 @@ timing.click_retry_count) → on_fail[] → сигнал recover (EnterResult,
   FrameTransaction, reverify start_sell — вне примитива).
 - on_fail[] — общая механика 5.3 (press_esc / click_free_area) с повторным
   прологом перед шагами; при деградации окна on_fail пропускается →
-  needs_recover=True. Результат DragResult (без трёхзначной обёртки — 5.7).
+  needs_recover=True. Результат DragResult; трёхзначная обёртка —
+  outcome.py (5.7).
+
+### Трёхзначный результат и страж необратимых (задача 5.7, spec
+action-primitives, инвариант 4)
+
+`l2core/primitives/outcome.py` — адаптер ПОВЕРХ результатов примитивов
+5.1–5.6 (сами примитивы не переписывались): `ActionOutcome {OK, FAILED,
+UNKNOWN}` (str-Enum, в лог диагностикой) + `PrimitiveResult` (общий
+контракт success/cancelled/unconfirmed) + `to_outcome(result)` + страж
+`IrreversibleGuard`. CANCELLED в enum не входит: отмена — домен kill
+switch (8.1, README-замечание 1.4), не итог действия; `to_outcome`
+отменённый результат не пропускает (ValueError, fail fast) — стратегия
+ветвит `cancelled` до адаптации.
+
+- **UNKNOWN vs FAILED** (честное различие): FAILED — verify выполнялся и
+  провалился либо HID-эффект не применён вовсе (якорь потерян до клика,
+  hover re-verify не сошёлся): эффект отсутствует/опровергнут. UNKNOWN —
+  HID-эффект, скорее всего, применён (клик ушёл / текст набран / wheel
+  послан / drag отпущен / HID-сбой оставил состояние неизвестным), но
+  подтвердить невозможно (якорь потерян на свежем кадре ПОСЛЕ действия,
+  OCR-чтение поля невозможно после набора). Различие несёт поле
+  `unconfirmed: bool = False`, добавленное в ClickResult/EnterResult/
+  ScrollResult/DragResult: True выставляется только в точках «эффект ушёл,
+  подтверждение невозможно» (клик→verify без якоря; drag: verify без
+  якоря, HID-сбой механики/release; enter: OcrReadError/_TypeFailed после
+  набора; scroll: wheel ушёл, якоря не было ни на одном poll'ах verify —
+  якорь был, но строка не менялась = опровергнутый эффект, FAILED).
+  Маппинг: success→OK; unconfirmed→UNKNOWN; иначе→FAILED; cancelled→
+  ValueError. Пины — tests/test_outcome.py (27 тестов, включая реальные
+  прогоны примитивов на UNKNOWN/FAILED-ветках).
+- **Страж необратимых**: спека запрещает ядру повторять необратимое при
+  UNKNOWN, «решение за стратегией» = выбор момента повтора и ответственность
+  за него. `IrreversibleGuard` делает запрет исполняемым: стратегия
+  помечает необратимое идентификатором и обязует себя before/after вокруг
+  исполнения (`wrap()` — обёртка с before/after, защита от пропуска).
+  `after(id, UNKNOWN, detail)` блокирует повтор; `before(id)` при блоке —
+  `IrreversibleRepeatError` (действие не доходит до исполнителя); снятие —
+  только явное `confirm_after_unknown(id, detail)` (записывает
+  GuardResolution в журнал resolutions; снятие без блока — ValueError).
+  OK/FAILED страж не задействуют; `after` принимает только ActionOutcome
+  (результат примитива/отмена — TypeError: домены не смешиваются). Страж
+  не исполняет действия и не решает за стратегию — только не даёт молча
+  повторить то, что могло уже свершиться.
 
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
@@ -471,8 +514,8 @@ cancelled=None, clock=time.monotonic, sleep=time.sleep) -> WaitResult`.
   до первого poll'а и после каждого неуспешного; отмена — результат с
   флагом `cancelled=True`, не исключение.
 - Возврат `WaitResult(success, cancelled, polls, elapsed, last_value)` —
-  факты и диагностика; обёртка в трёхзначный OK/FAILED/UNKNOWN — задача 5.7
-  (здесь не строится, структура не мешает).
+  факты и диагностика; WaitResult — не результат действия (нет HID-эффекта),
+  в обёртку outcome.py (5.7) не адаптируется, структура не мешает.
 - Часы и сон — инъекции (`clock`, `sleep`), в проде time.monotonic /
   time.sleep; тесты на фейковом времени без реального ожидания
   (инвариант 7).
@@ -553,7 +596,9 @@ null). Replay-модель эффектов: действие → записан
 4. **Трёхзначный результат критичных действий: OK / FAILED / UNKNOWN.**
    UNKNOWN = эффект не подтверждён (лаг, перекрытие). Потенциально необратимые
    действия (начать продажу, подтвердить) при UNKNOWN не повторяются — решение
-   за стратегией.
+   за стратегией; механизм — outcome.py (5.7): поле `unconfirmed` результатов
+   примитивов, адаптер `to_outcome`, страж `IrreversibleGuard`
+   (UNKNOWN → повтор запрещён до явного `confirm_after_unknown`).
 5. **Байт-идентичность вендоренного OCR-препроцесса**: вендорится
    замороженная копия preprocess + CTC greedy decode + загрузчик чекпоинта из
    `L2-CRNN-MODEL-TRAIN` (guard-тесты на эталонных векторах и кропах

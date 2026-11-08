@@ -65,7 +65,8 @@ found — иначе click_free_area был бы слепым, инвариан�
 результат needs_recover=True (исполнение recover — 5.8).
 
 РЕЗУЛЬТАТ: ScrollResult (requested/scrolled/reached_end/position/wheels/
-cancelled/on_fail_executed/failures) — без трёхзначной обёртки (5.7, YAGNI).
+cancelled/unconfirmed/on_fail_executed/failures); трёхзначная обёртка
+OK/FAILED/UNKNOWN — адаптер outcome.py (5.7) поверх success/unconfirmed.
 success = всё n проскроллено ИЛИ достигнут край по направлению (дальше
 крутить нечего). Отмена (kill switch 8.1, инъекция cancelled) — флаг,
 не исключение (консистентно с wait.py/activate.py/click.py).
@@ -166,13 +167,16 @@ class ScrollPosition:
 
 @dataclass(frozen=True)
 class ScrollResult:
-    """Итог scroll_list (обёртка OK/FAILED/UNKNOWN — задача 5.7, YAGNI).
+    """Итог scroll_list; трёхзначная обёртка OK/FAILED/UNKNOWN — адаптер
+    outcome.py (5.7) поверх success/unconfirmed.
 
     requested — заказанное число щелчков; scrolled — фактически
     проскроллено (подтверждено verify); reached_end — край по направлению
     достигнут по признаку модели; position — позиция на последнем кадре;
     wheels — всего послано HID-команд wheel (включая неподтверждённые
-    попытки); failures — диагностика провалов.
+    попытки); unconfirmed — wheel ушёл в HID, но verify итерации невозможен
+    (якорь потерян на всех poll'ах) — итог UNKNOWN; failures — диагностика
+    провалов.
     """
 
     requested: int
@@ -181,6 +185,7 @@ class ScrollResult:
     position: Optional[ScrollPosition]
     wheels: int = 0
     cancelled: bool = False
+    unconfirmed: bool = False
     on_fail_executed: bool = False
     failures: Tuple[str, ...] = ()
 
@@ -354,6 +359,10 @@ def scroll_list(
         max_attempts = 1 + config.timing.click_retry_count
         wheels = 0
         scrolled = 0
+        # Эффект неподтверждён: wheel ушёл в HID, но verify итерации
+        # невозможен (якорь не найден ни на одном poll'ах) — итог UNKNOWN
+        # в адаптере outcome.py (5.7), не FAILED.
+        effect_unconfirmed = False
         for i in range(1, n + 1):
             if cancelled is not None and cancelled():
                 return ScrollResult(requested=n, scrolled=scrolled,
@@ -397,6 +406,9 @@ def scroll_list(
                     a = find_anchor(f)
                     if a is None:
                         return None
+                    # Якорь был: verify выполнялся — неподтверждение здесь
+                    # это опровергнутый эффект (FAILED-земля), не UNKNOWN.
+                    anchor_seen[0] = True
                     pos = scroll_position(f, model=model, anchor=a,
                                           run_checks=run_checks,
                                           segmentation=seg)
@@ -407,6 +419,7 @@ def scroll_list(
                         return pos
                     return None
 
+                anchor_seen = [False]
                 waited = wait_until(
                     _settled,
                     timeout=config.timing.wait_default_timeout,
@@ -429,6 +442,10 @@ def scroll_list(
                     f"итерация {i}, попытка {attempt}: нижняя строка не "
                     f"изменилась и край по направлению не достигнут за "
                     f"таймаут")
+                if not anchor_seen[0]:
+                    # Wheel ушёл, но verify ни разу не выполнялся (якоря
+                    # не было на всех poll'ах): эффект неподтверждён.
+                    effect_unconfirmed = True
             if not done:
                 # Исчерпание retry: ПОВТОРНЫЙ ПРОЛОГ перед on_fail (паттерн
                 # 5.3): за цикл окно могло деградировать, а click_free_area
@@ -449,7 +466,7 @@ def scroll_list(
                         f" — слепые HID-шаги запрещены")
                     return ScrollResult(requested=n, scrolled=scrolled,
                                         reached_end=False, position=position,
-                                        wheels=wheels,
+                                        wheels=wheels, unconfirmed=effect_unconfirmed,
                                         on_fail_executed=False,
                                         failures=tuple(failures))
                 _run_on_fail(on_fail, hid=hid, cursor_pos=cursor_pos,
@@ -457,7 +474,7 @@ def scroll_list(
                              config=config, rng=rng)
                 return ScrollResult(requested=n, scrolled=scrolled,
                                     reached_end=False, position=position,
-                                    wheels=wheels,
+                                    wheels=wheels, unconfirmed=effect_unconfirmed,
                                     on_fail_executed=bool(on_fail),
                                     failures=tuple(failures))
             scrolled = i
@@ -465,4 +482,5 @@ def scroll_list(
         reached_end = position is not None and bool(getattr(position, end_flag))
         return ScrollResult(requested=n, scrolled=scrolled,
                             reached_end=reached_end, position=position,
-                            wheels=wheels, failures=tuple(failures))
+                            wheels=wheels, unconfirmed=effect_unconfirmed,
+                            failures=tuple(failures))

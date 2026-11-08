@@ -139,12 +139,14 @@ class EnterPreconditionError(EnterTextError):
 
 @dataclass(frozen=True)
 class EnterResult:
-    """Итог ввода (успех/отмена/сигнал recover; обёртка OK/FAILED/UNKNOWN —
-    задача 5.7, YAGNI).
+    """Итог ввода; трёхзначная обёртка OK/FAILED/UNKNOWN — адаптер
+    outcome.py (5.7) поверх полей success/unconfirmed.
 
     input_method — выбранный способ (keyboard/numpad); submit_method —
     способ отправки (enter/button/None при submit=False); layout_recovered —
-    сработало восстановление раскладки; attempts/failures — как в ClickResult.
+    сработало восстановление раскладки; unconfirmed — текст (и/или submit)
+    уже ушёл в HID, но прочитать поле/подтвердить невозможно — итог UNKNOWN;
+    attempts/failures — как в ClickResult.
     """
 
     region_id: str
@@ -154,6 +156,7 @@ class EnterResult:
     submit_method: Optional[str] = None
     layout_recovered: bool = False
     cancelled: bool = False
+    unconfirmed: bool = False
     on_fail_executed: bool = False
     failures: Tuple[str, ...] = ()
 
@@ -387,6 +390,10 @@ def enter_text(
 
     max_attempts = 1 + config.timing.click_retry_count
     failures: list = []
+    # Эффект неподтверждён: текст (частично или целиком) ушёл в HID, но
+    # прочитать поле/подтвердить клавишу невозможно — итог UNKNOWN в
+    # адаптере outcome.py (5.7), не FAILED.
+    effect_unconfirmed = False
     # Наблюдаемое OCR-содержимое поля: перед повторным набором (retry-попытка
     # или восстановление раскладки) стираем ЕГО — backspace x len(наблюденного),
     # не len(text): OCR мог увидеть меньше набранного, а печать поверх
@@ -474,8 +481,14 @@ def enter_text(
                 status=exc.status, reason=exc.detail, anchor=None,
                 content_loaded=None, content_detail=exc.detail)) from exc
         except OcrReadError as exc:
+            # Поле не прочитано (якорь потерян/стабилизация не сошлась) —
+            # набранный текст мог уйти в игру: эффект неподтверждён.
+            effect_unconfirmed = True
             failures.append(f"попытка {attempt}: OCR поля не удалось: {exc}")
         except _TypeFailed as exc:
+            # Нумпад: клики по клавишам могли частично пройти — эффект
+            # неизвестен, не опровергнут.
+            effect_unconfirmed = True
             failures.append(str(exc))
 
     # Исчерпание retry: повторный пролог перед on_fail — за цикл окно могло
@@ -495,11 +508,13 @@ def enter_text(
             f"запрещены")
         return EnterResult(region_id, success=False, attempts=max_attempts,
                            input_method=input_method, submit_method=submit_method,
+                           unconfirmed=effect_unconfirmed,
                            failures=tuple(failures))
     _run_on_fail(on_fail, hid=hid, cursor_pos=cursor_pos,
                  free_area_point=free_area_point, config=config, rng=rng)
     return EnterResult(region_id, success=False, attempts=max_attempts,
                        input_method=input_method, submit_method=submit_method,
+                       unconfirmed=effect_unconfirmed,
                        on_fail_executed=bool(on_fail), failures=tuple(failures))
 
 
