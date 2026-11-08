@@ -12,6 +12,14 @@ rng, часы):
     пролог → наведение курсора на область списка → n итераций (wheel →
     verify смены нижней строки ИЛИ признака конца) → retry/on_fail → recover
 
+СЛЕПЫХ WHEEL НЕТ (инвариант 9): wheel-команда уходит только при
+подтверждённом якоре — якорь не найден на стартовом кадре (навести курсор
+не на что) → сразу результат needs_recover без единой HID-команды; якорь
+потерян на свежем кадре перед попыткой → команда пропущена, попытка
+потрачена. Перед каждой wheel-командой — свежий grab и свежий якорь
+(кэша позиции нет — инвариант 3); сдвиг якоря перенаводит курсор на новый
+центр области списка.
+
 ПРОЛОГ (тот же binding ruling, что в 5.3/5.4): скролл допустим только при
 activate_game OK (5.2, иначе ActivateGameError проброшена) И статусе окна
 found (3.5). Иначе — исключение, HID не трогается (no blind scroll).
@@ -323,19 +331,25 @@ def scroll_list(
         if status.status != STATUS_FOUND:
             raise ScrollPreconditionError(direction, status)
 
-        # Начальная позиция + наведение курсора на область списка.
-        position: Optional[ScrollPosition] = None
-        prev_hash: Optional[bytes] = None
+        # Начальная позиция + наведение курсора на область списка. Якоря
+        # нет на стартовом кадре — позиционировать курсор не на что: wheel
+        # в непроверенную позицию запрещён (инвариант 9, слепых wheel нет),
+        # HID не трогаем и сразу отдаём сигнал recover.
         frame = tx.refresh()
         anchor = find_anchor(frame)
         if anchor is None:
-            failures.append("якорь не найден на начальном кадре")
-        else:
-            position = scroll_position(frame, model=model, anchor=anchor,
-                                       run_checks=run_checks, segmentation=seg)
-            prev_hash = position.bottom_row_hash
-            _move_to(hid, cursor_pos, _list_area_point(model.table_geometry,
-                                                       anchor))
+            return ScrollResult(
+                requested=n, scrolled=0, reached_end=False, position=None,
+                wheels=0,
+                failures=("якорь не найден на стартовом кадре — "
+                          "позиционирование курсора на область списка "
+                          "невозможно, слепые wheel-команды запрещены",))
+        position: Optional[ScrollPosition] = scroll_position(
+            frame, model=model, anchor=anchor, run_checks=run_checks,
+            segmentation=seg)
+        prev_hash: Optional[bytes] = position.bottom_row_hash
+        hover_point = _list_area_point(model.table_geometry, anchor)
+        _move_to(hid, cursor_pos, hover_point)
 
         max_attempts = 1 + config.timing.click_retry_count
         wheels = 0
@@ -357,6 +371,21 @@ def scroll_list(
                                         reached_end=False, position=position,
                                         wheels=wheels, cancelled=True,
                                         failures=tuple(failures))
+                # Свежий якорь обязателен перед каждой wheel-командой
+                # (инвариант 9): hover-точка валидна только пока якорь на
+                # месте, за время ожидания окно могло сдвинуться/исчезнуть.
+                # Якоря нет — команда не уходит, попытка потрачена.
+                frame = tx.refresh()
+                anchor = find_anchor(frame)
+                if anchor is None:
+                    failures.append(
+                        f"итерация {i}, попытка {attempt}: якорь не найден "
+                        f"на свежем кадре — wheel пропущен")
+                    continue
+                point = _list_area_point(model.table_geometry, anchor)
+                if point != hover_point:
+                    _move_to(hid, cursor_pos, point)
+                    hover_point = point
                 hid.scroll(1, step, wheel_delay_ms)
                 wheels += 1
 

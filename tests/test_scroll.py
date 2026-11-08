@@ -244,7 +244,7 @@ def found_status(frame):
 
 def run_scroll(direction, n, hid, clock, checker, *, model=None, screen=None,
                activate=None, status=None, on_fail=(), rng_seed=7,
-               wheel_delay_ms=0, cancelled=None):
+               wheel_delay_ms=0, cancelled=None, find_anchor=None):
     model = model or make_model()
     activate = activate or (lambda: ActivateResult(
         hwnd=1, already_active=True, attempts=0, cancelled=False))
@@ -256,7 +256,7 @@ def run_scroll(direction, n, hid, clock, checker, *, model=None, screen=None,
         cursor_pos=FakeCursor().get,
         activate=activate,
         window_status=status or found_status,
-        find_anchor=lambda frame: ANCHOR,
+        find_anchor=find_anchor or (lambda frame: ANCHOR),
         run_checks=checker,
         config=make_config(),
         on_fail=on_fail,
@@ -419,6 +419,65 @@ class TestRetry:
         wheels = [a for _, a, _ in hid.log if a == "scroll"]
         assert len(wheels) == 2  # провал + успешный повтор
         assert result.failures  # диагностика провала первой попытки
+
+
+class TestNoBlindScroll:
+    def test_no_initial_anchor_returns_recover_without_wheels(self):
+        # Стартовый кадр без якоря: позиционировать курсор на область списка
+        # нельзя — wheel в непроверенную позицию запрещён (инвариант 9):
+        # ноль wheel-команд, сразу сигнал recover.
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        result = run_scroll(DIR_DOWN, 3, hid, clock, ArrowChecker(),
+                            find_anchor=lambda frame: None)
+        assert result.success is False
+        assert result.needs_recover is True
+        assert result.scrolled == 0
+        assert result.wheels == 0
+        assert [a for _, a, _ in hid.log if a == "scroll"] == []
+
+    def test_anchor_lost_before_wheel_skips_attempt(self):
+        # Якорь есть на старте (hover выполнен), потерян на свежем кадре
+        # перед wheel попытки 1: команда НЕ уходит, попытка потрачена;
+        # попытка 2 с подтверждённым якорем — wheel уходит, verify OK.
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        anchors = [ANCHOR, None, ANCHOR, ANCHOR]
+        state = {"i": 0}
+
+        def find_anchor(frame):
+            i = min(state["i"], len(anchors) - 1)
+            state["i"] += 1
+            return anchors[i]
+
+        result = run_scroll(DIR_DOWN, 1, hid, clock, ArrowChecker(),
+                            find_anchor=find_anchor)
+        assert result.success is True
+        assert result.scrolled == 1
+        wheels = [args for _, a, args in hid.log if a == "scroll"]
+        assert wheels == [(1, 1, 0)]  # wheel только подтверждённой попытки
+        assert result.failures  # потеря якоря зафиксирована в диагностике
+
+    def test_anchor_lost_all_attempts_recover_without_wheels(self):
+        # Якорь потерян на всех retry-попытках итерации: ни одного wheel,
+        # on_fail исполнен, сигнал recover.
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        anchors = [ANCHOR, None, None, None]
+        state = {"i": 0}
+
+        def find_anchor(frame):
+            i = min(state["i"], len(anchors) - 1)
+            state["i"] += 1
+            return anchors[i]
+
+        result = run_scroll(DIR_DOWN, 1, hid, clock, ArrowChecker(),
+                            find_anchor=find_anchor, on_fail=("press_esc",))
+        assert result.success is False
+        assert result.needs_recover is True
+        assert result.wheels == 0
+        assert [a for _, a, _ in hid.log if a == "scroll"] == []
+        assert result.on_fail_executed is True
 
 
 class TestScrollPosition:
