@@ -289,6 +289,40 @@ ruling R6).
 Реальные числа и досъёмка числовых кропов (цены, «0 из N», адена) —
 на машине владельца с crnn_best.pt (docs/OWNER_QUESTIONS.md Q24).
 
+### click_element (задача 5.3, spec action-primitives, инварианты 1/2/3/9)
+
+`l2core/primitives/click.py` — оркестратор клика по элементу модели; все
+внешние эффекты — инъекции (HID, экран/FrameTransaction 3.6, activate,
+статус, поиск якоря, оценка проверок run_checks, rng, часы):
+пролог → цикл попыток (1 + timing.click_retry_count) → on_fail[] → сигнал
+recover.
+
+- **Пролог (binding ruling ревью 5.2): клик допустим только при
+  activate_game OK (5.2) И статусе окна found (3.5).** Иначе — исключение
+  (ActivateGameError проброшена / ClickPreconditionError), HID не трогается
+  — слепых кликов нет (инвариант 9).
+- Verify (инвариант 2) через обязательную типизированную VerifySpec
+  (проверки перехода модели, VerifySpec.from_transition) на свежем кадре;
+  клики без verify запрещены — параметр обязателен, guard-тест
+  `tests/test_click.py::TestVerifyContract` следит за сигнатурой.
+- Hover: наведение курсора на click_point (варианта/центра rect, HUD — только
+  через инъекцию hud_locator, без него клик невозможен) → hover-пауза
+  (timing.hover_pause) → re-verify присутствия элемента (hover мог изменить
+  вид/перекрыть) → только потом click.
+- Hover-пауза без sleep (инвариант 1): фиксированная задержка через
+  wait_until по инъецированным часам с предикатом «прошло время»
+  (интервал — timing.verify_interval); результат игнорируется — задержка
+  гарантирована механизмом дедлайна.
+- Тултип: детекции из кадра нет (модель элемент-тултип не содержит) —
+  честная механика «сдвиг курсора на TOOLTIP_SHIFT_PX (24) + пауза +
+  повтор в пределах retry», не детекция.
+- on_fail[]: «press_esc», «click_free_area» (точка — free_area_point или
+  центр config.resolution, честное допущение); неизвестный шаг — ошибка
+  модели. Исчерпание retry + on_fail → ClickResult(needs_recover=True) —
+  исполнение recover — задача 5.8.
+- Джиттер/hold_ms из behavior-профиля через инъецируемый rng (детерминизм
+  с seed, инвариант 7) — вендорный random HidDevice.click не используется.
+
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
 `l2core/primitives/wait.py` — единственная sanctioned-точка блокирующего
