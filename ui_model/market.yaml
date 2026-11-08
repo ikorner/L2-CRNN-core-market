@@ -1,5 +1,8 @@
 # UI-модель окна market. Импорт конвертером (l2core.model.converter) из base_screenshot/scr/meta.json.
 # Политика слияния: ручные правки побеждают, машинное дополняет; diff-отчёт — `python -m l2core.model.converter`.
+# rect'ы элементов батча scr_153901+ пересчитаны вручную от истинного якоря
+# (202,103), а не эвристического (207,77) конвертера (задача 3.3b;
+# guard-тест — tests/test_anchor.py::TestAnchorModelConsistency::test_market_batch2_rects_match_meta).
 # table_geometry откалибрована из меты под 1920x1080 (задача 2.4, метод — в отчёте 2.4).
 # Сигнатуры состояний и семантика подтверждённых переходов размечены (2.3-2.5,
 # обоснование — в отчёте 2.5); OCR-регионы и неподтверждённая семантика —
@@ -80,12 +83,12 @@ elements:
     variants:
       normal: {template: market/scr_153551_atrifacts_passive.png}
   collection_active:
-    rect: [851, 180, 139, 44]
+    rect: [856, 154, 139, 44]
     role: click_target
     variants:
       active: {template: market/scr_154103_collection_active.png}
   collection_all_active:
-    rect: [13, 233, 109, 28]
+    rect: [18, 207, 109, 28]
     role: click_target
     variants:
       active: {template: market/scr_154103_collection_all_active.png}
@@ -194,32 +197,32 @@ elements:
     variants:
       normal: {template: market/scr_153511_open_sale_trade.png}
   other_active:
-    rect: [710, 180, 139, 43]
+    rect: [715, 154, 139, 43]
     role: click_target
     variants:
       active: {template: market/scr_154002_other_active.png}
   other_all_active:
-    rect: [14, 234, 108, 26]
+    rect: [19, 208, 108, 26]
     role: click_target
     variants:
       active: {template: market/scr_154002_other_all_active.png}
   other_collors_passive:
-    rect: [244, 233, 108, 28]
+    rect: [249, 207, 108, 28]
     role: click_target
     variants:
       normal: {template: market/scr_154002_other_collors_passive.png}
   other_colors_active:
-    rect: [243, 232, 110, 29]
+    rect: [248, 206, 110, 29]
     role: click_target
     variants:
       active: {template: market/scr_154021_other_colors_active.png}
   other_other_active:
-    rect: [474, 234, 108, 26]
+    rect: [479, 208, 108, 26]
     role: click_target
     variants:
       active: {template: market/scr_154049_other_other_active.png}
   other_other_passive:
-    rect: [473, 233, 109, 27]
+    rect: [478, 207, 109, 27]
     role: click_target
     variants:
       normal: {template: market/scr_154002_other_other_passive.png}
@@ -229,22 +232,22 @@ elements:
     variants:
       active: {template: market/scr_153840_other_scroll_active.png}
   other_stones_active:
-    rect: [132, 233, 106, 28]
+    rect: [137, 207, 106, 28]
     role: click_target
     variants:
       active: {template: market/scr_154012_other_stones_active.png}
   other_stones_passive:
-    rect: [129, 231, 108, 30]
+    rect: [134, 205, 108, 30]
     role: click_target
     variants:
       normal: {template: market/scr_154002_other_stones_passive.png}
   other_up_stuff_active:
-    rect: [358, 233, 109, 28]
+    rect: [363, 207, 109, 28]
     role: click_target
     variants:
       active: {template: market/scr_154033_other_up_stuff_active.png}
   other_up_stuff_passive:
-    rect: [359, 232, 109, 29]
+    rect: [364, 206, 109, 29]
     role: click_target
     variants:
       normal: {template: market/scr_154002_other_up_stuff_passive.png}
@@ -274,47 +277,47 @@ elements:
     variants:
       normal: {template: market/scr_153551_pripas_passive.png}
   pripasi_active:
-    rect: [567, 180, 141, 42]
+    rect: [572, 154, 141, 42]
     role: click_target
     variants:
       active: {template: market/scr_153901_pripasi_active.png}
   pripasi_all_active:
-    rect: [12, 231, 110, 31]
+    rect: [17, 205, 110, 31]
     role: click_target
     variants:
       active: {template: market/scr_153901_pripasi_all_active.png}
   pripasi_all_passive:
-    rect: [14, 232, 108, 28]
+    rect: [19, 206, 108, 28]
     role: click_target
     variants:
       normal: {template: market/scr_153929_pripasi_all_passive.png}
   pripasi_rashodka_active:
-    rect: [359, 232, 109, 28]
+    rect: [364, 206, 109, 28]
     role: click_target
     variants:
       active: {template: market/scr_153949_pripasi_rashodka_active.png}
   pripasi_rashodka_passive:
-    rect: [358, 233, 109, 28]
+    rect: [363, 207, 109, 28]
     role: click_target
     variants:
       normal: {template: market/scr_153901_pripasi_rashodka_passive.png}
   pripasi_soulshot_active:
-    rect: [129, 232, 109, 29]
+    rect: [134, 206, 109, 29]
     role: click_target
     variants:
       active: {template: market/scr_153929_pripasi_soulshot_active.png}
   pripasi_soulshot_passive:
-    rect: [128, 234, 109, 25]
+    rect: [133, 208, 109, 25]
     role: click_target
     variants:
       normal: {template: market/scr_153901_pripasi_soulshot_passive.png}
   pripasi_spiritshot_active:
-    rect: [243, 233, 109, 27]
+    rect: [248, 207, 109, 27]
     role: click_target
     variants:
       active: {template: market/scr_153941_pripasi_spiritshot_active.png}
   pripasi_spitirshot_passive:
-    rect: [243, 232, 111, 29]
+    rect: [248, 206, 111, 29]
     role: click_target
     variants:
       normal: {template: market/scr_153901_pripasi_spitirshot_passive.png}

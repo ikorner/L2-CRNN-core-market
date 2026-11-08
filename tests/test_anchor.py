@@ -7,7 +7,8 @@ Ground truth — meta.json (base_screenshot/scr/) плюс сверка пози
 - market, батч 1 (scr_153551..scr_153840): окно открыто, якорь (207, 77);
 - market, батч 2 (scr_153901..scr_154134): окно открыто, якорь (202, 103)
   (окно сдвинуто; rect'ы элементов модели из батча 2 конвертер считал
-  от (207, 77) — нестыковка зафиксирована в отчёте 3.3, concerns);
+  от (207, 77) — исправлены вручную в задаче 3.3b, guard-тест ниже
+  (test_market_batch2_rects_match_meta) следит за регрессом);
 - shop_buy «opening» (scr_154330/154340/154355): якорь (155, 224);
 - shop_sell «opening» (scr_154213/154222/154244): якорь (154, 223);
 - негативы (окон торговли нет): scr_153511, scr_153527, scr_all_close;
@@ -169,6 +170,28 @@ class TestAnchorModelConsistency:
 
     @pytest.mark.parametrize("name", MARKET_BATCH_1)
     def test_market_batch1_rects_match_meta(self, models, name):
+        meta = _load_meta()
+        model = models["market"]
+        anchor = MARKET_ANCHORS[name]
+        for crop_name in meta["screenshots"][name]["crops"]:
+            crop = meta["crops"].get(crop_name)
+            if crop is None:
+                continue
+            element = _element_by_template(model, f"market/{crop_name}.png")
+            if element is None or element.rect is None:
+                continue
+            expect = crop["rect"]
+            got = [anchor[0] + element.rect[0], anchor[1] + element.rect[1],
+                   element.rect[2], element.rect[3]]
+            assert got == expect, (
+                f"{name}/{crop_name}: якорь+rect {got} != мета {expect}"
+            )
+
+    @pytest.mark.parametrize("name", MARKET_BATCH_2)
+    def test_market_batch2_rects_match_meta(self, models, name):
+        # rect'ы элементов батча 2 конвертер 2.2 вычел из (207, 77) вместо
+        # истинного якоря (202, 103) — исправлено вручную (задача 3.3b).
+        # Регресс должен ловиться здесь, а не пиксельным ревью.
         meta = _load_meta()
         model = models["market"]
         anchor = MARKET_ANCHORS[name]
