@@ -37,7 +37,7 @@
 
 ## 5. Примитивы действий
 
-- [ ] 5.1 Реализовать `wait_until(predicate, timeout)` и запрет sleep в коде ядра (инвариант AGENTS.md)
+- [x] 5.1 Реализовать `wait_until(predicate, timeout)` и запрет sleep в коде ядра (инвариант AGENTS.md)
 - [ ] 5.2 Реализовать `activate_game` (проверка фокуса/перекрытия перед каждым действием, SetForeground с retry + эскалацией)
 - [ ] 5.3 Реализовать `click_element` с verify, retry (n из конфига), `on_fail[]` из модели; учёт hover (verify после hover-паузы) и тултипов (сдвиг/ожидание исчезновения)
 - [ ] 5.4 Реализовать `enter_text`/`enter_price`: выбор способа ввода по распределению профиля (нумпад/клавиатура), рандомизация Enter vs кнопка «Поиск», восстановление раскладки (OCR поля, backspace + switch_layout + повтор)
