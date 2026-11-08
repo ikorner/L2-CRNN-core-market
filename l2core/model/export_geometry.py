@@ -20,7 +20,6 @@ CLI:
 """
 
 import argparse
-import importlib.util
 import sys
 from pathlib import Path
 from typing import Union
@@ -139,22 +138,27 @@ def _constants_of(window_id: str, version: str, geometry) -> dict:
 
 
 def _load_previous(output: Path) -> Union[dict, None]:
-    """Прочитать константы предыдущей выгрузки; None — файла нет/не читается."""
+    """Прочитать константы предыдущей выгрузки; None — файла нет/не читается.
+
+    Файл — сгенерированный плоский модуль констант; читается exec'ом текста
+    в пустом namespace. БЕЗ importlib: source loader кэширует pyc по
+    (mtime секунды, размер) — перезаписи выгрузки с той же длиной текста
+    в пределах секунды отдают stale-кэш и diff-отчёт становится недетерминирован
+    (вскрыто задачей 4.3: test_diff_is_deterministic флакал при другом
+    тайминге прогона). Exec по тексту детерминирован всегда.
+    """
     if not output.is_file():
         return None
-    spec = importlib.util.spec_from_file_location("table_geometry_prev", output)
-    if spec is None or spec.loader is None:
-        return None
-    module = importlib.util.module_from_spec(spec)
+    namespace: dict = {}
     try:
-        spec.loader.exec_module(module)
+        exec(output.read_text(encoding="utf-8"), namespace)  # noqa: S102
     except Exception:
         return None
     constants = {}
     for key in ("MODEL_VERSION",) + _CONSTANT_KEYS:
-        if not hasattr(module, key):
+        if key not in namespace:
             return None
-        constants[key] = getattr(module, key)
+        constants[key] = namespace[key]
     return constants
 
 
