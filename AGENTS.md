@@ -108,8 +108,28 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
 - `l2core/primitives/` — примитивы действий (wait_until, activate_game,
   click_element, enter_text/enter_price, scroll_list, drag_item).
 - `l2core/scenarios/` — сценарии (scan_market, setup_sell, monitor_shop).
-- `l2core/adapters/` — MssScreen/ReplayScreen/RecordingScreen, TemplateMatcher,
-  TorchOcr/RemoteOcr(позже), HidArduino.
+- `l2core/adapters/` — MssScreen/ReplayScreen/RecordingScreen (screen.py,
+  формат сессии — session.py), TemplateMatcher, TorchOcr/RemoteOcr(позже),
+  HidArduino.
+
+### Формат файла сессии (контракт replay, задача 9.2)
+
+Сессия — директория: `session.json` (манифест: `format: l2core-session`,
+`version: 1`, meta без меток времени, события) + `frames/*.png` (кадры BGR
+uint8, без потерь; одинаковые кадры дедуплицируются по содержимому).
+События: `frame` (кадр изменился без действия; первое событие обязано быть
+frame — начальное состояние) и `action` (`action` — нормализованный словарь
+действия, `image` — кадр-после или null, `result` — verify-результат или
+null). Replay-модель эффектов: действие → записанный после него кадр
+(ReplayScreen не кликает, а продвигает курсор; несовпадение действия —
+`ActionMismatchError`, конец записи — `SessionExhaustedError`).
+
+Программная запись сессии без живого экрана (R7, путь 9.2):
+`SessionWriter(path, meta=...)` → `record_frame(arr)` /
+`record_action(action, frame_after=arr|None)` / `set_result(status, detail)`
+→ `save()` (или контекстный менеджер). Чтение: `load_session(path)` →
+`.events`, `.read_image(ref)`. Живой прогон пишет сессию через
+`RecordingScreen(inner, path)` (декоратор поверх любого Screen).
 - `l2core/api/` — публичный синхронный API + события для модулей стратегий.
 - `l2core/config.py` — схема и типизированный загрузчик `config.yaml`.
 - `tests/` — pytest; `ui_model/` — YAML UI-модель; `assets/` — шаблоны и
