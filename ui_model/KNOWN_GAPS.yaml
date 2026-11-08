@@ -1,0 +1,21 @@
+# Известные незакрытые пробелы отгруженных UI-моделей (ruling R10).
+#
+# Тест tests/test_validator.py::test_shipped_models_match_known_gaps гоняет
+# валидатор (l2core.model.validator) по ui_model/*.yaml и требует: каждое
+# нарушение записано здесь, и каждая запись покрывает нарушение. Нарушение
+# вне списка — падение CI; запись без нарушения (пробел закрыт, запись
+# забыли убрать) — тоже падение. Запись закрывается правкой модели,
+# а не вычёркиванием отсюда.
+#
+# Содержимое инициализировано фактическими нарушениями моделей импорта 2.2
+# (сведены программно). Закрывающие задачи: table_geometry — 2.4,
+# сигнатуры/переходы — 2.5 и разметка владельцем.
+gaps:
+  # market: состояние из меты имеет одну template-сигнатуру; мета второй
+  # признак не знает — доразметка (2.5).
+  - {file: market.yaml, rule: state_signatures, subject: list__tab_home}
+  # Геометрия таблиц переносится в модель задачей 2.4; парсер (2.1) и
+  # конвертер (2.2) секции не создают.
+  - {file: market.yaml, rule: table_geometry_required, subject: table_geometry}
+  - {file: shop_buy.yaml, rule: table_geometry_required, subject: table_geometry}
+  - {file: shop_sell.yaml, rule: table_geometry_required, subject: table_geometry}

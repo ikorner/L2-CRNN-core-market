@@ -74,6 +74,12 @@ python -m pytest
 # и файлы в assets/ не перезаписываются (ручное побеждает, отчёт фиксирует).
 python -m l2core.model.converter
 
+# Валидатор UI-модели: инварианты спеки ui-model (сигнатуры состояний,
+# путь в recover, семантика переходов, rect'ы в окне, шаблоны в assets/).
+# Отгруженные модели имеют известные пробелы — они явно записаны в
+# ui_model/KNOWN_GAPS.yaml (ruling R10), тесты следят за их актуальностью.
+python -m l2core.model.validator ui_model/market.yaml ui_model/shop_buy.yaml ui_model/shop_sell.yaml
+
 # Валидация config.yaml против схемы l2core/config.py
 python -c "from l2core.config import load_config; load_config('config.yaml')"
 

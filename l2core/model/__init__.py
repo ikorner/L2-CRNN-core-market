@@ -9,13 +9,25 @@ ui_model/FORMAT.md; поставляемые файлы — ui_model/common.yaml
 - load_common(path) -> CommonDicts — общий словарь (варианты, роли, грамматики);
 - load_model(path, common=None) -> UiModel — модель окна; common=None —
   встроенный словарь, совпадающий с поставляемым common.yaml;
-- ModelFormatError — ошибка формата с именем файла и секцией.
+- ModelFormatError — ошибка формата с именем файла и секцией;
+- validate_model(model, assets_dir) -> list[Violation] — семантические
+  инварианты спеки ui-model (задача 2.3); CLI для людей:
+  python -m l2core.model.validator <файлы...>.
 
-Пакет отвечает только за формат и объектную модель: детекция состояний,
-семантическая валидация инвариантов и исполнение переходов — слоями выше.
+Пакет отвечает за формат, объектную модель и семантическую валидацию
+инвариантов: детекция состояний и исполнение переходов — слоями выше.
 """
 
 from .loader import ModelFormatError, load_common, load_model
+from .validator import (
+    Gap,
+    GapCheckResult,
+    Violation,
+    check_against_gaps,
+    format_report,
+    load_gaps,
+    validate_model,
+)
 from .types import (
     ActionSpec,
     Check,
@@ -40,6 +52,8 @@ __all__ = [
     "ColumnZone",
     "CommonDicts",
     "ElementSpec",
+    "Gap",
+    "GapCheckResult",
     "GrammarSpec",
     "ModelFormatError",
     "OcrRegionSpec",
@@ -50,7 +64,12 @@ __all__ = [
     "TransitionSpec",
     "UiModel",
     "VariantSpec",
+    "Violation",
     "WindowSpec",
+    "check_against_gaps",
+    "format_report",
     "load_common",
+    "load_gaps",
     "load_model",
+    "validate_model",
 ]
