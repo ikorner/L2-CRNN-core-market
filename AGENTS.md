@@ -1,0 +1,153 @@
+## Superpowers ↔ OpenSpec Integration
+
+### Design handoff
+
+Superpowers brainstorming is the primary design exploration process.
+
+After brainstorming is completed and the user approves the design:
+
+1. Locate and read the complete Superpowers design document.
+   Default location:
+   docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md
+
+2. Treat this document as the authoritative input for OpenSpec proposal generation.
+
+3. Do NOT repeat brainstorming, reopen settled decisions, or independently redesign the feature.
+
+4. Run OpenSpec propose using the existing design document as mandatory context.
+
+5. Translate the approved design into OpenSpec artifacts:
+   - proposal.md: intent, motivation, scope, goals and non-goals.
+   - specs/: observable, testable functional requirements.
+   - design.md: preserve the approved technical design and decisions.
+   - tasks.md: implementation tasks derived from the approved design and requirements.
+
+6. Preserve all approved decisions, constraints, trade-offs and non-goals.
+   Do not silently omit or reinterpret them.
+
+7. If information is missing or contradictory:
+   - First inspect the project and existing OpenSpec specs.
+   - Ask the user only if the missing information affects the intended behavior or architecture.
+   - Do not invent requirements.
+
+8. Before finishing, verify that every important design decision is represented in the appropriate OpenSpec artifact.
+
+### Conflict resolution
+
+- User-approved decisions take precedence.
+- Existing OpenSpec specs describe the current system behavior.
+- The approved Superpowers design describes the intended change.
+- OpenSpec artifacts formalize that change.
+- If the design conflicts with existing specifications, explicitly identify the conflict and resolve it before implementation.
+
+### Implementation boundary
+
+Do not start implementation until OpenSpec artifacts have been reviewed and approved.
+
+---
+
+## Проект: l2core — ядро торгового бота Lineage 2
+
+Драйвер трёх внутриигровых окон торговли: «Обзор лавок» (market),
+«Торговая лавка (Купить)» (shop_buy, лавка-выкуп), «Торговая лавка (Продажа)»
+(shop_sell). Всё знание об UI — в машиночитаемой UI-модели (`ui_model/`,
+YAML); ядро — её интерпретатор плюс примитивы и сценарии. Стратегии торговли
+— сменные модули поверх стабильного API, в ядро не входят.
+
+Авторитетные источники решений: `openspec/changes/core-market-driver/design.md`
+(решения не переоткрываются) и спецификации в `openspec/changes/core-market-driver/specs/`.
+
+### Команды
+
+Окружение: Python 3.10+, Windows (Win32 API, pywin32). Зависимости и pytest —
+в `pyproject.toml`.
+
+```bash
+# Установка (репозиторий, редактируемый режим, с dev-зависимостями)
+pip install -e ".[dev]"
+
+# Тесты (единственная проверяемая команда на текущем этапе)
+python -m pytest
+
+# Валидация config.yaml против схемы l2core/config.py
+python -c "from l2core.config import load_config; load_config('config.yaml')"
+
+# Запуск бота: точка входа появится вместе с публичным API (раздел 6 tasks.md);
+# документировать/выдумывать команду запуска до этого нельзя.
+```
+
+### Структура пакета
+
+Зависимости только вниз: стратегии → сценарии → примитивы → интерпретатор
+UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
+(MssScreen/ReplayScreen, TemplateMatcher, TorchOcr, HidArduino).
+
+- `l2core/model/` — интерпретатор UI-модели (YAML: окна, элементы, состояния,
+  переходы, OCR-регионы, table_geometry).
+- `l2core/detector/` — детекция окна и состояний, статусы окна
+  (`not_found / occluded_or_unstable / found`), перехватчик модалок.
+- `l2core/primitives/` — примитивы действий (wait_until, activate_game,
+  click_element, enter_text/enter_price, scroll_list, drag_item).
+- `l2core/scenarios/` — сценарии (scan_market, setup_sell, monitor_shop).
+- `l2core/adapters/` — MssScreen/ReplayScreen/RecordingScreen, TemplateMatcher,
+  TorchOcr/RemoteOcr(позже), HidArduino.
+- `l2core/api/` — публичный синхронный API + события для модулей стратегий.
+- `l2core/config.py` — схема и типизированный загрузчик `config.yaml`.
+- `tests/` — pytest; `ui_model/` — YAML UI-модель; `assets/` — шаблоны и
+  golden-кропы (версионируются вместе с моделью); `base_screenshot/scr/` —
+  сырьё (39 скриншотов + meta.json), не зависимость ядра.
+
+### Инварианты (нарушать нельзя)
+
+1. **Никаких `sleep` — только `wait_until(predicate, timeout)`**; таймауты из
+   конфига (`timing.wait_default_timeout`, `timing.verify_interval`).
+2. **Verify на каждое действие**: retry (n из конфига) → `on_fail[]` из
+   перехода модели → общий recover.
+3. **Никаких абсолютных координат вне слоя якоря**: все координаты элементов
+   1:1 от якоря своего окна; якорь ищется на каждом кадре, кэша позиции нет.
+4. **Трёхзначный результат критичных действий: OK / FAILED / UNKNOWN.**
+   UNKNOWN = эффект не подтверждён (лаг, перекрытие). Потенциально необратимые
+   действия (начать продажу, подтвердить) при UNKNOWN не повторяются — решение
+   за стратегией.
+5. **Байт-идентичность вендоренного OCR-препроцесса**: вендорится
+   замороженная копия preprocess + CTC greedy decode + загрузчик чекпоинта из
+   `L2-CRNN-MODEL-TRAIN` (guard-тесты на эталонных векторах и кропах
+   `assets/ocr_golden/`). Правки вендоренного кода запрещены.
+6. **TDD**: сначала тест (красный), потом код (зелёный).
+7. **Детерминизм тестов**: ни тест, ни код под тестом не зависят от времени
+   суток, случайных чисел без фиксированного seed и внешних сервисов;
+   replay-входы — записанные кадры, не живой экран.
+8. **Код и комментарии — на русском.**
+9. **Слепых кликов нет**: заблокированный экран, оверлеи, невозможность
+   активации окна → осмысленная ошибка / событие эскалации.
+
+### Процесс обновления модели после патчей игры
+
+Патч игры ломает UI → чинится модель, не код (в общем случае):
+
+1. Доснять скрины нового состояния, обновить meta.json (сырьё в
+   `base_screenshot/scr/`).
+2. Через конвертер (задача 2.2) импортировать кропы в `assets/` и собрать
+   карточки элементов; конвертер пишет diff-отчёт и НЕ перезаписывает ручные
+   правки модели.
+3. Разметить/исправить rect'ы, сигнатуры, переходы (verify, on_fail) в
+   `ui_model/`; переход без verify/on_fail не считается завершённым.
+4. Прогнать валидатор модели (задача 2.3) и `python -m pytest` — golden-тесты
+   геометрии и эталонные кропы `assets/ocr_golden/` обязаны проходить.
+5. Если патч меняет геометрию таблицы — перекалибровать `table_geometry` и
+   экспортировать константы в датасет-пайплайн (общий источник с обучением,
+   версия + diff-отчёт).
+6. Если модели недостаточно (новая динамика, новый примитив) — менять код
+   по слоям выше, инварианты сохранять.
+
+### Правила изменений
+
+- Обновление AGENTS.md — часть DoD ломающих задач: изменение команд,
+  структуры, инвариантов или процесса без правки этого файла = задача не
+  закрыта.
+- Процессный раздел «Superpowers ↔ OpenSpec Integration» выше — отдельный
+  контракт проекта; проектные изменения его не трогают.
+- Документация не описывает несуществующий код: команда запуска, API и
+  сценарии появляются в README/AGENTS.md только вместе с реализацией.
+- `crnn_best.pt` — вне git (путь в конфиге, `.gitignore`); шаблоны и
+  golden-кропы в `assets/` — версионируются.
