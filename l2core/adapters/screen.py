@@ -183,6 +183,8 @@ class ReplayScreen(Screen):
         self._current = self._session.read_image(self._session.events[0]["image"])
 
     def grab(self) -> np.ndarray:
+        if self._session is None:
+            raise ScreenClosedError("ReplayScreen закрыт")
         return self._current
 
     def notify_action(self, action: dict) -> None:

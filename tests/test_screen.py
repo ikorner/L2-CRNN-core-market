@@ -171,6 +171,15 @@ class TestReplayScreen:
         with pytest.raises(SessionFormatError):
             ReplayScreen(path)
 
+    def test_grab_after_close_rejected(self, tmp_path):
+        path = self._build_session(
+            tmp_path, lambda w: w.record_frame(frame(1))
+        )
+        screen = ReplayScreen(path)
+        screen.close()
+        with pytest.raises(ScreenClosedError):
+            screen.grab()
+
 
 class TestRecordingScreen:
     def test_records_frames_actions_results(self, tmp_path):
