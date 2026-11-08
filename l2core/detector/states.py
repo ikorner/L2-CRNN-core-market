@@ -92,6 +92,24 @@ class StateReport:
     ocr_degraded: bool
 
 
+@dataclass(frozen=True)
+class ContentReport:
+    """Результат проверки признака «контент прогрузился» (задача 3.5).
+
+    loaded: True — совпала хотя бы одна контентная сигнатура; False —
+    контентные сигнатуры есть, но ни одна не совпала (контент не прогружен);
+    None — контентных сигнатур в модели нет, проверить прогрузку нечем.
+    matched/failed — оценённые сигнатуры; skipped — имена исключённых
+    (опоры якоря) и недоступных (OCR без клиента) признаков.
+    """
+
+    loaded: Optional[bool]
+    matched: Tuple[SignatureResult, ...]
+    failed: Tuple[SignatureResult, ...]
+    skipped: Tuple[str, ...]
+    ocr_degraded: bool
+
+
 def _signature_name(check: Check) -> str:
     if check.kind == "pixel_probe":
         pts = "+".join(f"{p.at[0]},{p.at[1]}" for p in check.points)
@@ -266,6 +284,62 @@ class StateDetector:
             failed=tuple(failed_all),
             conflicts=(),
             ocr_degraded=any(r.matched is None for r in failed_all),
+        )
+
+    def check_content(self, frame: np.ndarray, anchor: Anchor, *,
+                      exclude_elements: Tuple[str, ...] = ()) -> ContentReport:
+        """Проверка признака «контент прогрузился» (задача 3.5).
+
+        Контентные сигнатуры — template/pixel_probe-сигнатуры не-recover
+        состояний окна, КРОМЕ элементов из exclude_elements (вызывающая
+        сторона исключает опоры якоря — заголовок/целое окно не считаются
+        контентом). Оценка та же, что в detect(), но без остановки на первом
+        провале: нужен факт «хотя бы одна контентная сигнатура совпала», а
+        не подтверждение конкретного состояния. OCR-сигнатуры без клиента
+        недоступны (ocr_degraded), в loaded не учитываются.
+        """
+        model = self._models[anchor.window_id]
+        gray = _to_gray(frame)
+        frame_h, frame_w = gray.shape
+
+        candidates: dict = {}
+        skipped: list = []
+        for state_id in sorted(model.states):
+            if state_id.startswith(RECOVER_PREFIX):
+                continue
+            for check in model.states[state_id].signatures:
+                name = _signature_name(check)
+                if name in candidates or name in skipped:
+                    continue
+                if (check.kind in ("pixel_probe", "template")
+                        and check.element in exclude_elements):
+                    skipped.append(name)
+                    continue
+                candidates[name] = (state_id, check)
+
+        if not candidates:
+            return ContentReport(
+                loaded=None, matched=(), failed=(), skipped=tuple(skipped),
+                ocr_degraded=False,
+            )
+
+        matched: list = []
+        failed: list = []
+        degraded = False
+        for name in sorted(candidates):
+            state_id, check = candidates[name]
+            result = self._evaluate(
+                check, model, anchor, gray, frame, frame_w, frame_h, state_id)
+            if result.matched is True:
+                matched.append(result)
+            else:
+                failed.append(result)
+                if result.matched is None:
+                    degraded = True
+        loaded = bool(matched)
+        return ContentReport(
+            loaded=loaded, matched=tuple(matched), failed=tuple(failed),
+            skipped=tuple(skipped), ocr_degraded=degraded,
         )
 
     def _evaluate(self, check: Check, model: UiModel, anchor: Anchor,
