@@ -91,6 +91,14 @@ python -m l2core.model.export_geometry ui_model/market.yaml \
 # Валидация config.yaml против схемы l2core/config.py
 python -c "from l2core.config import load_config; load_config('config.yaml')"
 
+# Golden-набор OCR: нарезка/пересоздание эталонных кропов из сырья по индексу
+# assets/ocr_golden/index.yaml (rect'ы 1:1, источник истины — индекс)
+python tools/gen_ocr_golden.py
+
+# OCR-бенчмарк на golden-наборе (ручной, вне CI): точность и время на CPU и
+# GPU; без crnn_best.pt — понятная ошибка, код выхода 2
+python tools/benchmark_ocr.py --model <путь>/crnn_best.pt
+
 # Запуск бота: точка входа появится вместе с публичным API (раздел 6 tasks.md);
 # документировать/выдумывать команду запуска до этого нельзя.
 ```
@@ -256,6 +264,30 @@ l2core/ (кроме самого ocr_vendor/), tests/ и tools/; импорт
 с текстом «ocr_vendor» ложных срабатываний не дают). Единственное
 исключение — `tests/test_ocr_vendor.py` (guard самого вендора, задача 4.1),
 зафиксировано явным allowlist'ом.
+
+### Golden-набор OCR и бенчмарк (задача 4.6)
+
+`assets/ocr_golden/` — эталонные кропы с известным текстом: index.yaml
+(карточки: id, файл, скриншот-источник, rect 1:1 в пикселях источника,
+ожидаемый текст, грамматика digits/price/text, units-суффиксы, критерий
+известности и кто/когда подтвердил) + кропы `<id>.png`. Критерий известности
+(R4): текст читается человеком со скриншота без сомнений и подтверждён
+визуальной проверкой кропа; description меты — аннотации, НЕ ground truth.
+Нарезка/пересоздание — `python tools/gen_ocr_golden.py` (из сырья по rect
+индекса). Тесты tests/test_ocr_golden.py: индекс валиден, кропы совпадают
+с повторной нарезкой из сырья (guard протухания), guard чтения через
+OcrClient — только при наличии реальной модели (иначе skip с parked-
+диагностикой; карточки с символами вне алфавита чекпоинта пропускаются
+с отчётом — алфавит реальной модели до получения файла честно неизвестен),
+smoke бенчмарка на fake-чекпоинте (CPU; GPU-ветка честно «skipped» без GPU,
+ruling R6).
+
+Бенчмарк (ручной, вне CI): `python tools/benchmark_ocr.py [--model путь]
+[--devices cpu cuda] [--repeat N]` — точность (exact match эталонного
+текста) и среднее время по кропам отдельно на CPU и GPU; без чекпоинта —
+понятная ошибка и код выхода 2 (crnn_best.pt вне git, paths.model).
+Реальные числа и досъёмка числовых кропов (цены, «0 из N», адена) —
+на машине владельца с crnn_best.pt (docs/OWNER_QUESTIONS.md Q24).
 
 ### Template matching (задача 3.3, решение 13)
 

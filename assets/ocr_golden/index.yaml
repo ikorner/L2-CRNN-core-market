@@ -1,0 +1,258 @@
+# Golden-набор OCR (task 4.6, spec ocr-reading «Golden-набор и OCR-бенчмарк»).
+# Эталонные кропы с ИЗВЕСТНЫМ текстом: guard чтения обёртки (tests/
+# test_ocr_golden.py) и OCR-бенчмарк (tools/benchmark_ocr.py).
+#
+# Критерий известности текста (ruling R4): текст читается человеком со
+# скриншота-источника без сомнений и подтверждён визуальной проверкой
+# нарезанного кропа. Описания meta.json — аннотации разметчика, НЕ ground
+# truth: ни один expected text не взят из description меты.
+#
+# rect — пиксели скриншота-источника 1:1 (1920x1080). Кропы нарезаются
+# инструментом tools/gen_ocr_golden.py (пересоздание: python tools/gen_ocr_golden.py);
+# тест следит, что файлы совпадают с повторной нарезкой rect из сырья.
+#
+# grammar — грамматика OCR-регионов (common.yaml, задача 4.4): digits,
+# price (разделители `,`/`.`, суффиксы `к`/`кк`), text. units — суффиксы-
+# единицы, которые модель окна могла бы задать для отсечения (документация
+# карточки, формат как в GrammarSpec types.py).
+#
+# Набор собран из 39 скринов сырья (base_screenshot/scr/). Досъёмка
+# числовых кропов (цены лавок, «0 из N», адена) — на машине владельца с
+# crnn_best.pt (docs/OWNER_QUESTIONS.md).
+version: 1
+criteria: >
+  Текст читается человеком со скриншота-источника без сомнений
+  и подтверждён визуальной проверкой нарезанного кропа; описания
+  meta.json (аннотации на русском) ground truth не являются.
+cards:
+  # --- scr_154330: «Торговая лавка (Купить)», начало покупки ---
+  - id: buy_title
+    file: buy_title.png
+    source: scr_154330
+    rect: [315, 232, 198, 29]
+    text: "Торговая лавка(Купить)"
+    grammar: text
+    known_by: заголовок окна, читается с кропа без сомнений
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: buy_kolvo
+    file: buy_kolvo.png
+    source: scr_154330
+    rect: [612, 264, 52, 22]
+    text: "(0/6)"
+    grammar: text
+    known_by: счётчик «(0/6)» справа от подписи «Список предметов», читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: buy_adena
+    file: buy_adena.png
+    source: scr_154330
+    rect: [318, 554, 110, 20]
+    text: "25,306,534,655"
+    grammar: price
+    known_by: количество адены под подписью «Аден», читается с кропа без сомнений
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: buy_price_zero
+    file: buy_price_zero.png
+    source: scr_154330
+    rect: [640, 554, 18, 20]
+    text: "0"
+    grammar: digits
+    known_by: поле «Цена» с введённым нулём (по правому краю поля), читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: buy_cancel
+    file: buy_cancel.png
+    source: scr_154330
+    rect: [312, 607, 98, 23]
+    text: "Отмена покупки"
+    grammar: text
+    known_by: подпись кнопки в нижнем ряду окна, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: buy_start
+    file: buy_start.png
+    source: scr_154330
+    rect: [416, 607, 100, 23]
+    text: "Начать покупку"
+    grammar: text
+    known_by: подпись кнопки в нижнем ряду окна, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: buy_history
+    file: buy_history.png
+    source: scr_154330
+    rect: [552, 607, 100, 23]
+    text: "История"
+    grammar: text
+    known_by: подпись кнопки в нижнем ряду окна, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: buy_viveska
+    file: buy_viveska.png
+    source: scr_154330
+    rect: [168, 605, 78, 27]
+    text: "Вывеска"
+    grammar: text
+    known_by: подпись кнопки в нижнем ряду окна, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  # --- scr_153551: «Обзор лавок», топ-5 (market.list) ---
+  - id: m5_qty_1
+    file: m5_qty_1.png
+    source: scr_153551
+    rect: [650, 452, 46, 20]
+    text: "2,461"
+    grammar: price
+    known_by: колонка «Кол-во сделок», строка 1, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: m5_qty_2
+    file: m5_qty_2.png
+    source: scr_153551
+    rect: [650, 512, 46, 20]
+    text: "330"
+    grammar: digits
+    known_by: колонка «Кол-во сделок», строка 2, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: m5_qty_3
+    file: m5_qty_3.png
+    source: scr_153551
+    rect: [650, 576, 50, 22]
+    text: "277"
+    grammar: digits
+    known_by: колонка «Кол-во сделок», строка 3, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: m5_qty_4
+    file: m5_qty_4.png
+    source: scr_153551
+    rect: [650, 636, 50, 22]
+    text: "270"
+    grammar: digits
+    known_by: колонка «Кол-во сделок», строка 4, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: m5_qty_5
+    file: m5_qty_5.png
+    source: scr_153551
+    rect: [650, 696, 50, 22]
+    text: "248"
+    grammar: digits
+    known_by: колонка «Кол-во сделок», строка 5, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: m5_price_1
+    file: m5_price_1.png
+    source: scr_153551
+    rect: [1135, 448, 85, 22]
+    text: "930 млрд"
+    grammar: price
+    units: [млрд]
+    known_by: колонка «Цена сделок», строка 1, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: m5_price_2
+    file: m5_price_2.png
+    source: scr_153551
+    rect: [1135, 508, 85, 22]
+    text: "850 млрд"
+    grammar: price
+    units: [млрд]
+    known_by: колонка «Цена сделок», строка 2, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: m5_price_3
+    file: m5_price_3.png
+    source: scr_153551
+    rect: [1135, 566, 85, 22]
+    text: "550 млрд"
+    grammar: price
+    units: [млрд]
+    known_by: колонка «Цена сделок», строка 3, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: m5_price_4
+    file: m5_price_4.png
+    source: scr_153551
+    rect: [1135, 626, 85, 22]
+    text: "440 млрд"
+    grammar: price
+    units: [млрд]
+    known_by: колонка «Цена сделок», строка 4, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: m5_price_5
+    file: m5_price_5.png
+    source: scr_153551
+    rect: [1135, 686, 85, 22]
+    text: "435 млрд"
+    grammar: price
+    units: [млрд]
+    known_by: колонка «Цена сделок», строка 5, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  # --- scr_153611: «Обзор лавок», строки списка (market.list) ---
+  - id: mrow_price_1aden
+    file: mrow_price_1aden.png
+    source: scr_153611
+    rect: [780, 363, 110, 22]
+    text: "1 аден"
+    grammar: price
+    units: [аден]
+    known_by: колонка «Цена» строки 1, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: mrow_price_240
+    file: mrow_price_240.png
+    source: scr_153611
+    rect: [740, 527, 170, 22]
+    text: "240 млрд аден"
+    grammar: price
+    units: [млрд, аден]
+    known_by: колонка «Цена» строки 4, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: mrow_price_355
+    file: mrow_price_355.png
+    source: scr_153611
+    rect: [740, 634, 170, 22]
+    text: "355 млрд аден"
+    grammar: price
+    units: [млрд, аден]
+    known_by: колонка «Цена» строки 6, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: mrow_price_320
+    file: mrow_price_320.png
+    source: scr_153611
+    rect: [740, 686, 170, 22]
+    text: "320 млрд аден"
+    grammar: price
+    units: [млрд, аден]
+    known_by: колонка «Цена» строки 7, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  # --- scr_154424: «Торговая лавка (Купить)», список покупок ---
+  - id: buylist_price
+    file: buylist_price.png
+    source: scr_154424
+    rect: [445, 444, 85, 22]
+    text: "4 тыс 444"
+    grammar: price
+    units: [тыс]
+    known_by: колонка «Цена покупки», строка 1, читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"
+  - id: buylist_total
+    file: buylist_total.png
+    source: scr_154424
+    rect: [508, 661, 100, 18]
+    text: "17 тыс 776"
+    grammar: price
+    units: [тыс]
+    known_by: поле «Ожидаемые расходы» (правый нижний угол окна), читается с кропа
+    confirmed_by: task-4.6 (визуальная проверка кропа)
+    confirmed_at: "2026-11-08"

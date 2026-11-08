@@ -132,6 +132,16 @@ class TorchOcr:
         """Устройство инференса (torch.device)."""
         return self._device
 
+    @property
+    def alphabet(self) -> list[str]:
+        """Алфавит модели из чекпоинта.
+
+        До получения реального crnn_best.pt честно неизвестно, тянет ли
+        модель кириллицу/«тыс»/«млрд»: guard golden-набора (task 4.6)
+        пропускает карточки с символами вне алфавита с диагностикой.
+        """
+        return list(self._alphabet)
+
     def read(self, region_img: np.ndarray) -> tuple[str, float]:
         """Контракт OcrClient: BGR/gray регион -> (текст, confidence)."""
         gray = _to_gray(np.asarray(region_img))
