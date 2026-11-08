@@ -30,8 +30,9 @@
   заданы в клиентской области игры — в окно не вписываются и здесь
   не проверяются.
 - template_missing — все кроп-шаблоны вариантов существуют в assets/.
-- table_geometry_required — окно со списком обязано иметь table_geometry
-  (обещание FORMAT.md; константы переносятся в задаче 2.4).
+- table_geometry_required — окно с текстовой таблицей списка
+  (WINDOWS_WITH_LISTS, состав зафиксирован в 2.4 по мете) обязано иметь
+  table_geometry.
 
 Нарушения — структурированные записи Violation (правило, файл, субъект,
 деталь), а не строки: allowlist пробелов отгруженных моделей (ruling R10,
@@ -52,8 +53,12 @@ import yaml
 from .loader import ModelFormatError, load_model
 from .types import Check, TransitionSpec, UiModel
 
-# Окна со списком: обязательная table_geometry (FORMAT.md).
-WINDOWS_WITH_LISTS = ("market", "shop_buy", "shop_sell")
+# Окна с текстовой таблицей списка: обязательная table_geometry (FORMAT.md).
+# Зафиксировано в 2.4 по мете: у shop_buy/shop_sell «списки» — иконные сетки
+# («Снаряжение»/«Список покупок»/«Продажа» окна «Торговая лавка»), текстовых
+# колонок нет. Таблицы «<Продажа>»/«<Покупка>» (история торговли) принадлежат
+# другим окнам, в моделях не описаны — см. комментарий в KNOWN_GAPS.yaml.
+WINDOWS_WITH_LISTS = ("market",)
 
 # Соглашение: recover-состояние — id с этим префиксом (см. модульный docstring).
 RECOVER_STATE_PREFIX = "recover"

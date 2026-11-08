@@ -80,6 +80,14 @@ python -m l2core.model.converter
 # ui_model/KNOWN_GAPS.yaml (ruling R10), тесты следят за их актуальностью.
 python -m l2core.model.validator ui_model/market.yaml ui_model/shop_buy.yaml ui_model/shop_sell.yaml
 
+# Экспорт констант геометрии таблицы (table_geometry) в датасет-пайплайн
+# (L2-CRNN-Dataset-Builder): Python-модуль констант с пометкой версии модели
+# (--version, git-описание ui_model/ или ручная) и diff-отчётом об отличиях
+# от предыдущей выгрузки (stdout + <output>.diff). Детерминирован, без меток
+# времени. Значения закреплены golden-тестами tests/test_table_geometry.py.
+python -m l2core.model.export_geometry ui_model/market.yaml \
+    --version <версия-модели> --output <путь>/table_geometry.py
+
 # Валидация config.yaml против схемы l2core/config.py
 python -c "from l2core.config import load_config; load_config('config.yaml')"
 

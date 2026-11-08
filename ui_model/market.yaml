@@ -1,6 +1,7 @@
 # UI-модель окна market. Импорт конвертером (l2core.model.converter) из base_screenshot/scr/meta.json.
 # Политика слияния: ручные правки побеждают, машинное дополняет; diff-отчёт — `python -m l2core.model.converter`.
-# Сигнатуры состояний, verify/on_fail, OCR-регионы и table_geometry доразмечаются вручную (задачи 2.3-2.5).
+# table_geometry откалибрована из меты под 1920x1080 (задача 2.4, метод — в отчёте 2.4).
+# Сигнатуры состояний, verify/on_fail и OCR-регионы доразмечаются вручную (задачи 2.3-2.5).
 window:
   id: market
   title: Обзор лавок
@@ -453,3 +454,18 @@ states:
     - {kind: template, element: market_main_button_active, variant: active}
 transitions: []
 ocr_regions: {}
+# Геометрия нарезки таблицы списка лавок. Калибровка под 1920x1080 из меты
+# (задача 2.4, метод и числа — в отчёте 2.4; golden-тесты —
+# tests/test_table_geometry.py). col_seps: 1px линии заголовка
+# (117/417/648/778) и правый край контента перед скроллбаром (967).
+# zone: x — от якоря окна, y — от верха строки.
+table_geometry:
+  col_seps: [117, 417, 648, 778, 967]
+  row_y0: 263
+  row_pitch: 56
+  max_rows: 8
+  columns:
+    item: {zone: [195, 10, 222, 38], grammar: text}
+    price: {zone: [437, 10, 170, 38], grammar: price}
+    seller: {zone: [655, 10, 118, 38], grammar: text}
+    deal: {zone: [790, 10, 140, 38], grammar: text}

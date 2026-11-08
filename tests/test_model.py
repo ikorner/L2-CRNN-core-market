@@ -81,10 +81,13 @@ def test_load_shipped_market_model_round_trip():
         ("template", "market_main_button_active")
     ]
 
-    # мета transitions/ocr_regions/table_geometry не знает — пусто.
+    # мета transitions/ocr_regions не знает — пусто; table_geometry
+    # откалибрована вручную (задача 2.4), значения — golden-тесты
+    # tests/test_table_geometry.py.
     assert model.transitions == ()
     assert model.ocr_regions == {}
-    assert model.table_geometry is None
+    assert model.table_geometry is not None
+    assert model.table_geometry.columns["price"].grammar.kind == "price"
 
 
 def test_empty_states_and_ocr_regions_are_valid(tmp_path):
@@ -194,10 +197,12 @@ def test_model_without_table_geometry_loads(tmp_path):
     assert model.table_geometry is None
 
 
-def test_shipped_models_have_no_table_geometry_yet():
-    """Реальный импорт (2.2) table_geometry не знает — секции нет."""
+def test_shipped_models_table_geometry_presence():
+    """2.4: геометрия размечена у market; у shop_* текстовой таблицы нет."""
     common = load_common(UI_MODEL / "common.yaml")
-    for window in ("market", "shop_buy", "shop_sell"):
+    market = load_model(UI_MODEL / "market.yaml", common)
+    assert market.table_geometry is not None
+    for window in ("shop_buy", "shop_sell"):
         model = load_model(UI_MODEL / f"{window}.yaml", common)
         assert model.table_geometry is None
 

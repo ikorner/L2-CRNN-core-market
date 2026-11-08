@@ -14,6 +14,7 @@ import yaml
 
 from l2core.model import load_model
 from l2core.model.validator import (
+    WINDOWS_WITH_LISTS,
     check_against_gaps,
     format_report,
     load_gaps,
@@ -235,7 +236,7 @@ def test_existing_template_passes(tmp_path):
 # --- Правило table_geometry_required: окна со списком обязаны иметь геометрию ---
 
 
-@pytest.mark.parametrize("window", ["market", "shop_buy", "shop_sell"])
+@pytest.mark.parametrize("window", list(WINDOWS_WITH_LISTS))
 def test_window_with_list_requires_table_geometry(tmp_path, window):
     text = MINIMAL_MODEL.replace("id: market", f"id: {window}")
     text = text.replace(
