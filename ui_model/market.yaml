@@ -1,7 +1,9 @@
 # UI-модель окна market. Импорт конвертером (l2core.model.converter) из base_screenshot/scr/meta.json.
 # Политика слияния: ручные правки побеждают, машинное дополняет; diff-отчёт — `python -m l2core.model.converter`.
 # table_geometry откалибрована из меты под 1920x1080 (задача 2.4, метод — в отчёте 2.4).
-# Сигнатуры состояний, verify/on_fail и OCR-регионы доразмечаются вручную (задачи 2.3-2.5).
+# Сигнатуры состояний и семантика подтверждённых переходов размечены (2.3-2.5,
+# обоснование — в отчёте 2.5); OCR-регионы и неподтверждённая семантика —
+# в KNOWN_GAPS.yaml и docs/OWNER_QUESTIONS.md.
 window:
   id: market
   title: Обзор лавок
@@ -452,7 +454,66 @@ states:
     params: {tab: home}
     signatures:
     - {kind: template, element: market_main_button_active, variant: active}
-transitions: []
+    # Второй признак (пробел KNOWN_GAPS закрыт правкой модели): открытое
+    # окно целиком, scr_153551 (мета второй признак не знала).
+    - {kind: template, element: market_main_menu, variant: normal}
+  recover_closed:
+    # «Все окна торговли закрыты» (scr_153511, scr_all_close). Сигнатуры —
+    # видимость HUD-иконок открытия (они импортированы в эту модель).
+    # Состояние глобальное (не окна market), живёт здесь, т.к. HUD-иконки
+    # импортом лежат в market.yaml; моделирование — вопрос владельцу (Q3,
+    # docs/OWNER_QUESTIONS.md).
+    params: {}
+    signatures:
+    - {kind: template, element: market_pic, variant: normal}
+    - {kind: template, element: open_buy_trade, variant: normal}
+# Семантика переходов (задача 2.5). Заполнены ТОЛЬКО переходы, подтверждённые
+# метой/скриншотами (R4: в мете click_leads_to: null всюду). Обоснование по
+# каждому переходу — в отчёте 2.5 и docs/OWNER_QUESTIONS.md. verify — наблюдаемые
+# признаки целевого состояния; on_fail — локальные пассивные шаги (design,
+# решение 6: ESC -> клик в свободную область); точная цепочка recover — рантайм
+# 5.8. timeout не задан — берётся из конфига при исполнении.
+transitions:
+  # scr_153511 (окон нет, иконка на HUD) -> scr_153551 (tab=home активен).
+  # Оговорка меты: при повторном открытии открывается последний tab —
+  # вопрос владельцу (Q2).
+  - from: recover_closed
+    action: click
+    element: market_pic
+    expected: list__tab_home
+    verify:
+      - {kind: template, element: market_main_button_active, variant: active}
+      - {kind: template, element: market_main_menu, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  # scr_153551 (tab=home) -> scr_153600 (tab=equipment, фильтр «Все» активен).
+  - from: list__tab_home
+    action: click
+    element: market_snar_passive
+    expected: list__filter_all__global_filter_all__tab_equipment
+    verify:
+      - {kind: template, element: snaryg_active, variant: active}
+      - {kind: template, element: filter_button_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  # Обратный таб: scr_153600 -> scr_153551. Элемент — таб «Главная» в
+  # невыбранном виде (scr_153712, в мете вариант помечен active по ошибке
+  # слота — описание кропа «пассивный»).
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: main_not_active
+    expected: list__tab_home
+    verify:
+      - {kind: template, element: market_main_button_active, variant: active}
+      - {kind: template, element: market_main_menu, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  # scr_153551 (кнопка есть) -> scr_all_close (окон нет).
+  - from: list__tab_home
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
 ocr_regions: {}
 # Геометрия нарезки таблицы списка лавок. Калибровка под 1920x1080 из меты
 # (задача 2.4, метод и числа — в отчёте 2.4; golden-тесты —

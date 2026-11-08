@@ -74,17 +74,20 @@ def test_load_shipped_market_model_round_trip():
     assert pic.search_area == (1000, 420, 200, 160)
     assert pic.variants["normal"].click_point == (86, 64)
 
-    # состояние из меты: params + template-сигнатуры фактов наблюдения.
+    # состояние из меты: params + template-сигнатуры фактов наблюдания.
+    # Вторая сигнатура добавлена в 2.5 (пробел KNOWN_GAPS закрыт правкой
+    # модели): открытое окно целиком, scr_153551.
     home = model.states["list__tab_home"]
     assert home.params == {"tab": "home"}
     assert [(s.kind, s.element) for s in home.signatures] == [
-        ("template", "market_main_button_active")
+        ("template", "market_main_button_active"),
+        ("template", "market_main_menu"),
     ]
 
-    # мета transitions/ocr_regions не знает — пусто; table_geometry
-    # откалибрована вручную (задача 2.4), значения — golden-тесты
-    # tests/test_table_geometry.py.
-    assert model.transitions == ()
+    # семантика подтверждённых переходов размечена в 2.5 (данные —
+    # тесты/test_transitions.py); неподтверждённая — KNOWN_GAPS/OWNER_QUESTIONS.
+    assert model.transitions != ()
+    assert "recover_closed" in model.states
     assert model.ocr_regions == {}
     assert model.table_geometry is not None
     assert model.table_geometry.columns["price"].grammar.kind == "price"
