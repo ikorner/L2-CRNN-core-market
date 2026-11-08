@@ -153,8 +153,8 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
 - `l2core/adapters/` — MssScreen/ReplayScreen/RecordingScreen (screen.py,
   формат сессии — session.py), win32-шлюз и находилка окна игры (win32.py,
   DPI-aware объявление процесса), TemplateMatcher (template.py),
-  вендоренная копия OCR-кода (ocr_vendor/, задача 4.1), TorchOcr/RemoteOcr(позже),
-  HidArduino.
+  вендоренная копия OCR-кода (ocr_vendor/, задача 4.1), OCR-адаптер
+  (ocr.py: OcrClient/TorchOcr/RemoteOcr, задача 4.2), HidArduino.
 
 ### Вендоринг OCR-кода (задача 4.1, инвариант 5)
 
@@ -174,6 +174,23 @@ Guard-тесты `tests/test_ocr_vendor.py` сравнивают вендор с
 вне CI; проверяет коммит-источник). Для запуска guard-тестов исходный
 репозиторий не нужен. Обёртка инференса (TorchOcr/OcrClient) — задача 4.2,
 сюда не входит.
+
+### OCR-адаптер (задача 4.2)
+
+`l2core/adapters/ocr.py`: протокол `OcrClient` (`read(region_img) ->
+(text, confidence)`, runtime_checkable — подмена без наследования),
+`TorchOcr` (in-process инференс поверх ocr_vendor) и заглушка `RemoteOcr`
+(NotImplementedError — удалённый сервис, задача будущего). Точка подмены —
+фабрика `create_ocr_client(kind, ...)`: аргумент (далее — конфиг) выбирает
+реализацию без правки ядра. Модуль импортируется без torch (ленивый импорт
+при создании TorchOcr); модель грузится один раз при создании, устройство —
+авто-детект cuda → cpu (инъекция `cuda_available` для тестов обоих путей;
+выбор устройства вендоренного load_model mps/cpu для ядра не используется).
+Confidence — средняя max-softmax по таймстепам, round 4 (формула
+`confidence_from_logits` оригинального autolabel.py — та же метрика, что
+в пайплайне автоматической разметки; замер 4.2, отчёт task-4.2-report.md).
+Грамматики (4.4), перечитывания (4.5), бенчмарк (4.6) — не здесь (YAGNI).
+Тесты: `tests/test_ocr.py` (фейковый чекпоинт fake_crnn.pt, exact-пины).
 
 ### Template matching (задача 3.3, решение 13)
 
