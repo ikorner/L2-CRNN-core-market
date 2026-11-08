@@ -154,7 +154,42 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
   формат сессии — session.py), win32-шлюз и находилка окна игры (win32.py,
   DPI-aware объявление процесса), TemplateMatcher (template.py),
   вендоренная копия OCR-кода (ocr_vendor/, задача 4.1), OCR-адаптер
-  (ocr.py: OcrClient/TorchOcr/RemoteOcr, задача 4.2), HidArduino.
+  (ocr.py: OcrClient/TorchOcr/RemoteOcr, задача 4.2), сегментация таблицы
+  (table_segmentation/, задача 4.3), HidArduino.
+
+### Вендоринг сегментации таблицы (задача 4.3, design.md решение 12)
+
+Байт-идентичный блок `rows_and_columns` / `extract_cells` / `trim_to_text`
+(+ их хелперы и дефолтные константы) из L2-CRNN-Dataset-Builder/
+build_dataset.py — `l2core/adapters/table_segmentation/build_dataset.py`.
+Источник — коммит 606a65ebb474a1b8ea13ad2483aaa915b89a168d (шапка файла).
+Не скопированы: `detect_window` (в ядре — свой детектор якоря), разметка/
+сборка датасета, CLI; адаптации — только импортный уровень (убраны импорты
+невендоренных частей). Правки вендора запрещены: менять в источнике, затем
+перевендоривать (эталоны перегенерирует `tools/gen_table_segmentation_fixtures.py`,
+запуск вручную вне CI, проверяет коммит-источник).
+
+Вендор читает геометрию из module-level globals; дефолты — калибровка
+датасета 1136x833, устаревшая для рантайма (ruling R5). Рантайм работает
+только через wrapper `TableSegmentation` (segmentation.py): при создании
+подменяет глобалы константами `table_geometry` модели (через объектную
+модель l2core.model), эффект процесс-wide. Маппинг: col_seps[0] → CONTENT_X0,
+col_seps[1:] → COL_SEPS, ключ колонки «item» → «name» (обрезка зоны текста
+без иконки привязана к литералу «name» в вендоре), полоса заголовка
+row_y0−18..row_y0, ROW_H = row_pitch (в новой калибровке нет разделительных
+линий между строками), TABLE_BOTTOM = row_y0 + max_rows·pitch (не биндинг
+при кропе по якорю), зоны item/price → NAME_TEXT_X/PRICE_TEXT_X. Детали и
+обоснования — в отчёте task-4.3-report.md.
+
+Guard-тесты `tests/test_table_segmentation_vendor.py` сравнивают вендор с
+эталонами `tests/fixtures/table_segmentation/` (exact: структуры, хэши,
+байты кропов на сохранённых входах). Guard запрета прямых импортов
+(по аналогии с R13): `tests/test_table_segmentation_contract.py` — импорт
+вендоренного build_dataset разрешён только внутри `l2core/adapters/` и
+явным allowlist'ом тестов (guard вендора и тест wrapper'а). Интеграционная
+нарезка реальных скринов меты константами модели —
+`tests/test_table_segmentation.py` (7 строк, тайлинг от row_y0, зоны
+колонок из 2.4). Потребитель read_rows — задача 6.1.
 
 ### Вендоринг OCR-кода (задача 4.1, инвариант 5)
 
