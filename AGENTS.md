@@ -323,6 +323,26 @@ R13/4.2b): AST-проход по l2core/ ищет вызовы `.sleep(...)` (ti
 перезагрузка Arduino), `adapters/ocr_vendor/`, `adapters/table_segmentation/`
 (байт-идентичный вендор), `primitives/wait.py` (sanctioned-точка ожидания).
 
+### activate_game (задача 5.2, spec core-api-events, safety)
+
+`l2core/primitives/activate.py`: активация окна игры перед действием —
+поиск окна (GameWindowFinder, критерии из config.window), проверка фокуса
+(GetForegroundWindow == hwnd через шлюз), при необходимости SetForeground,
+verify через wait_until («фокус получен», тайминги timing из конфига),
+retry: попыток = 1 + timing.click_retry_count; исчерпание → ActivateGameError
+(reason=focus_not_acquired, диагностика) — сигнал эскалации, recover-цепочка
+— 5.8. Окно не найдено/свёрнуто/без клиентской области → ActivateGameError
+с reason находилки (3.2), SetForeground не вызывается (инвариант 9). Отмена
+через cancelled (kill switch 8.1) → результат с cancelled=True, не исключение.
+Протокол Win32Gateway расширен методами `get_foreground_window()` /
+`set_foreground(hwnd)` (реализация — PyWin32Gateway, в тестах fake).
+
+Проверка перекрытия — честный минимум: фокус. Надёжной дешёвой проверки
+перекрытия клиентской области другим окном Win32 не даёт; перекрытие
+покрывается статус-детектором 3.5 (occluded_or_unstable) и перехватчиком
+модалок 3.6 — вне примитива. Контракт «activate перед каждым действием»
+оформляется в 5.3+ (click_element), здесь — готовый примитив + сигнал.
+
 ### Template matching (задача 3.3, решение 13)
 
 Вид поиска — NCC, эквивалент OpenCV `TM_CCOEFF_NORMED`. Реализация по

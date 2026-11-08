@@ -43,6 +43,12 @@ class Win32Gateway(Protocol):
     def is_iconic(self, hwnd: int) -> bool:
         """True, если окно свёрнуто в значок."""
 
+    def get_foreground_window(self) -> int | None:
+        """hwnd окна в фокусе ввода; None — фокус не установлен."""
+
+    def set_foreground(self, hwnd: int) -> bool:
+        """SetForegroundWindow; True — вызов выполнен, False — ошибка API."""
+
     def set_process_dpi_aware(self) -> bool:
         """Объявить процесс DPI-aware; False — объявить не удалось."""
 
@@ -154,6 +160,21 @@ class PyWin32Gateway:
         import win32gui
 
         return bool(win32gui.IsIconic(hwnd))
+
+    def get_foreground_window(self) -> int | None:
+        import win32gui
+
+        hwnd = win32gui.GetForegroundWindow()
+        return hwnd if hwnd else None
+
+    def set_foreground(self, hwnd: int) -> bool:
+        import win32gui
+
+        try:
+            win32gui.SetForegroundWindow(hwnd)
+            return True
+        except Exception:  # pragma: no cover - зависит от ОС/прав
+            return False
 
     def set_process_dpi_aware(self) -> bool:
         # Сначала per-monitor DPI awareness (Vista+), при недоступности —
