@@ -345,6 +345,58 @@ class TestVerifyRetry:
         # Клик в свободную область — в заданную точку (курсор доведён туда).
         assert cursor.pos == (100, 700)
 
+    def test_on_fail_rechecks_prologue(self):
+        # Перед on_fail-шагами пролог повторён (activate + статус found):
+        # окно живо — шаги исполняются, activate вызван дважды.
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        cursor = FakeCursor()
+        cursor.track(hid)
+        activates = {"count": 0}
+
+        def activate():
+            activates["count"] += 1
+            return ActivateResult(hwnd=1, already_active=True, attempts=0, cancelled=False)
+
+        checker = FakeChecker(verify=[False, False, False])
+        result = run_click(
+            hid, clock, checker, on_fail=ON_FAIL, activate=activate,
+            cursor_pos=cursor.get,
+        )
+        assert result.on_fail_executed is True
+        assert activates["count"] == 2  # пролог клика + пролог on_fail
+
+    def test_on_fail_skipped_when_window_degraded(self):
+        # Цикл исчерпан из-за деградации окна (к моменту on_fail статус
+        # not_found): шаги on_fail НЕ исполняются — слепой клик в центр
+        # экрана без found запрещён (инвариант 9); needs_recover=True,
+        # причина — в failures.
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        FakeCursor().track(hid)
+        state = {"calls": 0}
+
+        def status_fn(frame):
+            state["calls"] += 1
+            if state["calls"] == 1:
+                return found_status(frame)
+            return WindowStatus(
+                status=STATUS_NOT_FOUND, reason="window_not_found", anchor=None,
+                content_loaded=None, content_detail="",
+            )
+
+        checker = FakeChecker(verify=[False, False, False])
+        result = run_click(hid, clock, checker, on_fail=ON_FAIL, status=status_fn)
+
+        assert result.success is False
+        assert result.on_fail_executed is False
+        assert result.needs_recover is True
+        # HID-шагов on_fail (ESC / free_area) не было.
+        assert [a for _, a, _ in hid.log].count("key_press") == 0
+        assert [a for _, a, _ in hid.log].count("click") == 3  # только попытки
+        # Причина пропуска — в диагностике.
+        assert any("on_fail" in failure for failure in result.failures)
+
     def test_no_on_fail_steps_empty(self):
         # on_fail не задан: результат — сигнал recover без esc/кликов.
         clock = FakeClock()
@@ -452,6 +504,38 @@ class TestHoverAndTooltip:
         shift_t = moves[1][0]
         next_move_t = moves[2][0]
         assert next_move_t - shift_t >= 0.2 - 1e-9  # float-дрейф фейковых часов
+
+    def test_click_point_recomputed_from_post_hover_anchor(self):
+        # Точка клика пересчитывается от свежего (post-hover) якоря: якорь
+        # сдвинулся за hover-паузу — перед кликом курсор корректируется дельтой
+        # сдвига (rng не расходуется повторно — джиттер считается раз на попытку).
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        cursor = FakeCursor()
+        cursor.track(hid)
+        seq = [
+            Anchor(window_id="market", x=202, y=103, score=0.99, method="template"),
+            Anchor(window_id="market", x=206, y=104, score=0.99, method="template"),
+            Anchor(window_id="market", x=202, y=103, score=0.99, method="template"),
+        ]
+        state = {"i": 0}
+
+        def find_anchor(frame):
+            anchor = seq[min(state["i"], len(seq) - 1)]
+            state["i"] += 1
+            return anchor
+
+        result = run_click(hid, clock, FakeChecker(), find_anchor=find_anchor,
+                           cursor_pos=cursor.get)
+
+        assert result.success is True
+        moves = [args for _, action, args in hid.log if action == "move_rel"]
+        # Первая наводка — от pre-hover якоря, корректировка — дельта сдвига.
+        rng = random.Random(7)
+        jx, jy = rng.randint(-3, 3), rng.randint(-3, 3)
+        target = (202 + RECT[0] + 50 + jx, 103 + RECT[1] + 15 + jy)
+        assert moves[0] == (target[0] - 500, target[1] - 300)
+        assert moves[-1] == (206 - 202, 104 - 103)
 
     def test_anchor_lost_on_attempt_fails_attempt(self):
         # Якорь не найден на свежем кадре попытки: попытка потрачена без клика.

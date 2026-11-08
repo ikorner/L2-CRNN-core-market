@@ -28,7 +28,10 @@ rng, часы):
 4. Hover: курсор наведён на точку, затем hover-пауза (timing.hover_pause) и
    re-verify присутствия элемента (проверка шаблона варианта на свежем
    кадре): hover мог изменить вид/перекрыть элемент — клика по чужому
-   состоянию нет. Провал → попытка потрачена;
+   состоянию нет. Точка клика пересчитывается от свежего (post-hover)
+   якоря: при сдвиге окна курсор корректируется дельтой (джиттер считается
+   раз на попытку, пересчёт rng не расходует). Провал re-verify → попытка
+   потрачена;
 5. HID click (hold_ms из behavior.press_delay_min/max_ms через rng —
    детерминизм вместо вендорного random модуля);
 6. Verify (инвариант 2): verify.checks (VerifySpec — спецификация перехода
@@ -46,9 +49,11 @@ EPS-дрейф float на финальном poll значения не имее
 ON_FAIL[]: шаги перехода модели — «press_esc» (HID ESC) и «click_free_area»
 (клик в свободную область клиента игры; точка — free_area_point или центр
 config.resolution — честное допущение: свободная область не размечена
-моделью, параметризуемо; точная цепочка — 5.8). Неизвестный шаг — ошибка
-модели (ClickElementError, fail fast). После on_fail — ClickResult с
-needs_recover=True (исполнение recover — задача 5.8, здесь сигнал).
+моделью, параметризуемо; точная цепочка — 5.8). Перед on_fail пролог
+повторяется (activate + статус found): без него click_free_area был бы
+слепым кликом при деградировавшем окне (инвариант 9) — при провале on_fail
+пропускается, результат сразу needs_recover=True с причиной в failures.
+Неизвестный шаг — ошибка модели (ClickElementError, fail fast).
 
 РЕЗУЛЬТАТ: ClickResult (success/attempts/cancelled/on_fail_executed/
 failures) — без трёхзначной обёртки (задача 5.7, YAGNI). Отмена (kill
@@ -225,15 +230,18 @@ def _jitter(rng: JitterRng, px: int) -> Tuple[int, int]:
 
 
 def _click_point(element: ElementSpec, variant: Optional[str],
-                 anchor: Anchor, frame: np.ndarray, hud_locator, rng: JitterRng,
-                 config: CoreConfig) -> Optional[Tuple[int, int]]:
-    """Абсолютная точка клика (с джиттером) или None (HUD не локализован).
+                 anchor: Anchor, frame: np.ndarray, hud_locator,
+                 config: CoreConfig, jitter: Tuple[int, int]
+                 ) -> Optional[Tuple[int, int]]:
+    """Абсолютная точка клика или None (HUD не локализован).
 
     Обычный элемент: anchor + rect + click_point варианта (иначе центр rect).
     HUD: точку даёт только hud_locator(element, variant, frame) — без него
     позиция в search_area неизвестна и слепой клик запрещён (ClickElementError).
+    Джиттер профиля передаётся готовым (считается раз на попытку): пересчёт
+    точки от другого якоря не расходует rng и детерминирован (инвариант 7).
     """
-    jx, jy = _jitter(rng, config.behavior.click_jitter_px)
+    jx, jy = jitter
     if element.hud:
         if hud_locator is None:
             raise ClickElementError(
@@ -348,8 +356,9 @@ def click_element(
             if anchor is None:
                 failures.append(f"попытка {attempt}: якорь не найден на кадре")
                 continue
+            jitter = _jitter(rng, config.behavior.click_jitter_px)
             point = _click_point(element, resolved_variant, anchor, frame,
-                                 hud_locator, rng, config)
+                                 hud_locator, config, jitter)
             if point is None:
                 failures.append(
                     f"попытка {attempt}: HUD-элемент {element_id!r} не "
@@ -380,6 +389,19 @@ def click_element(
                         f"попытка {attempt}: элемент не подтверждён после "
                         f"hover ({'; '.join(presence.failures) or 'шаблон не совпал'})")
                     continue
+            # Точка клика пересчитывается от свежего (post-hover) якоря:
+            # за паузу окно могло сдвинуться — корректируем курсор дельтой
+            # (джиттер тот же, rng не расходуется; при неподвижном якоре
+            # дельта нулевая и HID-трафика лишнего нет).
+            final_point = _click_point(element, resolved_variant, hover_anchor,
+                                       hover_frame, hud_locator, config, jitter)
+            if final_point is None:
+                failures.append(
+                    f"попытка {attempt}: HUD-элемент {element_id!r} не "
+                    f"локализован после hover")
+                continue
+            if final_point != point:
+                _move_to(hid, cursor_pos, final_point)
 
             hid.click(BTN_LEFT, 1, _hold_ms(config, rng))
 
@@ -395,7 +417,23 @@ def click_element(
                 f"попытка {attempt}: verify не подтверждён "
                 f"({'; '.join(report.failures) or 'признаки не совпали'})")
 
-        # Исчерпание retry: шаги on_fail[] из модели, затем — сигнал recover.
+        # Исчерпание retry: ПОВТОРНЫЙ ПРОЛОГ перед on_fail — за цикл окно
+        # могло деградировать (якорь потерян на всех попытках = окно
+        # перекрыто/исчезло), а click_free_area кликает в область экрана:
+        # без activate OK + статуса found это слепой клик (инвариант 9),
+        # on_fail пропускаем и сразу отдаём сигнал recover с причиной.
+        reactivated = activate()
+        if reactivated.cancelled:
+            return ClickResult(element_id, success=False,
+                               attempts=max_attempts, cancelled=True)
+        status = window_status(tx.refresh())
+        if status.status != STATUS_FOUND:
+            failures.append(
+                f"on_fail пропущен: статус окна {status.status!r} "
+                f"({status.reason or status.content_detail}) — слепые "
+                f"HID-шаги запрещены")
+            return ClickResult(element_id, success=False, attempts=max_attempts,
+                               on_fail_executed=False, failures=tuple(failures))
         _run_on_fail(on_fail, hid=hid, cursor_pos=cursor_pos,
                      free_area_point=free_area_point, config=config, rng=rng)
         return ClickResult(element_id, success=False, attempts=max_attempts,

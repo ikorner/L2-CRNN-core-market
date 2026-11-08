@@ -317,9 +317,12 @@ recover.
   честная механика «сдвиг курсора на TOOLTIP_SHIFT_PX (24) + пауза +
   повтор в пределах retry», не детекция.
 - on_fail[]: «press_esc», «click_free_area» (точка — free_area_point или
-  центр config.resolution, честное допущение); неизвестный шаг — ошибка
-  модели. Исчерпание retry + on_fail → ClickResult(needs_recover=True) —
-  исполнение recover — задача 5.8.
+  центр config.resolution, честное допущение); перед on_fail пролог
+  повторяется (activate + found): иначе click_free_area был бы слепым
+  кликом при деградировавшем окне (инвариант 9) — при провале on_fail
+  пропускается, сразу needs_recover=True с причиной в failures;
+  неизвестный шаг — ошибка модели. Исчерпание retry + on_fail →
+  ClickResult(needs_recover=True) — исполнение recover — задача 5.8.
 - Джиттер/hold_ms из behavior-профиля через инъецируемый rng (детерминизм
   с seed, инвариант 7) — вендорный random HidDevice.click не используется.
 
