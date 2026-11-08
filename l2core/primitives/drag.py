@@ -52,9 +52,16 @@ ActivateGameError проброшена — эскалация) И статусе
 задержки через _fixed_pause по инъецированным часам (механизм дедлайна
 wait_until, см. click.py). Прямых вызовов sleep здесь нет.
 
-ОТМЕНА МЕЖДУ PRESS И RELEASE: если cancelled сработал в удержании или в
-паузе на цели, кнопка ОТПУЩЕНА (mouse_up) до возврата — мышь зажатой не
-остаётся (инвариант 9: эскалация не оставляет опасного состояния).
+PRESS → RELEASE — TRY/FINALLY (инвариант 9 в форме «нет опасных состояний»):
+механика drag между mouse_down и mouse_up обёрнута в try/finally — кнопка
+отпускается при ЛЮБОМ выходе: отмена (cancelled в удержании/на цели),
+транспортный HidError (traj, release-цепочка HID) или исключение самого
+cancelled(). HidError механики drag — попытка потрачена с причиной в
+failures (retry → on_fail → recover по общему паттерну), а не эскалация
+рантайма: drag обратим, повтор безопасен. HidError самого release глушится
+и фиксируется в failures (состояние кнопки неизвестно → needs_recover,
+release_all делает recover 5.8). Не-HidError исключения пробрасываются
+ПОСЛЕ release (finally гарантирует освобождение кнопки).
 
 ОБРАТИМОСТЬ И REVERTIFY (3.6): перенос предмета меняет состояние, но
 обратим — предмет можно перетащить обратно. Re-verify «перед необратимым»
@@ -64,9 +71,12 @@ reverify сценария: транзакция кадра (3.6) не вложе
 свою FrameTransaction, reverify start_sell исполняется вне примитива.
 
 ГРАНИЦЫ: якорь проверяется перед press каждой попытки; сдвиг окна ПОСЛЕ
-press поймает verify (см. границу ответственности за точки). Залипшая
-кнопка при HID-сбое (HidError из транспорта) — эскалация рантайма, очистку
-делает владелец сессии HID (release_all в __exit__ HidDevice, 5.8).
+press поймает verify (см. границу ответственности за точки). mouse_down
+намеренно ВНЕ try: press не подтверждён (HidTimeoutError не различает
+«не выполнилось» и «выполнилось без ответа») — release не вызываем,
+очистку при таком сбое делает recover 5.8 (release_all). Кнопка остаётся
+возможно залипшей только если не подтверждён и сам release (фиксируется
+в failures, needs_recover=True).
 
 РЕЗУЛЬТАТ: DragResult (source_point/target_point/success/attempts/cancelled/
 on_fail_executed/failures) — без трёхзначной обёртки (5.7, YAGNI).
@@ -81,7 +91,7 @@ from typing import Callable, Optional, Tuple
 
 import numpy as np
 
-from l2core.adapters.hid import BTN_LEFT
+from l2core.adapters.hid import BTN_LEFT, HidError
 from l2core.adapters.screen import Screen
 from l2core.config import CoreConfig
 from l2core.detector.anchor import Anchor
@@ -277,22 +287,41 @@ def drag_item(
 
             _move_to(hid, cursor_pos, plan.source)
             hid.mouse_down(BTN_LEFT)
-            _fixed_pause(plan.hold_s, config=config, cancelled=cancelled,
-                         clock=clock, sleep=sleep)
-            if cancelled is not None and cancelled():
-                # Отмена в удержании: кнопку отпускаем, drag не продолжаем.
-                hid.mouse_up(BTN_LEFT)
+            # Механика drag между press и release — под try/finally: кнопка
+            # отпускается при ЛЮБОМ выходе (отмена, транспортный HidError,
+            # исключение самого cancelled()). HidError механики — попытка
+            # потрачена с причиной в failures (drag обратим, retry безопасен);
+            # HidError самого release глушится и фиксируется (состояние
+            # кнопки неизвестно → needs_recover → release_all в recover 5.8).
+            drag_failed = False
+            drag_cancelled = False
+            try:
+                _fixed_pause(plan.hold_s, config=config, cancelled=cancelled,
+                             clock=clock, sleep=sleep)
+                if cancelled is not None and cancelled():
+                    drag_cancelled = True
+                if not drag_cancelled:
+                    hid.traj(list(plan.traj_points))
+                    _fixed_pause(config.timing.hover_pause, config=config,
+                                 cancelled=cancelled, clock=clock, sleep=sleep)
+                    if cancelled is not None and cancelled():
+                        drag_cancelled = True
+            except HidError as exc:
+                failures.append(f"попытка {attempt}: HID-сбой drag ({exc})")
+                drag_failed = True
+            finally:
+                try:
+                    hid.mouse_up(BTN_LEFT)
+                except HidError as release_exc:
+                    failures.append(
+                        f"попытка {attempt}: mouse_up после сбоя не подтверждён "
+                        f"({release_exc}) — состояние кнопки неизвестно")
+                    drag_failed = True
+            if drag_cancelled:
                 return DragResult(source_point, target_point, success=False,
                                   attempts=attempt - 1, cancelled=True)
-            hid.traj(list(plan.traj_points))
-            _fixed_pause(config.timing.hover_pause, config=config,
-                         cancelled=cancelled, clock=clock, sleep=sleep)
-            if cancelled is not None and cancelled():
-                # Отмена на цели: траектория прошла, кнопку отпускаем.
-                hid.mouse_up(BTN_LEFT)
-                return DragResult(source_point, target_point, success=False,
-                                  attempts=attempt - 1, cancelled=True)
-            hid.mouse_up(BTN_LEFT)
+            if drag_failed:
+                continue
 
             verify_frame = tx.refresh()
             verify_anchor = find_anchor(verify_frame)

@@ -421,8 +421,13 @@ timing.click_retry_count) → on_fail[] → сигнал recover (EnterResult,
   drag в протоколе нет, вендорить нельзя): move_rel к source →
   mouse_down (BTN_LEFT) → удержание → пакетная траектория traj
   ((dx, dy, delay_ms) за точку, исполнение на плате, один пакет CMD_TRAJ)
-  → пауза на цели → mouse_up. Отмена между press и release отпускает
-  кнопку (mouse_up) до возврата — мышь зажатой не остаётся.
+  → пауза на цели → mouse_up. Механика между press и release — под
+  try/finally: кнопка отпускается при любом выходе (отмена, транспортный
+  HidError, исключение cancelled()). HidError механики — попытка потрачена
+  с причиной в failures (drag обратим, retry безопасен), HidError самого
+  release глушится и фиксируется в failures (состояние кнопки неизвестно →
+  needs_recover → release_all в recover 5.8); mouse_down намеренно вне try
+  (press не подтверждён — release не вызываем, очистка у 5.8).
 - **Траектория (behavior-профиль)**: source/target + джиттер
   click_jitter_px; 1..3 промежуточные точки (drag_midpoints_min/max) с
   джиттером move_jitter_px; последний шаг — ровно в target; пауза шага —

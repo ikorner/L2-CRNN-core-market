@@ -80,11 +80,29 @@ class FakeScreen:
 
 
 class ScriptedHid:
-    """HID с записью действий: (время, действие, args)."""
+    """HID с записью действий: (время, действие, args).
+
+    fail_on(action, exc) — одноразовая инъекция исключения в действие
+    (очередь на действие: исключение бросается, пока очередь не пуста).
+    Действие в log фиксируется ДО броска, после броска — маркер
+    («fault:<действие>», текст исключения): сбойное освобождение кнопки
+    видно в журнале, а пины действий не зависят от того, бросило ли оно.
+    """
 
     def __init__(self, clock):
         self.clock = clock
         self.log = []
+        self._faults = {}
+
+    def fail_on(self, action, exc):
+        self._faults.setdefault(action, []).append(exc)
+
+    def _check(self, action):
+        queue = self._faults.get(action)
+        if queue:
+            exc = queue.pop(0)
+            self.log.append((self.clock.now, f"fault:{action}", (str(exc),)))
+            raise exc
 
     def move_rel(self, dx, dy):
         self.log.append((self.clock.now, "move_rel", (dx, dy)))
@@ -97,12 +115,15 @@ class ScriptedHid:
 
     def mouse_down(self, button=1):
         self.log.append((self.clock.now, "mouse_down", (button,)))
+        self._check("mouse_down")
 
     def mouse_up(self, button=1):
         self.log.append((self.clock.now, "mouse_up", (button,)))
+        self._check("mouse_up")
 
     def traj(self, points):
         self.log.append((self.clock.now, "traj", tuple(points)))
+        self._check("traj")
 
 
 class FakeCursor:
@@ -397,6 +418,117 @@ class TestSuccessfulDrag:
         assert result.cancelled is True
         actions = [a for _, a, _ in hid.log]
         assert actions == ["move_rel", "mouse_down", "traj", "mouse_up"]
+
+
+class TestReleaseSafety:
+    """Кнопка не остаётся зажатой ни на одном пути между press и release
+    (ревью 5.6: try/finally между mouse_down и mouse_up)."""
+
+    def test_traj_hid_error_releases_and_retries(self):
+        # HidError из traj: кнопка отпущена (finally), попытка потрачена с
+        # причиной в failures, retry по общему паттерну — второй drag успешен.
+        # verify=[False, True]: вторая попытка тратится на verify, третья
+        # успешна — failures результата наблюдаемы.
+        from l2core.adapters.hid import HidError
+
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        FakeCursor().track(hid)
+        hid.fail_on("traj", HidError("таймаут CMD_TRAJ"))
+        checker = FakeChecker(verify=[False, True])
+
+        result = run_drag(hid, clock, checker)
+
+        assert result.success is True
+        assert result.attempts == 3
+        actions = [a for _, a, _ in hid.log]
+        # Попытка 1: press, сбойная traj, освобождение; попытки 2/3 — полные.
+        assert actions == [
+            "move_rel", "mouse_down", "traj", "fault:traj", "mouse_up",
+            "move_rel", "mouse_down", "traj", "mouse_up",
+            "move_rel", "mouse_down", "traj", "mouse_up",
+        ]
+        # Причина потраченной попытки — в failures (наблюдаемо при исчерпании
+        # retry: tests/test_drag.py::TestReleaseSafety::
+        # test_traj_hid_error_exhausted_runs_on_fail).
+
+    def test_traj_hid_error_exhausted_runs_on_fail(self):
+        # Транспортный сбой traj на всех попытках: каждая попытка закрыта
+        # release, затем повторный пролог -> on_fail[] -> needs_recover.
+        from l2core.adapters.hid import HidError
+
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        FakeCursor().track(hid)
+        for _ in range(3):
+            hid.fail_on("traj", HidError("таймаут CMD_TRAJ"))
+
+        result = run_drag(hid, clock, FakeChecker(), on_fail=ON_FAIL)
+
+        assert result.success is False
+        assert result.attempts == 3
+        assert result.on_fail_executed is True
+        assert result.needs_recover is True
+        actions = [a for _, a, _ in hid.log]
+        assert actions.count("mouse_down") == 3
+        assert actions.count("mouse_up") == 3  # ни одна попытка не оставила кнопку
+        assert actions.count("traj") == 3  # traj вызывался и сбоил каждый раз
+        assert actions.count("fault:traj") == 3
+        assert actions[-2:] == ["move_rel", "click"]  # on_fail: free_area
+        assert any("HID-сбой drag" in failure for failure in result.failures)
+
+    def test_release_error_after_traj_error_recorded_and_swallowed(self):
+        # И traj, и спасательный release бросают HidError: вторичный HidError
+        # release глушится и фиксируется в failures (состояние кнопки
+        # неизвестно). Итог — исчерпание retry (verify не подтверждён),
+        # failures результата наблюдаемы.
+        from l2core.adapters.hid import HidError
+
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        FakeCursor().track(hid)
+        hid.fail_on("traj", HidError("таймаут CMD_TRAJ"))
+        hid.fail_on("mouse_up", HidError("таймаут CMD_MOUSE_UP"))
+        checker = FakeChecker(verify=[False])
+
+        result = run_drag(hid, clock, checker, on_fail=(),
+                          config=make_config(click_retry_count=1))
+
+        assert result.success is False
+        assert result.attempts == 2
+        assert result.needs_recover is True
+        assert any("HID-сбой drag" in failure for failure in result.failures)
+        assert any("mouse_up после сбоя" in failure for failure in result.failures)
+        # Попытка 1: press, сбойная traj, сбойное освобождение (в log);
+        # попытка 2 — полный drag, verify не подтверждён.
+        actions = [a for _, a, _ in hid.log]
+        assert actions == [
+            "move_rel", "mouse_down", "traj", "fault:traj",
+            "mouse_up", "fault:mouse_up",
+            "move_rel", "mouse_down", "traj", "mouse_up",
+        ]
+
+    def test_cancelled_callable_raising_still_releases(self):
+        # cancelled() бросает исключение между press и release: кнопка всё
+        # равно отпущена (finally гарантирует release на любом выходе),
+        # исключение проброшено.
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        FakeCursor().track(hid)
+        state = {"armed": False}
+
+        def cancelled():
+            if state["armed"]:
+                raise RuntimeError("сломался kill switch")
+            if any(a == "mouse_down" for _, a, _ in hid.log):
+                state["armed"] = True
+            return False
+
+        with pytest.raises(RuntimeError):
+            run_drag(hid, clock, FakeChecker(), cancelled=cancelled)
+
+        actions = [a for _, a, _ in hid.log]
+        assert actions == ["move_rel", "mouse_down", "mouse_up"]  # release есть
 
 
 class TestModelBoundaries:
