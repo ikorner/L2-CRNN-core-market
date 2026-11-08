@@ -125,7 +125,18 @@ ocr_regions:
   price_cell:
     rect: [x, y, w, h]
     grammar: price
+  search_field:          # поле ввода
+    rect: [x, y, w, h]
+    grammar: text
+    placeholder: 'Введите\s+название'  # опционально: regex плейсхолдера
 ```
+
+`placeholder` — опциональный regex-паттерн текста пустого поля ввода.
+Стабилизатор мигающей каретки (задача 4.5) возвращает для совпавшего с
+паттерном (или пустого) текста status `placeholder` и value `None` —
+плейсхолдер ≠ введённый текст. Паттерн проверяется `re.search` против
+сырого прочитанного текста; в модели не задан — данных о плейсхолдерах
+нет (docs/OWNER_QUESTIONS.md, Q23).
 
 ## table_geometry
 

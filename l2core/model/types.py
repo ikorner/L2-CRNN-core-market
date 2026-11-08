@@ -125,9 +125,17 @@ class TransitionSpec:
 
 @dataclass(frozen=True)
 class OcrRegionSpec:
+    """OCR-регион: rect от якоря окна, грамматика ожидаемого значения.
+
+    placeholder — опциональный regex-паттерн текста-плейсхолдера поля
+    ввода (пустое поле); стабилизатор (задача 4.5) отличает его от
+    введённого текста. None — паттерн не задан (нет данных в модели).
+    """
+
     id: str
     rect: Rect
     grammar: GrammarSpec
+    placeholder: Optional[str] = None
 
 
 @dataclass(frozen=True)

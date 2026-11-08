@@ -41,6 +41,13 @@ from .validator import (
     load_gaps,
     validate_model,
 )
+from .reading import (
+    OcrReadError,
+    ReadAttempt,
+    StableReadResult,
+    read_confident,
+    read_stable,
+)
 from .types import (
     ActionSpec,
     Check,
@@ -75,11 +82,14 @@ __all__ = [
     "GrammarMismatch",
     "GrammarSpec",
     "ModelFormatError",
+    "OcrReadError",
     "OcrRegionSpec",
     "ProbePoint",
+    "ReadAttempt",
     "Rect",
     "RegionReadResult",
     "StateSpec",
+    "StableReadResult",
     "TableGeometry",
     "TransitionSpec",
     "UiModel",
@@ -94,6 +104,8 @@ __all__ = [
     "load_gaps",
     "load_model",
     "parse_value",
+    "read_confident",
     "read_region",
+    "read_stable",
     "validate_model",
 ]

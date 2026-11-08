@@ -12,6 +12,7 @@
 """
 
 from pathlib import Path
+import re
 from typing import Any, Optional, Union
 
 import yaml
@@ -204,6 +205,27 @@ def _parse_grammar(file: Path, section: str, name: str, raw: Any) -> GrammarSpec
         max_value=max_value,
         units=units,
     )
+
+
+def _parse_placeholder(file: Path, section: str, raw: Any) -> Optional[str]:
+    """Regex-паттерн плейсхолдера поля ввода или None (не задан).
+
+    Должен компилироваться как regex (re.search против прочитанного
+    текста, задача 4.5); некомпилируемый — ошибка формата.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not raw:
+        raise ModelFormatError(
+            file, section, "placeholder: ожидается непустая строка-регулярное выражение"
+        )
+    try:
+        re.compile(raw)
+    except re.error as exc:
+        raise ModelFormatError(
+            file, section, f"placeholder: некорректное regex-выражение: {exc}"
+        ) from exc
+    return raw
 
 
 def _parse_range_bound(file: Path, section: str, raw: Any, bound: str) -> Optional[int]:
@@ -503,13 +525,14 @@ def _parse_ocr_regions(file: Path, raw: Any, common: CommonDicts) -> dict:
         sec = f"{section}.{region_id}"
         if not isinstance(spec, dict):
             raise ModelFormatError(file, sec, "ожидается mapping ключ: значение")
-        _reject_unknown(file, sec, spec, {"rect", "grammar"})
+        _reject_unknown(file, sec, spec, {"rect", "grammar", "placeholder"})
 
         rect = _parse_rect(file, f"{sec}.rect", spec.get("rect"))
         regions[region_id] = OcrRegionSpec(
             id=region_id,
             rect=rect,
             grammar=_resolve_grammar(file, sec, spec.get("grammar"), common),
+            placeholder=_parse_placeholder(file, f"{sec}.placeholder", spec.get("placeholder")),
         )
     return regions
 

@@ -109,8 +109,20 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
   `min`/`max`/`units` в грамматике — FORMAT.md) и механизм перечитывания
   при несовпадении: `read_region(ocr, frame, rect, grammar)` через контракт
   OcrClient — одно перечитывание с увеличением региона, при повторе —
-  статус `invalid`, `confidence=0.0` (сигнал «не сошлось»). Цикл из N
-  перечитываний и порог confidence — 4.5, не здесь.
+  статус `invalid`, `confidence=0.0` (сигнал «не сошлось»). Слой чтения
+  (4.5, reading.py): `read_confident` — цикл до `reread_count`
+  перечитываний с увеличением региона (внешняя попытка k стартует с
+  региона +k·pad от исходного; внутренняя перечитка read_region — +pad
+  при несовпадении грамматики, двойного расширения нет) до порога
+  `confidence_threshold` из конфига, исчерпание → `OcrReadError` с
+  диагностикой (region_id, threshold, attempts: rect/text/confidence/
+  status); `read_stable` — стабилизация поля ввода от мигающей каретки:
+  чтение кадров от источника (`frame_source()`, совместимо с Screen.grab)
+  до двух подряд одинаковых текстов, лимит `max_frames`, исчерпание →
+  `OcrReadError`; стабильный текст совпавший с regex-паттерном
+  `placeholder` региона (опциональное поле ocr_regions, FORMAT.md) или
+  пустой → status `placeholder`, value=None (плейсхолдер ≠ введённый
+  текст).
 - `l2core/detector/` — детекция окна и состояний, статусы окна
   (`not_found / occluded_or_unstable / found`), перехватчик модалок.
   Детектор якоря (3.3, anchor.py): numpy-only `detect_window()` (яркие
