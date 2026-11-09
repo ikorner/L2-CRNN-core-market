@@ -358,7 +358,9 @@ class L2CoreBot:
     источники (recover on_escalation 5.8) — через bot.push(type, payload);
     kill switch (8.1) подключается параметром kill_switch: release_all при
     kill — исключение guard'а владельца, событие killed — push этой
-    очереди. Доставка — bot.dispatcher.subscribe(type, cb).
+    очереди, а wiring.cancelled движок подставляет ks.is_killed сам
+    (явный wiring.cancelled сборки побеждает). Доставка —
+    bot.dispatcher.subscribe(type, cb).
     """
 
     def __init__(
@@ -375,15 +377,25 @@ class L2CoreBot:
         sleep: Callable[[float], None] = time.sleep,
     ):
         self._owner = threading.current_thread()
-        # Kill switch (8.1): release_all при kill — санкционированное
-        # исключение guard'а владельца (слушатель — чужой поток, см.
-        # hid_owner.py/killswitch.py); событие killed публикуется в
-        # очередь этой сборки.
+        # Kill switch (8.1): без явного cancelled (параметр, wiring) сборка
+        # проверяет kill-флаг — headline-гарантия спеки «прерывание
+        # блокирующих вызовов» не должна зависеть от ручной передачи
+        # cancelled в build_wiring. Приоритет: явный wiring.cancelled
+        # (сборка вызывающего слоя) > параметр cancelled > kill_switch.
+        cancelled_default = (cancelled if cancelled is not None
+                             else (kill_switch.is_killed
+                                   if kill_switch is not None else None))
+        # release_all при kill — санкционированное исключение guard'а
+        # владельца (слушатель — чужой поток, см. hid_owner.py/
+        # killswitch.py); событие killed публикуется в очередь этой сборки.
         guarded = OwnerGuardedHid(wiring.hid, owner_thread=self._owner,
                                   kill_switch=(kill_switch.is_killed
                                                if kill_switch is not None
                                                else None))
-        self._wiring = dataclasses.replace(wiring, hid=guarded)
+        self._wiring = dataclasses.replace(
+            wiring, hid=guarded,
+            cancelled=(wiring.cancelled if wiring.cancelled is not None
+                       else cancelled_default))
         # Журнал ведётся на push (до потребления): pull-форма wait_event
         # не теряет события, забранные dispatcher'ом (7.3).
         self._queue = EventQueue(journal=EventJournal())
@@ -395,11 +407,6 @@ class L2CoreBot:
         self._event_api = None   # создан после dispatcher'а (см. ниже)
         interval = (poll_interval if poll_interval is not None
                     else wiring.config.timing.poll_interval)
-        # Kill switch (8.1): без явного cancelled observer проверяет
-        # kill-флаг — после kill цикл наблюдения завершается сам.
-        observer_cancelled = (cancelled if cancelled is not None
-                              else (kill_switch.is_killed
-                                    if kill_switch is not None else None))
         # Id окон наблюдения — из сборки моделей (дедупликация: модели
         # в тестах могут совпадать).
         seen: list = []
@@ -415,7 +422,7 @@ class L2CoreBot:
             window_status=wiring.window_status,
             queue=self._queue, interval=interval, monitor=monitor,
             modal=modal, detect_state=wiring.detect_state,
-            cancelled=observer_cancelled, clock=clock, sleep=sleep,
+            cancelled=cancelled_default, clock=clock, sleep=sleep,
             window_ids=tuple(seen))
         self._dispatcher = EventDispatcher(self._queue,
                                            poll_interval=dispatch_interval)

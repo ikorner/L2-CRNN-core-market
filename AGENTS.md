@@ -867,9 +867,11 @@ StateObserver / EventDispatcher; очередь — `l2core/api/events.py`
 - Kill switch (8.1) подключается параметром `kill_switch`: движок
   передаёт guard-сборку HID (release_all при kill — санкционированное
   исключение guard'а владельца, см. killswitch.py) и публикует событие
-  killed; без явного `cancelled` observer проверяет kill-флаг и завершает
-  цикл сам. AST-guard'а на observer нет — сценарий «Observer не отправляет
-  действия» покрыт интеграционно (tests/test_engine.py).
+  killed; cancelled подставляется в копию wiring автоматически (явный
+  wiring.cancelled побеждает). Без явного `cancelled` observer проверяет
+  kill-флаг и завершает цикл сам. AST-guard'а на observer нет — сценарий
+  «Observer не отправляет действия» покрыт интеграционно
+  (tests/test_engine.py).
 - Тесты: tests/test_engine.py (очередь: порядок/seq/неизвестный тип/
   конкурентность; guard: делегирование/чужой поток/явный владелец;
   dispatcher: порядок/изоляция исключений/unsubscribe/join; observer:
@@ -948,10 +950,14 @@ CANCELLED-домен, не UNKNOWN); (2) `hid.release_all()` best-effort; (3) у
   выполняется из любого потока (идемпотентен, только отпускает кнопки);
   любая другая HID-команда из чужого потока при активном kill по-прежнему
   HidOwnershipError (fail closed). L2CoreBot(kill_switch=ks) собирает это
-  сам: guard-сборка + attach + push killed в свою очередь; без явного
-  cancelled observer по умолчанию проверяет kill-флаг и завершает цикл
-  сам. Движок kill НЕ останавливает: dispatcher должен дожить до доставки
-  события killed; join потоков — за стратегией (killed -> bot.stop()).
+  сам: guard-сборка + attach + push killed в свою очередь; cancelled
+  подставляется в копию wiring автоматически — приоритет: явный
+  wiring.cancelled сборки > параметр cancelled > kill_switch.is_killed
+  (headline-гарантия спеки «прерывание блокирующих вызовов» не зависит от
+  ручной передачи cancelled в build_wiring). Без явного cancelled observer
+  проверяет kill-флаг и завершает цикл сам. Движок kill НЕ останавливает:
+  dispatcher должен дожить до доставки события killed; join потоков — за
+  стратегией (killed -> bot.stop()).
 - Ожидание в цикле слушателя — wait_until (инвариант 1), часы/сон —
   инъекции; `poll_once()` — детерминированная итерация проверок для тестов
   без потоков. Жизненный цикл один: повторный start — KillSwitchError,
@@ -960,10 +966,12 @@ CANCELLED-домен, не UNKNOWN); (2) `hid.release_all()` best-effort; (3) у
   win32gui.SetCursorPos, ленивый импорт).
 - Конфиг: `kill_switch.safe_point` — пара неотрицательных int [x, y] |
   null (валидатор по схеме 1.3; shipped config.yaml == дефолты схемы).
-- Тесты: tests/test_killswitch.py (35 тестов: хоткей/таймаут/эффекты/
+- Тесты: tests/test_killswitch.py (38 тестов: хоткей/таймаут/эффекты/
   идемпотентность/жизненный цикл, прерывание wait_until и полного
-  api.open_market из потока стратегии, активность через API, guard-
-  исключение, интеграция с L2CoreBot, конфиг safe_point, парсинг хоткея).
+  api.open_market из потока стратегии, дефолт wiring.cancelled движком
+  (без ручного cancelled) и приоритет явного, активность через API,
+  guard-исключение, интеграция с L2CoreBot, конфиг safe_point, парсинг
+  хоткея).
   YAGNI: dry-run (8.2) и JSONL-лог (8.3) сюда не входят.
 
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)

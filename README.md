@@ -118,20 +118,47 @@ UNKNOWN/CANCELLED, освобождение HID (`release_all`), увод кур
 
 Компонент — `l2core/api/killswitch.py` (`KillSwitch`); хоткей слушается
 низкоуровневым Win32-хуком WH_KEYBOARD_LL (не через arduino; источник
-клавиш — инъекция, тесты на фейках). Сборка:
+клавиш — инъекция, тесты на фейках). Каноническая сборка — через движок
+(`build_wiring` возвращает ApiWiring; `create_api` — фасад без движка,
+для него `cancelled` передаётся явно):
 
 ```python
+from pathlib import Path
+from l2core.adapters.hid import HidDevice
+from l2core.adapters.screen import MssScreen
+from l2core.adapters.template import default_matcher
+from l2core.adapters.win32 import (GameWindowFinder, PyWin32Gateway,
+                                   Win32HotkeySource, ensure_dpi_aware)
+from l2core.api.engine import L2CoreBot
+from l2core.api.killswitch import KillSwitch
+from l2core.api.wiring import build_wiring
+from l2core.model import load_model
+
+config = load_config("config.yaml")
+gateway = PyWin32Gateway()
+ensure_dpi_aware(gateway)
 ks = KillSwitch(config.kill_switch,
                 hotkey_source=Win32HotkeySource(config.kill_switch.hotkey),
-                set_cursor_pos=lambda x, y: gateway.set_cursor_pos(x, y))
-api = create_api(config, cancelled=ks.is_killed)   # прерывание вызовов
-bot = L2CoreBot(wiring, kill_switch=ks)            # release_all + killed
+                set_cursor_pos=gateway.set_cursor_pos)
+models = {name: load_model(f"ui_model/{name}.yaml")
+          for name in ("market", "shop_buy", "shop_sell")}
+hid = HidDevice(config.paths.arduino_port); hid.connect()
+wiring = build_wiring(
+    config=config, models=models, screen=MssScreen(), hid=hid, ocr=...,
+    matcher=default_matcher(), assets_dir=Path("assets"),
+    cursor_pos=lambda: gateway.get_cursor_pos() or (0, 0),
+    activate=..., game_finder=GameWindowFinder(gateway, title=config.window.title))
+bot = L2CoreBot(wiring, kill_switch=ks)  # hid + killed + cancelled движок
+api = bot.api                            # тот же guard-wiring (7.1)
 ks.start(); bot.start()
 # стратегия получила killed -> bot.stop() (join потоков — за стратегией)
 ```
 
 Kill идемпотентен и необратим. Активность потока стратегии фиксируют
 вызовы API (`wiring.note_activity`) — они продлевают таймаут неактивности.
+Движок с `kill_switch` подставляет `ks.is_killed` в wiring.cancelled сам
+(явный `wiring.cancelled` сборки побеждает) — прерывание блокирующих
+вызовов не зависит от ручной передачи cancelled.
 
 ## Типичные проблемы
 

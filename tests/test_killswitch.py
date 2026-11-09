@@ -542,6 +542,69 @@ class TestEngineIntegration:
         assert shutdown.stopped is True
 
 
+# --- Асимметрия авто-подключения (ревью 8.1) ---
+
+
+class TestBotCancelledDefault:
+    """L2CoreBot(kill_switch=ks) дефолтит wiring.cancelled = ks.is_killed
+    (явный wiring.cancelled побеждает). Иначе headline-гарантия спеки
+    «прерывание блокирующих вызовов» молча не работает: wait_until
+    стратегии идёт до таймаута, поток-владелец HID шлёт команды."""
+
+    def test_wiring_cancelled_defaults_to_kill_switch(self):
+        ks = make_switch()
+        bot = L2CoreBot(_blocking_wiring(RecordingHid()),
+                        kill_switch=ks, poll_interval=POLL)
+
+        assert bot.wiring.cancelled is not None
+        assert bot.wiring.cancelled() is False
+        ks.kill(REASON_HOTKEY)
+        assert bot.wiring.cancelled() is True
+
+    def test_explicit_wiring_cancelled_wins(self):
+        ks = make_switch()
+        custom = lambda: False   # noqa: E731
+        bot = L2CoreBot(_blocking_wiring(RecordingHid(), cancelled=custom),
+                        kill_switch=ks, poll_interval=POLL)
+        assert bot.wiring.cancelled is custom
+
+    def test_api_call_interrupted_without_explicit_wiring_cancelled(self):
+        """Интеграционный прогон: wiring собран БЕЗ cancelled, движок
+        подставил ks.is_killed — блокирующий api.open_market из потока
+        стратегии прерывается kill'ом (CANCELLED-домен)."""
+        import dataclasses
+
+        ks = make_switch()
+        hid = RecordingHid()
+        wiring = _blocking_wiring(hid)
+        wiring = dataclasses.replace(
+            wiring,
+            config=CoreConfig(timing=TimingConfig(
+                wait_default_timeout=5.0, verify_interval=0.02)))
+        outcome = {}
+
+        def strategy():
+            # Бот создаётся в потоке стратегии: владелец guard-сборки —
+            # этот поток (эталонная сборка).
+            bot = L2CoreBot(wiring, kill_switch=ks, poll_interval=POLL)
+            api = L2CoreAPI(bot.wiring,
+                            owner_thread=threading.current_thread())
+            outcome["result"] = api.open_market()
+
+        thread = threading.Thread(target=strategy, name="strategy")
+        thread.start()
+        assert wait_for(lambda: "click" in hid.calls)   # клик ушёл, ждём verify
+        ks.kill(REASON_HOTKEY)
+        thread.join(timeout=5.0)
+        assert not thread.is_alive()
+
+        result = outcome["result"]
+        assert result.cancelled is True
+        assert result.outcome is None
+        assert result.unconfirmed is True
+        assert "release_all" in hid.calls
+
+
 # --- Конфиг: safe_point ---
 
 

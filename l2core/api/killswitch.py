@@ -63,16 +63,26 @@ guard tests/test_sleep_contract.py), часы/сон — инъекции. poll_
 одна детерминированная итерация проверок (хоткей? таймаут?), публичная
 точка для тестов без потоков.
 
-ЭТАЛОННАЯ СБОРКА (живой запуск):
+ЭТАЛОННАЯ СБОРКА (живой запуск — через движок; create_api — фасад без
+движка, тогда cancelled передаётся явно и hid/on_kill подключаются
+вручную через ks.attach — проще движок):
 
+    gateway = PyWin32Gateway(); ensure_dpi_aware(gateway)
     ks = KillSwitch(config.kill_switch,
                     hotkey_source=Win32HotkeySource(config.kill_switch.hotkey),
-                    set_cursor_pos=lambda x, y: gateway.set_cursor_pos(x, y))
-    api = create_api(config, cancelled=ks.is_killed)      # wiring.cancelled
-    bot = L2CoreBot(wiring_or_create, kill_switch=ks)     # hid + killed
+                    set_cursor_pos=gateway.set_cursor_pos)
+    wiring = build_wiring(config=config, models=models, screen=MssScreen(),
+                          hid=hid, ocr=ocr, matcher=default_matcher(),
+                          assets_dir=Path("assets"), cursor_pos=...,
+                          activate=..., game_finder=...)
+    bot = L2CoreBot(wiring, kill_switch=ks)   # hid + killed + cancelled
+    api = bot.api                             # тот же guard-wiring (7.1)
     ks.start(); bot.start()
-    ...                                                   # стратегия работает
     # по killed: bot.stop()
+
+Движок с kill_switch подставляет ks.is_killed в wiring.cancelled сам
+(явный wiring.cancelled сборки побеждает) — прерывание блокирующих
+вызовов не зависит от ручной передачи cancelled в build_wiring.
 
 YAGNI (задача 8.1): dry-run (8.2) и JSONL-лог (8.3) сюда не входят.
 """
