@@ -833,7 +833,10 @@ class L2CoreAPI:
         цепочки 5.8). cause — результат примитива/сценария/навигации API с
         needs_recover; без него — ScenarioRecoverError (fail fast). Пара
         target/hud_element — решение вызывающего слоя (market+market_pic /
-        shop_buy+open_buy_trade / shop_sell+open_sale_trade)."""
+        shop_buy+open_buy_trade / shop_sell+open_sale_trade). По итогу
+        публикует события журнально-очередного канала (7.3): успех ->
+        recovered, эскалация -> escalation (payload — справочник
+        docs/API.md); отмена — без событий."""
         self._check_thread()
         c = self._cancelled(cancelled)
         w = self._w
