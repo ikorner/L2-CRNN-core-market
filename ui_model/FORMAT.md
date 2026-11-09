@@ -97,8 +97,13 @@ states:
 Простые переходы декларативно: `(state, action) -> (expected, verify,
 timeout, on_fail[])`. Действие — `click` (поле `element`) или `key`
 (поле `key`). `timeout` опционален: не задан — берётся из конфига при
-исполнении. Семантика шагов `on_fail` определяется кодом recover
-(примитивы), парсер имена не ограничивает.
+исполнении. Шаги `on_fail` — только именованные шаги исполнителя
+(`press_esc`, `click_free_area`; семантика — код recover-примитивов);
+координатные действия в переходах недопустимы — точки кликов
+происходят из `rect`/`click_point` элементов (слой якоря). Словарь шагов
+и полный обход графа (unknown достижим отовсюду и имеет выход)
+проверяет трассировка (задача 6.5, `l2core.model.trace`, тесты CI);
+непустоту `verify`/`on_fail` требует парсер.
 
 ```yaml
 transitions:
@@ -109,7 +114,7 @@ transitions:
     timeout: 5.0
     verify:
       - {kind: template, element: tab_equipment, variant: active}
-    on_fail: [press_esc, reopen_market]
+    on_fail: [press_esc, click_free_area]
 ```
 
 ## ocr_regions

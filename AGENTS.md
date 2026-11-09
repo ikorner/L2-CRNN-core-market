@@ -80,6 +80,14 @@ python -m l2core.model.converter
 # ui_model/KNOWN_GAPS.yaml (ruling R10), тесты следят за их актуальностью.
 python -m l2core.model.validator ui_model/market.yaml ui_model/shop_buy.yaml ui_model/shop_sell.yaml
 
+# Трассировка use-cases по графу переходов (6.5, spec market-scenarios):
+# синтезированный узел unknown (достижим отовсюду — аксиома рёбер деградации)
+# обязан иметь выход в рабочее состояние через recover_-состояния
+# (unknown_no_exit / recover_no_return по рёбрам переходов модели); шаги
+# on_fail — только именованные шаги исполнителя (нет координатных
+# литералов в переходах). Правила парсера/валидатора не дублирует, а
+# ссылается. CLI нет — запуск в тестах CI (tests/test_trace.py).
+
 # Экспорт констант геометрии таблицы (table_geometry) в датасет-пайплайн
 # (L2-CRNN-Dataset-Builder): Python-модуль констант с пометкой версии модели
 # (--version, git-описание ui_model/ или ручная) и diff-отчётом об отличиях
