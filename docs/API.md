@@ -58,7 +58,7 @@ bot.push("killed", {"reason": ...})            # == bot.event_api.push(...)
 | `window_closed` | observer (7.2) | `{"window": str}` — исчезнувшее окно |
 | `modal` | перехватчик модалок (observer, 3.6) | `ModalReport` |
 | `recovered` | `api.recover()` по успеху цепочки | `{"target": str, "steps": tuple[str, ...]}` |
-| `escalation` | `api.recover()` по эскалации цепочки | `{"target": str, "detail": str, "steps": tuple[str, ...]}` |
+| `escalation` | `api.recover()` по эскалации цепочки; observer при устойчивой деградации (8.4) | `{"target": str \| None, "detail": str, "steps": tuple[str, ...]}` |
 | `killed` | kill switch (8.1, `L2CoreBot(kill_switch=...)`) | `{"reason": "hotkey" \| "inactivity"}` |
 
 ### `sold` — `SoldPayload` (l2core/scenarios/monitor.py, 6.3)
@@ -90,9 +90,12 @@ observer'а (market / shop_buy / shop_sell).
 
 Публикуются `api.recover()` по итогу recover-цепочки 5.8/6.4 (успех →
 `recovered`; исчерпание цепочки/неоткрытие окна → `escalation`; отмена —
-событий нет). `target` — восстанавливаемое окно; `steps` — имена шагов
-цепочки (кортеж); `detail` (escalation) — причина эскалации
-(`escalation_detail`). Событие дублирует не push-callback `on_escalation`
+событий нет) и state observer'ом при устойчивой деградации (safety 8.4,
+см. «Ошибки и эскалации» ниже). `target` — восстанавливаемое окно
+(None при observer-эскалации от модалки: целевого окна нет); `steps` —
+имена шагов цепочки (кортеж; у observer-эскалации пустой — цепочки не
+было); `detail` — причина эскалации (`escalation_detail` у recover /
+reason статуса 3.5 или модалки у observer). Событие дублирует не push-callback `on_escalation`
 wiring'а (точка расширения вызывающего слоя), а журнально-очередной канал:
 push-callback и событие — разные каналы, подключаются независимо.
 
@@ -115,6 +118,44 @@ UNKNOWN), выполнил `hid.release_all()` (best-effort) и увёл кур�
 за жизнь объекта KillSwitch. Остановку движка (join потоков) выполняет
 стратегия: получила `killed` → `bot.stop()` (dispatcher должен остаться
 живым до доставки самого события).
+
+## Ошибки и эскалации (safety, 8.4)
+
+Спека safety: осмысленная ошибка или событие эскалации при заблокированном
+экране, оверлеях или невозможности активации окна; слепых кликов нет —
+на каждой строке HID не тронут до подтверждения предусловий.
+
+### Матрица отказов: что получает стратегия
+
+| Состояние / причина | Сигнал стратегии | HID |
+|---|---|---|
+| Окно игры не найдено / свёрнуто / без клиентской области (3.2: `window_not_found` / `window_minimized` / `no_client_area`) | исключение `ActivateGameError` с `reason` (при действии); `get_state()` → `status=not_found`, `detail` = reason; `health().game_window.ok=False` с reason | не тронут (SetForeground не вызывался) |
+| Фокус не получен: `SetForeground` исчерпал retry (`focus_not_acquired`) | исключение `ActivateGameError(reason="focus_not_acquired", detail)` — сигнал эскалации; recover-цепочка — решение вызывающего слоя | не тронут |
+| Окно торговли не найдено/не стабильно при действии (статус ≠ `found`) | исключение `ClickPreconditionError` / `EnterPreconditionError` / `ScrollPreconditionError` / `DragPreconditionError` (5.3–5.6, пролог activate+found) | не тронут |
+| Устойчивая деградация `occluded_or_unstable` (`anchor_lost` / `anchor_moved` / `anchor_appeared`, перекрытие тултипом/окном; ≥3 кадров подряд) | событие `escalation` от observer: `{"target": <окно>, "detail": <reason 3.5>, "steps": ()}` — одно за эпизод; при действии в этот момент — precondition-исключение | observer HID не получает; действия отклонены прологом |
+| Неизвестная модалка-оверлей (3.6: `modal.unknown`) | событие `modal` (`ModalReport`, каждый цикл); устойчивая (≥3 циклов) → дополнительно одно `escalation` `{"target": None, "detail": ..., "steps": ()}` за эпизод | не тронут |
+| Отказ примитива/сценария (`needs_recover`) | результат с `needs_recover=True` + диагностика `failures` → `api.recover()` → событие `recovered` или `escalation` | `release_all` первым шагом цепочки |
+| UNKNOWN необратимого действия (`start_sell`) | страж 5.7: повтор блокирован (`IrreversibleRepeatError`) до явного `guard.confirm_after_unknown` | решение за стратегией |
+| Kill switch (хоткей/таймаут неактивности) | событие `killed` + cancelled-флаг во всех блокирующих вызовах | `release_all()` best-effort, курсор в safe_point |
+
+Пороги устойчивости observer'а — константы `_OCCLUDED_ESCALATION_FRAMES` /
+`_MODAL_ESCALATION_CYCLES` (по 3), параметры конструктора `StateObserver`
+(`occluded_escalation_frames` / `modal_escalation_cycles`) — точка подмены
+для тестов и нестандартных сборок; ключей конфига нет (события редки).
+
+### Диагностируемость reason-ов
+
+- `ActivateGameError.reason` — один из `window_not_found`,
+  `window_minimized`, `no_client_area` (находилка 3.2) либо
+  `focus_not_acquired` (исчерпан retry SetForeground); `detail` — человеку
+  читаемая диагностика (foreground/hwnd при focus_not_acquired).
+- `WindowStatus.reason` — `anchor_not_found` / `anchor_lost` /
+  `anchor_appeared` / `anchor_moved` (3.5) или reason находилки окна игры
+  (окно торговли вне кадра из-за недоступности игры).
+- Событие `escalation` от observer несёт `target` (окно или None при
+  модалке) и `detail` (reason статуса/модалки) — достаточно для
+  разбора без записанных кадров (модалка дополнительно пишет снимок,
+  3.6).
 
 ## Журнал событий
 

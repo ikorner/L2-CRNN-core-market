@@ -20,7 +20,9 @@ spec core-api-events: «Модель потоков: executor, observer, dispatc
   — отправить действие из observer-потока невозможно по построению.
   Публикует события в EventQueue: window_closed (переход «окно было ->
   окна нет»), modal (перехватчик сработал), sold (монитор детектировал
-  продажу). Внутреннее состояние observer'а — допустимое исключение
+  продажу), escalation (устойчивая деградация occluded_or_unstable /
+  устойчивая модалка — safety 8.4, одно событие за эпизод). Внутреннее
+  состояние observer'а — допустимое исключение
   (монитор/наблюдатель, design 8): последний снапшот и факт открытого
   окна для детекции закрытия. Ожидание между итерациями — wait_until по
   инъецированным часам с предикатом stop/cancelled (инвариант 1: сна нет;
@@ -82,6 +84,7 @@ import numpy as np
 
 from l2core.api.core import L2CoreAPI
 from l2core.api.events import (
+    EVENT_ESCALATION,
     EVENT_KILLED,
     EVENT_MODAL,
     EVENT_SOLD,
@@ -92,7 +95,7 @@ from l2core.api.events import (
     EventQueue,
 )
 from l2core.api.hid_owner import OwnerGuardedHid
-from l2core.detector.status import STATUS_NOT_FOUND
+from l2core.detector.status import STATUS_NOT_FOUND, STATUS_OCCLUDED
 from l2core.primitives.wait import wait_until
 
 __all__ = [
@@ -109,6 +112,17 @@ logger = logging.getLogger(__name__)
 # Дефолт интервала опроса очереди dispatcher'ом (сек): потребитель должен
 # замечать stop-флаг быстро; не конфигурируется отдельно (poll-петля).
 _DISPATCH_POLL_INTERVAL = 0.1
+
+# Safety (8.4, spec «Осмысленные ошибки при блокировках экрана и оверлеях»):
+# пороги устойчивой деградации observer'а (подряд кадров/циклов) — превышение
+# порога превращается в одно событие escalation за эпизод (дедуп: стратегия
+# получает сигнал «экран заблокирован/перекрыт, действия остановлены», а не
+# спам каждый цикл). Единичные всплески (межкадровый джиттер тултипа) —
+# штатно, эскалации нет. Константы, не конфиг: события редки, требования
+# настраивать порог нет (YAGNI; параметры конструктора — точка подмены тестов
+# и нестандартных сборок).
+_OCCLUDED_ESCALATION_FRAMES = 3     # кадров подряд occluded_or_unstable
+_MODAL_ESCALATION_CYCLES = 3        # циклов подряд с modal.unknown
 
 
 class EngineError(Exception):
@@ -167,6 +181,19 @@ class StateObserver:
     поток: фиксируется в лог, цикл продолжается — наблюдатель обязан
     переживать кратковременные деградации (деградация 3.5/6.3 — штатный
     режим, не повод умирать).
+
+    Safety (8.4, spec «Осмысленные ошибки при блокировках экрана и
+    оверлеях»): устойчивая деградация статуса 3.5 (occluded_or_unstable
+    N кадров подряд — anchor_lost/anchor_moved/anchor_appeared, перекрытие
+    тултипом/окном) и устойчивая неизвестная модалка (3.6, N циклов подряд)
+    публикуются одним событием escalation за эпизод (payload —
+    {"target", "detail", "steps": ()} в формате 7.3; target=None при
+    модалке). Единичные всплески — не эскалация; возврат к устойчивому
+    состоянию переводит счётчик (новый эпизод — новое событие). Это
+    наблюдательный канал «заблокированный экран»: действия при этом не
+    выполняются — примитивы 5.x отклоняют действие прологом (activate +
+    status found), observer лишь даёт стратегии диагностируемый сигнал
+    между блокирующими вызовами.
     """
 
     def __init__(
@@ -186,10 +213,18 @@ class StateObserver:
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
         window_ids: Tuple[str, ...] = ("market", "shop_buy", "shop_sell"),
+        occluded_escalation_frames: int = _OCCLUDED_ESCALATION_FRAMES,
+        modal_escalation_cycles: int = _MODAL_ESCALATION_CYCLES,
     ):
         if interval <= 0:
             raise ValueError(f"interval observer'а должен быть > 0 "
                              f"(получено {interval!r})")
+        if occluded_escalation_frames <= 0:
+            raise ValueError(f"порог устойчивой деградации должен быть > 0 "
+                             f"(получено {occluded_escalation_frames!r})")
+        if modal_escalation_cycles <= 0:
+            raise ValueError(f"порог устойчивой модалки должен быть > 0 "
+                             f"(получено {modal_escalation_cycles!r})")
         self._screen = screen
         self._game_window = game_window
         self._current_window = current_window
@@ -204,6 +239,14 @@ class StateObserver:
         self._clock = clock
         self._sleep = sleep
         self._window_ids = window_ids
+        self._occluded_escalation_frames = occluded_escalation_frames
+        self._modal_escalation_cycles = modal_escalation_cycles
+        # Safety (8.4): счётчики/флаги эпизодов устойчивой деградации
+        # (внутреннее состояние наблюдателя — монитору разрешено, design 8).
+        self._occluded_streak = 0
+        self._occluded_escalated = False
+        self._modal_streak = 0
+        self._modal_escalated = False
         self._stop = threading.Event()
         self._snapshot = ObserverSnapshot(detail="наблюдение ещё не выполнялось")
         self._iterations = 0
@@ -269,6 +312,9 @@ class StateObserver:
             if self._detect_state is not None and report.anchor is not None:
                 detected = self._detect_state(frame, report.anchor)
                 state = detected.state
+            self._track_occluded(window, report)
+        else:
+            self._reset_occluded()
         self._snapshot = ObserverSnapshot(
             window=window, status=status, state=state, detail=detail)
         if self._modal is not None:
@@ -276,13 +322,60 @@ class StateObserver:
             anchors = {window_id: self._find_anchor(frame, window_id)
                        for window_id in self._window_ids}
             modal_report = self._modal.check(frame, game, anchors)
-            if modal_report.detected:
-                self._queue.push(EVENT_MODAL, modal_report)
+            self._track_modal(modal_report)
         if self._monitor is not None:
             poll = self._monitor.poll()
             if poll.sold is not None:
                 self._queue.push(EVENT_SOLD, poll.sold)
         return prev_window
+
+    # --- safety: устойчивая деградация -> escalation (8.4) ---
+
+    def _track_occluded(self, window: str, report: Any) -> None:
+        """Счётчик эпизода occluded_or_unstable: порог подряд кадров ->
+        одно событие escalation за эпизод (дедуп флагом)."""
+        if report.status != STATUS_OCCLUDED:
+            self._reset_occluded()
+            return
+        self._occluded_streak += 1
+        if (not self._occluded_escalated
+                and self._occluded_streak >= self._occluded_escalation_frames):
+            self._queue.push(EVENT_ESCALATION, {
+                "target": window,
+                "detail": report.reason or "окно нестабильно или перекрыто",
+                "steps": (),
+            })
+            self._occluded_escalated = True
+            logger.warning(
+                "observer: устойчивая деградация окна %s (%s кадров подряд): "
+                "escalation", window, self._occluded_streak)
+
+    def _reset_occluded(self) -> None:
+        """Снятие эпизода деградации (found/not_found/нет окна)."""
+        self._occluded_streak = 0
+        self._occluded_escalated = False
+
+    def _track_modal(self, modal_report: Any) -> None:
+        """Счётчик эпизода modal.unknown: порог подряд циклов -> одно
+        событие escalation за эпизод (модалка не уходит сама)."""
+        if modal_report.detected:
+            self._queue.push(EVENT_MODAL, modal_report)
+            self._modal_streak += 1
+            if (not self._modal_escalated
+                    and self._modal_streak >= self._modal_escalation_cycles):
+                reason = modal_report.reason or "кандидат не уходит"
+                self._queue.push(EVENT_ESCALATION, {
+                    "target": None,
+                    "detail": f"устойчивая неизвестная модалка: {reason}",
+                    "steps": (),
+                })
+                self._modal_escalated = True
+                logger.warning(
+                    "observer: устойчивая модалка (%s циклов подряд): "
+                    "escalation", self._modal_streak)
+        else:
+            self._modal_streak = 0
+            self._modal_escalated = False
 
 
 class EventDispatcher:

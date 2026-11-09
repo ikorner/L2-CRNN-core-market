@@ -8,6 +8,8 @@ executor, observer, dispatcher»; сценарий «Observer не отправ�
 - OwnerGuardedHid: HID-команды только из потока-владельца (action executor),
   вызов из чужого потока -> HidOwnershipError, железо не тронуто;
 - StateObserver: публикует события sold/window_closed/modal в очередь,
+  escalation при устойчивой деградации occluded_or_unstable / устойчивой
+  модалке (safety 8.4, одиночная эскалация за эпизод + rearm),
   HID не получает ВООБЩЕ (observer'у hid не передаётся; интеграционно —
   wiring.hid движка после прогона чист), снапшот состояния обновляется;
 - EventDispatcher: доставка callbacks НЕ в observer-потоке, порядок
@@ -40,6 +42,7 @@ from l2core.api.events import (
     EVENT_SOLD,
     EVENT_WINDOW_CLOSED,
     Event,
+    EventJournal,
     EventQueue,
 )
 from l2core.api.hid_owner import HidOwnershipError, OwnerGuardedHid
@@ -49,6 +52,7 @@ from l2core.detector.modal import ModalReport
 from l2core.detector.status import (
     STATUS_FOUND,
     STATUS_NOT_FOUND,
+    STATUS_OCCLUDED,
     WindowStatus,
 )
 from l2core.model import UiModel, WindowSpec
@@ -594,6 +598,159 @@ class TestStateObserver:
         stop()
         assert screen.grabs == 0   # отмена до чтения кадра (паттерн 6.3)
         assert observer.iterations == 0
+
+
+# --- StateObserver: осмысленные ошибки при блокировках (8.4, safety) ---
+
+
+class ScriptedStatus:
+    """window_status по сценарию (последнее значение повторяется)."""
+
+    def __init__(self, statuses):
+        self._statuses = list(statuses)
+        self._index = 0
+
+    def __call__(self, frame, window_id):
+        status = self._statuses[min(self._index, len(self._statuses) - 1)]
+        self._index += 1
+        if status == STATUS_OCCLUDED:
+            return WindowStatus(
+                status=STATUS_OCCLUDED,
+                reason="anchor_lost: якорь был на предыдущем кадре",
+                anchor=None, content_loaded=None,
+                content_detail="статус не found")
+        return WindowStatus(status=STATUS_FOUND, reason=None, anchor=None,
+                            content_loaded=True, content_detail="ok")
+
+
+def make_safety_observer(queue, *, statuses, modal=None,
+                         occluded_frames=None, modal_cycles=None):
+    """Observer для safety-тестов: скриптованный статус 3.5."""
+    kwargs = {}
+    if occluded_frames is not None:
+        kwargs["occluded_escalation_frames"] = occluded_frames
+    if modal_cycles is not None:
+        kwargs["modal_escalation_cycles"] = modal_cycles
+    return StateObserver(
+        screen=FakeScreen(),
+        game_window=lambda: GameWindow.found(1, (0, 0, 64, 64)),
+        current_window=ScriptedWindows(("market",)),
+        find_anchor=lambda frame, window_id: None,
+        window_status=ScriptedStatus(statuses),
+        queue=queue, interval=POLL_INTERVAL, modal=modal, **kwargs)
+
+
+class TestObserverSafetyEscalation:
+    """Устойчивая деградация (заблокированный экран/перекрытие) и
+    устойчивая неизвестная модалка превращаются observer'ом в событие
+    escalation (spec safety: диагностируемая эскалация, не слепые клики;
+    observer HID не получает вообще — «не кликая» выполнено по построению).
+
+    Чтение очереди — через журнал (записывается на push, неразрушающее).
+    """
+
+    @staticmethod
+    def _types(queue):
+        return [entry.event.type
+                for entry in queue.journal.get_events()]
+
+    @staticmethod
+    def _escalations(queue):
+        return [entry.event for entry in queue.journal.get_events()
+                if entry.event.type == EVENT_ESCALATION]
+
+    def test_persistent_occluded_publishes_single_escalation(self):
+        queue = EventQueue(journal=EventJournal())
+        observer = make_safety_observer(queue, statuses=(STATUS_OCCLUDED,))
+        _, stop = run_observer(observer)
+        try:
+            assert wait_for(lambda: len(self._escalations(queue)) >= 1)
+            stop()
+            escalations = self._escalations(queue)
+            assert len(escalations) == 1   # одно событие за эпизод блокировки
+            assert escalations[0].payload == {
+                "target": "market",
+                "detail": "anchor_lost: якорь был на предыдущем кадре",
+                "steps": (),
+            }
+            # иных событий нет (модалок/продаж/закрытий не было)
+            assert self._types(queue) == [EVENT_ESCALATION]
+            assert observer.snapshot.status == STATUS_OCCLUDED
+        finally:
+            stop()
+
+    def test_transient_occluded_publishes_nothing(self):
+        queue = EventQueue(journal=EventJournal())
+        observer = make_safety_observer(
+            queue, statuses=(STATUS_FOUND, STATUS_OCCLUDED, STATUS_FOUND,
+                             STATUS_OCCLUDED, STATUS_FOUND),
+            occluded_frames=3)
+        _, stop = run_observer(observer)
+        try:
+            assert wait_for(lambda: observer.iterations >= 6)
+            assert len(queue) == 0   # единичные всплески — не эскалация
+        finally:
+            stop()
+
+    def test_escalation_rearms_after_recovery(self):
+        queue = EventQueue(journal=EventJournal())
+        # длинный occluded-эпизод, восстановление, второй эпизод
+        statuses = (STATUS_OCCLUDED,) * 6 + (STATUS_FOUND,) * 2 \
+            + (STATUS_OCCLUDED,) * 6
+        observer = make_safety_observer(queue, statuses=statuses)
+        _, stop = run_observer(observer)
+        try:
+            assert wait_for(lambda: len(self._escalations(queue)) >= 2)
+            stop()
+            assert len(self._escalations(queue)) == 2
+        finally:
+            stop()
+
+    def test_persistent_modal_publishes_single_escalation(self):
+        queue = EventQueue(journal=EventJournal())
+        detected = threading.Event()
+        modal = ScriptedModal(detected)
+        observer = make_safety_observer(queue, statuses=(STATUS_FOUND,),
+                                        modal=modal, modal_cycles=3)
+        _, stop = run_observer(observer)
+        try:
+            detected.set()
+            assert wait_for(lambda: len(self._escalations(queue)) >= 1)
+            stop()
+            escalations = self._escalations(queue)
+            assert len(escalations) == 1
+            assert escalations[0].payload["target"] is None
+            assert "модал" in escalations[0].payload["detail"]
+            assert escalations[0].payload["steps"] == ()
+            # модалка публикуется каждый цикл, эскалация — один раз
+            modals = [t for t in self._types(queue) if t == EVENT_MODAL]
+            assert len(modals) >= 3
+        finally:
+            stop()
+
+    def test_modal_escalation_rearms_after_dismissal(self):
+        queue = EventQueue(journal=EventJournal())
+        detected = threading.Event()
+        modal = ScriptedModal(detected)
+        observer = make_safety_observer(queue, statuses=(STATUS_FOUND,),
+                                        modal=modal, modal_cycles=2)
+        _, stop = run_observer(observer)
+        try:
+            detected.set()
+            assert wait_for(lambda: len(self._escalations(queue)) >= 1)
+            calls_before = modal.calls
+            detected.clear()
+            # дождаться цикла с необнаруженной модалкой (сброс эпизода)
+            assert wait_for(lambda: modal.calls > calls_before
+                            and len(self._escalations(queue)) == 1)
+            first = list(self._escalations(queue))
+            detected.set()
+            assert wait_for(lambda: len(self._escalations(queue)) >= 2)
+            stop()
+            second = [e for e in self._escalations(queue) if e not in first]
+            assert len(second) == 1   # новый эпизод — новая эскалация
+        finally:
+            stop()
 
 
 # --- L2CoreBot ---
