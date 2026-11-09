@@ -56,16 +56,16 @@
 
 ## 7. API и потоки
 
-- [ ] 7.1 Реализовать синхронный API: `open_market/close_market`, `open_shop_buy/open_shop_sell`, `set_tab`, `set_filter`, `search`, `scroll_list`, `read_rows`, `setup_sell`, `start_sell/cancel_sell`, `read_shop_state`, `get_state`, `recover`, `health`
+- [x] 7.1 Реализовать синхронный API: `open_market/close_market`, `open_shop_buy/open_shop_sell`, `set_tab`, `set_filter`, `search`, `scroll_list`, `read_rows`, `setup_sell`, `start_sell/cancel_sell`, `read_shop_state`, `get_state`, `recover`, `health`
 - [x] 7.2 Реализовать модель потоков: action executor (единственный владелец HID), state observer (фоновый, только чтение, питает события), event dispatcher (очередь, доставка callbacks в поток стратегии)
-- [ ] 7.3 Реализовать события двух форм: `on(callback)` (push) и `wait_event(type, timeout)` (pull); типы `sold`, `window_closed`, `modal`, `recovered`, `escalation`, `killed`; журнал событий ядром; API-справочник с полезной нагрузкой (пишется вместе с кодом)
+- [x] 7.3 Реализовать события двух форм: `on(callback)` (push) и `wait_event(type, timeout)` (pull); типы `sold`, `window_closed`, `modal`, `recovered`, `escalation`, `killed`; журнал событий ядром; API-справочник с полезной нагрузкой (пишется вместе с кодом)
 
 ## 8. Безопасность и логирование
 
 - [x] 8.1 Реализовать kill switch: локальный хоткей (клавиатура, не arduino) + глобальный таймаут неактивности; прерывание блокирующих вызовов с UNKNOWN/CANCELLED, `hid.release_all()`, курсор в безопасную точку, событие `killed`
-- [ ] 8.2 Реализовать dry-run режим (конфиг-флаг): чтение и детекция без HID, действия только логируются
-- [ ] 8.3 Реализовать JSONL-лог действий (кадр до/после, действие, verify-результат) с ротацией и ограничением размера (только ключевые кадры)
-- [ ] 8.4 Реализовать осмысленные ошибки при заблокированном экране/оверлеях (без слепых кликов)
+- [x] 8.2 Реализовать dry-run режим (конфиг-флаг): чтение и детекция без HID, действия только логируются
+- [x] 8.3 Реализовать JSONL-лог действий (кадр до/после, действие, verify-результат) с ротацией и ограничением размера (только ключевые кадры)
+- [x] 8.4 Реализовать осмысленные ошибки при заблокированном экране/оверлеях (без слепых кликов)
 
 ## 9. Тесты и приёмка
 
