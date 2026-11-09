@@ -163,3 +163,29 @@ class TestWindowConfig:
         path.write_text("window:\n  title: ''\n", encoding="utf-8")
         with pytest.raises(ConfigError):
             load_config(path)
+
+
+class TestCursorPos:
+    """get_cursor_pos — позиция курсора для wiring HID (задача 7.1).
+
+    Провайдер cursor_y/cursor_x протокола HID-адаптера: ядру нужна текущая
+    абсолютная позиция курсора для расчёта относительных дельт move_rel.
+    """
+
+    def test_real_gateway_returns_tuple_of_ints(self):
+        pytest.importorskip("win32gui")
+        from l2core.adapters.win32 import PyWin32Gateway
+
+        pos = PyWin32Gateway().get_cursor_pos()
+        assert isinstance(pos, tuple)
+        assert len(pos) == 2
+        assert all(isinstance(v, int) for v in pos)
+
+    def test_protocol_declares_method(self):
+        import inspect
+
+        from l2core.adapters.win32 import Win32Gateway
+
+        assert hasattr(Win32Gateway, "get_cursor_pos")
+        sig = inspect.signature(Win32Gateway.get_cursor_pos)
+        assert list(sig.parameters) == ["self"]

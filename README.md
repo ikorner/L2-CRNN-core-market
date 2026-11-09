@@ -7,9 +7,10 @@
 примитивы и сценарии. Стратегии торговли (что покупать/продавать и по каким
 ценам) — сменные модули поверх стабильного API и в этот репозиторий не входят.
 
-Статус: в разработке. Готовы структура пакета, конфигурация и тестовый
-скелет; адаптеры, детектор, OCR, примитивы, сценарии и публичный API ещё не
-реализованы (план — `openspec/changes/core-market-driver/tasks.md`).
+Статус: в разработке. Готовы адаптеры, детекторы, OCR, примитивы, сценарии
+и синхронный публичный API (задача 7.1); события/модель потоков (7.2–7.3) и
+готовые стратегии — ещё нет (план —
+`openspec/changes/core-market-driver/tasks.md`).
 
 ## Требования
 
@@ -70,10 +71,35 @@ dry_run: true
 
 ## Запуск
 
-Точка входа (CLI/сервис поверх публичного API из `l2core/api/`) появится
-вместе с реализацией API — см. раздел 6 плана
-`openspec/changes/core-market-driver/tasks.md`. До этого репозиторий —
-библиотека + тесты:
+Публичный API — синхронный фасад `L2CoreAPI` (`l2core/api/`), собираемый
+фабрикой `create_api` (живые адаптеры: MssScreen, HidDevice, TorchOcr,
+PyWin32Gateway, детекторы). Модуль стратегии создаёт API в своём потоке и
+вызывает блокирующие методы только из него (enforcement — проверка
+потока-владельца, чужой поток → RuntimeError):
+
+```python
+from l2core.api import create_api
+
+api = create_api("config.yaml")          # владелец — поток конструктора
+state = api.get_state()                  # (window, state, params, status)
+opened = api.open_market()               # клик по HUD + ожидание сигнатуры
+if opened.needs_recover:
+    api.recover(opened, "market", hud_element="market_pic")
+rows = api.read_rows()                   # RowsResult со snapshot_id
+api.scroll_list("down", 3)
+api.close_market()
+```
+
+Навигация возвращает `NavigationResult` с трёхзначным `outcome`
+(OK / FAILED / UNKNOWN — адаптер 5.7): UNKNOWN означает «эффект, скорее
+всего, ушёл, подтвердить нельзя» — повтор потенциально необратимого до
+явного `api.guard.confirm_after_unknown(...)` запрещён. Регионы, которых нет
+в отгруженной UI-модели (поле поиска, поле цены, показатели лавки),
+передаются в `create_api` параметрами `search_region` / `price_region` /
+`shop_regions` (см. KNOWN_GAPS и докстринги `l2core/api/`).
+
+Полный цикл бота (CLI/сервис, kill switch 8.1, события 7.3, потоки 7.2) —
+вне текущего объёма; репозиторий пока — библиотека + тесты:
 
 ```bash
 python -m pytest

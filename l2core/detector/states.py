@@ -149,17 +149,16 @@ class StateDetector:
         self._ocr_client = ocr_client
         self._template_threshold = template_threshold
         self._color_tolerance = color_tolerance
-        self._templates = self._load_templates()
+        self._templates: dict = {}
+        self._load_templates()
 
     def _load_templates(self) -> dict:
         """Шаблоны template-сигнатур (окно, элемент, вариант) -> серый массив.
 
         Ссылки модели проверяются здесь же: несуществующий элемент/вариант
         или отсутствующий файл — падение при создании (ошибка разметчика,
-        не рантайма).
+        не рантайма). Загрузка — через _load_template (кэш на экземпляре).
         """
-        import cv2
-
         templates = {}
         for window_id, model in self._models.items():
             for state_id, state in model.states.items():
@@ -176,26 +175,46 @@ class StateDetector:
                     key = (window_id, check.element, check.variant)
                     if key in templates:
                         continue
-                    try:
-                        element = model.elements[check.element]
-                    except KeyError:
-                        raise KeyError(
-                            f"сигнатура состояния {state_id!r} ссылается на "
-                            f"несуществующий элемент {check.element!r}"
-                        ) from None
-                    try:
-                        spec = element.variants[check.variant]
-                    except KeyError:
-                        raise KeyError(
-                            f"элемент {check.element!r} состояния {state_id!r} "
-                            f"не имеет варианта {check.variant!r}"
-                        ) from None
-                    path = self._assets_dir / spec.template
-                    image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
-                    if image is None:
-                        raise FileNotFoundError(f"шаблон сигнатуры не найден: {path}")
-                    templates[key] = (np.asarray(image, dtype=np.float64), element)
+                    templates[key] = self._load_template(
+                        window_id, check.element, check.variant,
+                        context=f"сигнатура состояния {state_id!r}")
         return templates
+
+    def _load_template(self, window_id: str, element_id: str, variant: str,
+                       *, context: str):
+        """Загрузить шаблон (окно, элемент, вариант) с кэшем на экземпляре.
+
+        Ошибки ссылок модели — падение (разметчик, не рантайм). Точка
+        переиспользования _load_templates и ленивой загрузки проверок
+        переходов (evaluate): verify-наборы могут ссылаться на элементы,
+        не входящие ни в одну сигнатуру состояний.
+        """
+        import cv2
+
+        key = (window_id, element_id, variant)
+        loaded = self._templates.get(key)
+        if loaded is not None:
+            return loaded
+        model = self._models[window_id]
+        try:
+            element = model.elements[element_id]
+        except KeyError:
+            raise KeyError(
+                f"{context} ссылается на несуществующий элемент "
+                f"{element_id!r}") from None
+        try:
+            spec = element.variants[variant]
+        except KeyError:
+            raise KeyError(
+                f"элемент {element_id!r} ({context}) не имеет варианта "
+                f"{variant!r}") from None
+        path = self._assets_dir / spec.template
+        image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+        if image is None:
+            raise FileNotFoundError(f"шаблон не найден: {path}")
+        loaded = (np.asarray(image, dtype=np.float64), element)
+        self._templates[key] = loaded
+        return loaded
 
     def detect(self, frame: np.ndarray, anchor: Anchor) -> StateReport:
         """Классификация состояния окна по кадру и свежему якорю."""
@@ -284,6 +303,27 @@ class StateDetector:
             failed=tuple(failed_all),
             conflicts=(),
             ocr_degraded=any(r.matched is None for r in failed_all),
+        )
+
+    def evaluate(self, checks: Tuple[Check, ...], frame: np.ndarray,
+                 anchor: Anchor) -> Tuple[SignatureResult, ...]:
+        """Публичная оценка произвольного набора проверок (wiring 7.1).
+
+        Та же семантика, что у сигнатур состояний (detect): тот же matcher,
+        порог template_threshold, допуск пиксель-пробы и OCR-клиент — это
+        точка переиспользования для run_checks-провайдера сборки API
+        (l2core/api/wiring.py): verify-наборы переходов оцениваются без
+        дублирования _evaluate. matched=None — недоступная OCR-проверка
+        без клиента (деградация, как в сигнатурах). state_id результата
+        пустой: проверки не привязаны к состоянию.
+        """
+        model = self._models[anchor.window_id]
+        gray = _to_gray(frame)
+        frame_h, frame_w = gray.shape
+        return tuple(
+            self._evaluate(check, model, anchor, gray, frame, frame_w, frame_h,
+                           state_id="")
+            for check in checks
         )
 
     def check_content(self, frame: np.ndarray, anchor: Anchor, *,
@@ -380,7 +420,9 @@ class StateDetector:
     def _evaluate_template(self, check: Check, anchor: Anchor, gray: np.ndarray,
                            frame_w: int, frame_h: int,
                            state_id: str, name: str) -> SignatureResult:
-        template, element = self._templates[(anchor.window_id, check.element, check.variant)]
+        template, element = self._load_template(
+            anchor.window_id, check.element, check.variant,
+            context="проверка перехода")
         h, w = template.shape
         if element.hud:
             # HUD-элемент: search_area — допустимая область поиска в кадре.

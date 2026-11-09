@@ -107,8 +107,9 @@ python tools/gen_ocr_golden.py
 # GPU; без crnn_best.pt — понятная ошибка, код выхода 2
 python tools/benchmark_ocr.py --model <путь>/crnn_best.pt
 
-# Запуск бота: точка входа появится вместе с публичным API (раздел 6 tasks.md);
-# документировать/выдумывать команду запуска до этого нельзя.
+# Запуск бота: публичный API есть (create_api, задача 7.1), готовый
+# цикл бота/CLI — нет (kill switch 8.1, события 7.3, потоки 7.2);
+# выдумывать команду запуска нельзя.
 ```
 
 ### Структура пакета
@@ -153,7 +154,12 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
   него состояния с OCR-сигнатурами дают unknown+диагностику (деградация,
   не исключение); конфликт/неподтверждение → unknown с журналированием
   конфликтующих признаков; состояния с префиксом `recover_` (глобальный
-  recover 5.8) классификацией не занимаются. Порог template-сигнатур
+  recover 5.8) классификацией не занимаются. Публичная оценка произвольных
+  проверок — `StateDetector.evaluate(checks, frame, anchor)` (та же
+  семантика/пороги, что у сигнатур; точка переиспользования run_checks
+  сборки API 7.1); шаблоны проверок грузятся лениво с кэшем на экземпляре —
+  verify-наборы переходов могут ссылаться на элементы вне сигнатур
+  состояний. Порог template-сигнатур
   0.9 — замер 3.4 (позитивы ≥0.998, макс. ложный дискриминирующий 0.829).
   Детектор статусов (3.5, status.py): статусы `not_found /
   occluded_or_unstable / found` + признак «контент прогрузился». Компонент
@@ -730,6 +736,71 @@ market-scenarios «Сценарий recover как композиция прим
   провайдеры/последовательность шагов ScriptedHid, release_all от cause,
   прозрачная эскалация/отмена, fail fast, проброс RecoverError модели).
 
+### Синхронный блокирующий API для стратегий (задача 7.1, spec
+core-api-events, инварианты 1/2/4/9)
+
+`l2core/api/core.py` — L2CoreAPI, ТОНКИЙ ФАСАД: методы — композиции
+существующих сценариев/примитивов поверх сборки провайдеров ApiWiring
+(`l2core/api/wiring.py`), механика не дублируется. Карта: open_market/
+close_market/open_shop_buy/open_shop_sell (навигация), set_tab/set_filter/
+search/scroll_list (обзор), read_rows (6.1), setup_sell/start_sell/
+cancel_sell (6.2 + страж 5.7), read_shop_state (разовое чтение показателей
+— паттерн монитора 6.3 без baseline, деградация флагами), get_state
+(window/state/params/status 3.4/3.5), recover (6.4), health (агрегат:
+окно игры 3.2, окно торговли, OCR, HID — через провайдеров).
+
+- **Thread-owner**: владелец — поток конструктора (или owner_thread); каждый
+  публичный метод проверяет threading.current_thread() — чужой поток →
+  RuntimeError (spec: «стратегия MUST вызывать блокирующий API только из
+  своего потока»; enforcement в точке вызова).
+- **Навигация**: open_market — verify/on_fail из перехода модели
+  (recover_closed -> list__tab_home, как 6.1); open_shop_buy/open_shop_sell
+  требуют verify (межокнные переходы не выражены — KNOWN_GAPS п.3);
+  set_tab/set_filter — verify из перехода модели, иначе явный (fail fast).
+  Открытие через HUD НЕ click_element 5.3: его пролог требует якорь окна,
+  которого при закрытом обзоре нет (та же латентная граница открытия в
+  scan 6.1) — механика паттерна 5.8: пролог активации → hud_locator →
+  РОВНО ОДИН клик → блокирующее ожидание сигнатуры окна на свежих кадрах
+  (wait_until, тайминги конфига): сигнатура сошлась — OK; verify выполнялся,
+  но не сошёлся за таймаут — FAILED; якоря не было ни разу — UNKNOWN
+  (клик ушёл, не подтверждён). Повторных кликов по таймауту нет.
+  Навигация возвращает NavigationResult (success/outcome/cancelled/
+  unconfirmed/on_fail_executed/failures, needs_recover).
+- **read_shop_state**: регионы counter/revenue — параметр regions →
+  wiring.shop_regions → ocr_regions модели (в отгруженной пусто —
+  KNOWN_GAPS п.10); грамматики показателей числовые (ApiError иначе);
+  якоря нет/регион не сошёлся — ShopStateResult(degraded=True, failures),
+  не исключение; HID не трогает (наблюдатель).
+- **Отмена**: методы принимают cancelled (аргумент побеждает wiring.
+  cancelled); мгновенные вызовы без флага в результате (read_rows/
+  get_state/read_shop_state) на отмене — ApiError; остальные — флагом.
+- **Страж**: api.guard — IrreversibleGuard сборки (5.7): start_sell при
+  UNKNOWN блокирует повтор до guard.confirm_after_unknown стратегией.
+- **wiring.py — единая точка сборки провайдеров**: find_anchor(frame,
+  window_id) / window_status(frame, window_id) (детекторы 3.3/3.5),
+  run_checks — через StateDetector.evaluate (3.4, публичная точка
+  переиспользования _evaluate; шаблоны проверок переходов грузятся лениво
+  — verify может ссылаться на элементы вне сигнатур состояний),
+  current_window (первый найденный якорь), close_point (market →
+  main_market_close_button, shop_sell → close_sell_button; shop_buy нет —
+  None, fallback 5.8: ESC), hud_locator (template matching в search_area
+  HUD-элемента + click_point варианта, порог hud_threshold=0.9),
+  goal_reached(target) — якорь цели найден, health-провайдеры
+  (game_window — находилка 3.2; ocr_health дефолт True — локальный OCR жив
+  по построению; hid_health — is_connected, если есть).
+- **create_api(config, ...)** — фабрика живой сборки: load_config по пути,
+  модели из ui_model/, MssScreen/HidDevice/TorchOcr (create_ocr_client)/
+  PyWin32Gateway (ensure_dpi_aware, get_cursor_pos, activate_game 5.2);
+  адаптеры подменяемы (тесты); регионы KNOWN_GAPS — параметрами.
+- Win32Gateway расширен get_cursor_pos() (позиция курсора для относительных
+  дельт HID; см. activate_game 5.2).
+- YAGNI: никакого event dispatcher (7.3), executor/observer (7.2), kill
+  switch (8.1) — здесь только синхронный фасад.
+- Тесты: tests/test_api.py (контракт всех методов на скриптованном мире:
+  делегирование, OK/FAILED/UNKNOWN, thread-owner, отмена, страж),
+  tests/test_wiring.py (математика провайдеров, create_api с подменой
+  адаптеров на реальных моделях).
+
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
 `l2core/primitives/wait.py` — единственная sanctioned-точка блокирующего
@@ -776,7 +847,8 @@ retry: попыток = 1 + timing.click_retry_count; исчерпание → A
 с reason находилки (3.2), SetForeground не вызывается (инвариант 9). Отмена
 через cancelled (kill switch 8.1) → результат с cancelled=True, не исключение.
 Протокол Win32Gateway расширен методами `get_foreground_window()` /
-`set_foreground(hwnd)` (реализация — PyWin32Gateway, в тестах fake).
+`set_foreground(hwnd)` / `get_cursor_pos()` (реализация —
+PyWin32Gateway, в тестах fake).
 
 Проверка перекрытия — честный минимум: фокус. Надёжной дешёвой проверки
 перекрытия клиентской области другим окном Win32 не даёт; перекрытие
@@ -815,7 +887,12 @@ null). Replay-модель эффектов: действие → записан
 → `save()` (или контекстный менеджер). Чтение: `load_session(path)` →
 `.events`, `.read_image(ref)`. Живой прогон пишет сессию через
 `RecordingScreen(inner, path)` (декоратор поверх любого Screen).
-- `l2core/api/` — публичный синхронный API + события для модулей стратегий.
+- `l2core/api/` — публичный синхронный API для модулей стратегий (задача
+  7.1): L2CoreAPI — тонкий фасад, композирующий сценарии 6.1–6.4 и
+  примитивы 5.x поверх провайдеров сборки ApiWiring (l2core/api/wiring.py —
+  build_wiring из детекторов 3.3–3.5 и create_api с живыми адаптерами:
+  MssScreen/HidDevice/TorchOcr/PyWin32Gateway). События/потоки 7.2–7.3 —
+  не здесь (YAGNI).
 - `l2core/config.py` — схема и типизированный загрузчик `config.yaml`.
 - `tests/` — pytest; `ui_model/` — YAML UI-модель; `assets/` — шаблоны и
   golden-кропы (версионируются вместе с моделью); `base_screenshot/scr/` —

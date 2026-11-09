@@ -533,3 +533,73 @@ class TestRealScreenshots:
         модели нет -> честный unknown (а не уверенное чужое состояние)."""
         report = detect_on(real_detector, "scr_153802", "market")
         assert report.state is None
+
+
+class TestEvaluateChecks:
+    """Публичная оценка произвольного набора проверок (wiring 7.1).
+
+    run_checks-провайдер сборки API (l2core/api/wiring.py) обязан оценивать
+    verify-наборы переходов той же семантикой, что и сигнатуры состояний:
+    тот же matcher/порог/допуск/OCR-клиент. Точка переиспользования —
+    StateDetector.evaluate: без него wiring дублировал бы _evaluate.
+    """
+
+    def test_template_checks_use_signature_semantics(self, synth):
+        t_ok = write_template(synth, Path("t/a.png"), 250)   # ~0.98 >= 0.9
+        t_bad = write_template(synth, Path("t/b.png"), 100)  # ~0.39 < 0.9
+        model = make_model(
+            states={},
+            elements={"el_a": element("el_a", Rect(0, 0, 8, 8), t_ok),
+                      "el_b": element("el_b", Rect(20, 20, 8, 8), t_bad)},
+        )
+        detector = detector_for({"market": model}, RecordingMatcher(), synth)
+        results = detector.evaluate(
+            (tpl_check("el_a"), tpl_check("el_b")),
+            np.zeros((300, 400, 3), dtype=np.uint8),
+            Anchor("market", 0, 0, 1.0, "template"))
+        assert [r.matched for r in results] == [True, False]
+        assert results[0].name == "template:el_a/normal"
+        assert "ncc=" in results[1].detail
+
+    def test_ocr_check_without_client_is_unavailable(self, synth):
+        model = make_model(
+            states={},
+            elements={"el_a": element("el_a", Rect(0, 0, 8, 8),
+                                      write_template(synth, Path("t/a.png"), 250))},
+            ocr_regions={"reg": OcrRegionSpec(
+                id="reg", rect=Rect(0, 0, 8, 8),
+                grammar=GrammarSpec(name="g", kind="text"))},
+        )
+        detector = detector_for({"market": model}, RecordingMatcher(), synth)
+        results = detector.evaluate(
+            (Check(kind="ocr", region="reg", expect="abc"),),
+            np.zeros((300, 400, 3), dtype=np.uint8),
+            Anchor("market", 0, 0, 1.0, "template"))
+        assert [r.matched for r in results] == [None]
+        assert "нет OCR-клиента" in results[0].detail
+
+    def test_ocr_check_with_client_compares_text(self, synth):
+        model = make_model(
+            states={},
+            elements={"el_a": element("el_a", Rect(0, 0, 8, 8),
+                                      write_template(synth, Path("t/a.png"), 250))},
+            ocr_regions={"reg": OcrRegionSpec(
+                id="reg", rect=Rect(0, 0, 8, 8),
+                grammar=GrammarSpec(name="g", kind="text"))},
+        )
+        detector = detector_for(
+            {"market": model}, RecordingMatcher(), synth,
+            ocr_client=FakeOcr(answers=[("abc", 0.99)]))
+        results = detector.evaluate(
+            (Check(kind="ocr", region="reg", expect="abc"),),
+            np.zeros((300, 400, 3), dtype=np.uint8),
+            Anchor("market", 0, 0, 1.0, "template"))
+        assert [r.matched for r in results] == [True]
+
+    def test_empty_checks_are_vacuously_true(self, synth):
+        model = make_model(states={})
+        detector = detector_for({"market": model}, RecordingMatcher(), synth)
+        results = detector.evaluate(
+            (), np.zeros((300, 400, 3), dtype=np.uint8),
+            Anchor("market", 0, 0, 1.0, "template"))
+        assert results == ()

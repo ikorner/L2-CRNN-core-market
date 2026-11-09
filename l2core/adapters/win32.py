@@ -52,6 +52,10 @@ class Win32Gateway(Protocol):
     def set_process_dpi_aware(self) -> bool:
         """Объявить процесс DPI-aware; False — объявить не удалось."""
 
+    def get_cursor_pos(self) -> tuple[int, int] | None:
+        """Позиция курсора в экранных пикселях (x, y); None — недоступна.
+        Нужна ядру для расчёта относительных дельт HID (wiring 7.1)."""
+
 
 @dataclass(frozen=True)
 class GameWindow:
@@ -193,3 +197,12 @@ class PyWin32Gateway:
                 return bool(ctypes.windll.user32.SetProcessDPIAware())
             except Exception:
                 return False
+
+    def get_cursor_pos(self) -> tuple[int, int] | None:
+        import win32gui
+
+        try:
+            x, y = win32gui.GetCursorPos()
+            return (int(x), int(y))
+        except Exception:  # pragma: no cover - зависит от ОС
+            return None
