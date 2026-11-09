@@ -32,6 +32,7 @@ from l2core.model import (
     VariantSpec,
     WindowSpec,
 )
+from l2core.model.rows import dedup_rows
 from l2core.primitives.activate import ActivateResult
 from l2core.primitives.click import CheckReport, VerifySpec
 from l2core.primitives.scroll import (
@@ -342,6 +343,31 @@ class TestScanMarket:
         # Два снимка (по чтению на кадре) с разными snapshot_id.
         assert len(point.snapshots) == 2
         assert point.snapshots[0].snapshot_id != point.snapshots[1].snapshot_id
+
+    def test_overlap_row_on_other_y_kept_as_position_duplicate(self):
+        # Перекрывающий скролл: та же строка пришла на другом y — в агрегате
+        # две записи (дедуп-ключ ядра включает screen_y; честное
+        # задокументированное поведение ScanResult). Дедуп по (icon, цена)
+        # без y — ответственность стратегии: dedup_rows с
+        # match_screen_y=False склеивает.
+        overlap_top = make_frame(rows={
+            0: {"texts": {"item": COLOR_ITEM_A, "price": COLOR_PRICE_A,
+                          "seller": COLOR_SELLER}, "icon": ICON_A},
+        })
+        overlap_scrolled = make_frame(rows={
+            1: {"texts": {"item": COLOR_ITEM_A, "price": COLOR_PRICE_A,
+                          "seller": COLOR_SELLER}, "icon": ICON_A},
+        })
+        result, _ = run_scan(
+            [ScanPoint(verify=POINT_VERIFY)],
+            frames=[overlap_top, overlap_scrolled],
+            disabled_by_pos={1: {DOWN_ARROW_DISABLED_ELEMENT}},
+        )
+        rows = result.points[0].rows
+        assert [(r.cells["item"].value, r.screen_y) for r in rows] == [
+            ("Меч", 20), ("Меч", 30),
+        ]
+        assert len(dedup_rows(rows, match_screen_y=False)) == 1
 
     def test_end_marker_stops_scroll_early(self):
         # Конец по признаку модели (disabled-стрелка на позиции 1): wheel

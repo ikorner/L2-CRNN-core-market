@@ -274,10 +274,12 @@ def setup_sell(
     итоговый verify. Контракт — в докстринге модуля.
 
     model — модель окна shop_sell; hud_model — модель, содержащая
-    HUD-элемент открытия (market, open_sale_trade); без неё открытие
-    невозможно (open_element есть, а элемент не найден — SetupSellError).
-    open_element=None — открытие пропускается (лавка открыта вызывающим
-    слоем); тогда open_verify не нужен.
+    HUD-элемент открытия (market, open_sale_trade). hud_model=None +
+    open_element задан: элемент ищется в модели окна и, если его там нет,
+    вылетает ClickElementError (честный fail fast — отсутствует элемент
+    модели, 5.3), не SetupSellError. open_element=None — открытие
+    пропускается (лавка открыта вызывающим слоем); тогда open_verify не
+    нужен.
     """
     items = tuple(items)
     grid = _resolve_grid(grid, model)

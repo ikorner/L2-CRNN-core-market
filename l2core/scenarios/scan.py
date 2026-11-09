@@ -122,6 +122,12 @@ class ScanResult:
     failures — диагностика отказа (needs_recover примитива: исполнение
     recover — вызывающий слой, 6.4); cancelled — прервано через cancelled
     (kill switch 8.1), HID-эффекты прекращены.
+
+    ВНИМАНИЕ: агрегат строк (PointScan.rows) может содержать позиционные
+    дубли — дедуп-ключ ядра (dedup_rows) включает screen_y, а при
+    перекрывающем скролле (overlap) одна и та же строка приходит на другом
+    y и проходит дедуп как новая. Дедуп по (icon_hash, цена) без y —
+    ответственность стратегии (dedup_rows(..., match_screen_y=False)).
     """
 
     points: Tuple[PointScan, ...]

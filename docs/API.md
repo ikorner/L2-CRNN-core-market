@@ -71,6 +71,11 @@ bot.push("killed", {"reason": ...})            # == bot.event_api.push(...)
 | `revenue_delta` | int \| None | приращение прибыли; None вместе с `revenue` |
 | `snapshot_id` | str | sha1 байтов кадра-источника (тот же источник, что у RowsResult 6.1) |
 
+Двойной канал: если монитор подключён и внешним `on_sold`-callback'ом,
+и через сборку движка (`L2CoreBot(monitor=...)`), подписчик движка
+получит `sold` дважды разными путями — держи один канал (либо wiring
+движка, либо внешний).
+
 ### `window_closed` — dict
 
 `{"window": <id окна торговли>}` — открытое окно исчезло со всех кадров
@@ -165,6 +170,14 @@ UNKNOWN), выполнил `hid.release_all()` (best-effort) и увёл кур�
 `event` (Event) + `timestamp` (момент публикации; в проде реальное время,
 диагностика гонок, не контракт payload). Доступ: `api.get_events(since_seq)`
 — записи с `seq >= since_seq`.
+
+## Чтение обзора: позиционные дубли (scan_market / read_rows)
+
+Агрегат строк `ScanResult.points[].rows` может содержать позиционные дубли:
+дедуп-ключ ядра (`dedup_rows`) включает `screen_y`, а при перекрывающем
+скролле (overlap) одна и та же строка приходит на другом y и проходит дедуп
+как новая. Дедуп по (icon_hash, цена) без y — ответственность стратегии:
+`dedup_rows(rows, match_screen_y=False)`.
 
 ## Пример цикла стратегии (pull)
 

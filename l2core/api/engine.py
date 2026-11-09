@@ -526,7 +526,6 @@ class L2CoreBot:
                                    owner_thread=self._owner)
         self._api = L2CoreAPI(self._wiring, owner_thread=self._owner,
                               events=self._event_api)
-        self._cancelled = cancelled
         self._observer_thread: Optional[threading.Thread] = None
         self._dispatcher_thread: Optional[threading.Thread] = None
         self._started = False

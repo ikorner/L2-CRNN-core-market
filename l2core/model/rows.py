@@ -326,12 +326,18 @@ def dedup_rows(
     *,
     price_column: str = "price",
     hamming_threshold: int = DEFAULT_HAMMING_THRESHOLD,
+    match_screen_y: bool = True,
 ) -> Tuple[Row, ...]:
     """Сквозной дедуп строк между кадрами скролла (spec ocr-reading).
 
     Ключ строки: icon_hash (по Хэммингу <= threshold) + цена + y (все три
     совпали — та же строка). Порядок — по первому появлению. Порог —
     параметр (происхождение дефолта — в докстринге модуля).
+
+    match_screen_y=False исключает y из ключа (дедуп по icon + цена) —
+    выбор стратегии для перекрывающего скролла: overlap-строка приходит на
+    другом y и иначе проходит как новая (предупреждение — в докстринге
+    ScanResult, l2core/scenarios/scan.py).
     """
     accepted: list = []
     for row in rows:
@@ -339,7 +345,7 @@ def dedup_rows(
         duplicate = any(
             _icons_match(prev.icon_hash, row.icon_hash, hamming_threshold)
             and _price_key(prev, price_column) == price
-            and prev.screen_y == row.screen_y
+            and (not match_screen_y or prev.screen_y == row.screen_y)
             for prev in accepted
         )
         if not duplicate:

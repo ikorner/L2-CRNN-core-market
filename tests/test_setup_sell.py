@@ -37,7 +37,11 @@ from l2core.model import (
     WindowSpec,
 )
 from l2core.primitives.activate import ActivateResult
-from l2core.primitives.click import CheckReport, VerifySpec
+from l2core.primitives.click import (
+    CheckReport,
+    ClickElementError,
+    VerifySpec,
+)
 from l2core.primitives.outcome import (
     ActionOutcome,
     IrreversibleGuard,
@@ -337,7 +341,7 @@ def hud_locator(element, variant, frame):
 
 def run_setup(items, *, grid=GRID, model_grid=GRID, price_region=PRICE_REGION,
               source_points=None, fail_elements=(), find_anchor=None,
-              cancelled=None, rng_seed=7, ocr=None):
+              cancelled=None, rng_seed=7, ocr=None, hud_model="default"):
     clock = FakeClock()
     screen = ShopScreen()
     hid = ScriptedHid(clock, screen)
@@ -347,7 +351,7 @@ def run_setup(items, *, grid=GRID, model_grid=GRID, price_region=PRICE_REGION,
     result = setup_sell(
         items,
         model=make_shop_model(grid=model_grid),
-        hud_model=make_hud_model(),
+        hud_model=make_hud_model() if hud_model == "default" else hud_model,
         grid=grid,
         ocr=ocr or DictOcr(OCR_TEXTS),
         screen=screen,
@@ -457,6 +461,14 @@ class TestSetupSell:
         with pytest.raises(SetupSellError, match="price"):
             run_setup([SellItem(slot=0, price=100)],
                       price_region=None, source_points=[(40, 120)])
+
+    def test_missing_hud_model_open_element_is_click_element_error(self):
+        # Контракт докстринга setup_sell: hud_model=None + open_element,
+        # которого нет в модели окна — честный fail fast ClickElementError
+        # из click.py (5.3: отсутствует элемент модели), не SetupSellError.
+        with pytest.raises(ClickElementError, match="open_sale_trade"):
+            run_setup([SellItem(slot=0, price=100)],
+                      hud_model=None, source_points=[(40, 120)])
 
     def test_duplicate_slot_is_setup_error(self):
         with pytest.raises(SetupSellError, match="повтор"):
