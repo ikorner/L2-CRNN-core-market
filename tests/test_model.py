@@ -2,9 +2,10 @@
 
 Покрывают: круглый путь load -> объектная модель -> доступ к элементам,
 состояниям, переходам, OCR-регионам и геометрии таблицы; общий словарь;
-диагностику ошибок формата с именем файла и секции. Семантические
-инварианты (число сигнатур, вписывание rect'ов и т.п.) — зона валидатора
-(задача 2.3), здесь не проверяются.
+диагностику ошибок формата с именем файла и секции (все ветки
+ModelFormatError, задача 9.1). Семантические инварианты (число сигнатур,
+вписывание rect'ов и т.п.) — зона валидатора (задача 2.3), здесь не
+проверяются.
 """
 
 from pathlib import Path
@@ -464,6 +465,483 @@ def test_error_message_contains_file_and_section(tmp_path):
     assert "market.yaml" in msg  # файл
     assert "elements" in msg  # секция
     assert "tab_home" in msg  # элемент
+
+
+# --- Задача 9.1: доведение покрытия диагностики формата до всех веток ---
+
+# Мутации формат-образца: (id, kwargs для _write_model, фрагмент диагностики).
+# Каждая параправка должна приводить к ModelFormatError своей ветки парсера
+# (loader.py): проверяем и саму ошибку, и наличие в сообщении якоря ветки.
+_FORMAT_CASES = [
+    # --- window ---
+    pytest.param(
+        {"replace": (
+            'window:\n  id: market\n  title: "Обзор лавок"\n  size: [804, 598]'),
+         "with_text": "window: просто строка"},
+        "window",
+        id="window-не-mapping",
+    ),
+    pytest.param(
+        {"replace": "  id: market", "with_text": "  id: bazaar"},
+        "неизвестное окно",
+        id="window-неизвестный-id",
+    ),
+    pytest.param(
+        {"replace": '  title: "Обзор лавок"', "with_text": '  title: ""'},
+        "title",
+        id="window-пустой-title",
+    ),
+    pytest.param(
+        {"replace": "  size: [804, 598]", "with_text": "  size: [804]"},
+        "size",
+        id="window-size-не-пара",
+    ),
+    pytest.param(
+        {"replace": "  size: [804, 598]", "with_text": "  size: [804, -598]"},
+        "size",
+        id="window-size-не-положительные",
+    ),
+    pytest.param(
+        {"replace": "  size: [804, 598]",
+         "with_text": "  size: [804, 598]\n  zorder: 3"},
+        "неизвестные ключи",
+        id="window-неизвестный-ключ",
+    ),
+    # --- elements ---
+    pytest.param(
+        {"drop_section": "elements", "extra": "elements: [tab_home]\n"},
+        "elements",
+        id="elements-не-mapping",
+    ),
+    pytest.param(
+        {"drop_section": "elements", "extra": "elements: {}\n"},
+        "непустой mapping",
+        id="elements-пусто",
+    ),
+    pytest.param(
+        {"drop_section": "elements", "extra": "elements:\n  tab_home: 42\n"},
+        "tab_home",
+        id="elements-спека-не-mapping",
+    ),
+    pytest.param(
+        {"replace": "    role: click_target", "with_text": ""},
+        "неизвестная роль",
+        id="elements-роль-отсутствует",
+    ),
+    pytest.param(
+        {"replace": "    hud: true", "with_text": "    hud: 1"},
+        "hud",
+        id="elements-hud-не-bool",
+    ),
+    pytest.param(
+        {"replace": "    search_area: [1000, 420, 200, 160]",
+         "with_text": "    rect: [1, 2, 3, 4]\n    search_area: [1000, 420, 200, 160]"},
+        "не задаёт rect",
+        id="elements-hud-с-rect",
+    ),
+    # --- variants ---
+    pytest.param(
+        {"replace": (
+            "    variants:\n"
+            "      normal: {template: market/tab_home_normal.png}\n"
+            "      active: {template: market/tab_home_active.png, click_point: [81, 61]}"),
+         "with_text": "    variants: [normal, active]"},
+        "variants",
+        id="variants-не-mapping",
+    ),
+    pytest.param(
+        {"replace": "      normal: {template: market/tab_home_normal.png}",
+         "with_text": "      normal: 5"},
+        "normal",
+        id="variants-спека-не-mapping",
+    ),
+    pytest.param(
+        {"replace": "      normal: {template: market/tab_home_normal.png}",
+         "with_text": "      normal: {template: market/tab_home_normal.png, blur: 3}"},
+        "неизвестные ключи",
+        id="variants-неизвестный-ключ",
+    ),
+    pytest.param(
+        {"replace": "      normal: {template: market/tab_home_normal.png}",
+         "with_text": "      normal: {click_point: [1, 2]}"},
+        "template",
+        id="variants-template-отсутствует",
+    ),
+    pytest.param(
+        {"replace": "      normal: {template: market/tab_home_normal.png}",
+         "with_text": "      normal: {template: ''}"},
+        "template",
+        id="variants-template-пустой",
+    ),
+    pytest.param(
+        {"replace": (
+            "      active: {template: market/tab_home_active.png, click_point: [81, 61]}"),
+         "with_text": (
+            "      active: {template: market/tab_home_active.png, click_point: [81]}")},
+        "click_point",
+        id="variants-click_point-не-пара",
+    ),
+    # --- states ---
+    pytest.param(
+        {"drop_section": "states", "extra": "states: [list_home]\n"},
+        "states",
+        id="states-не-mapping",
+    ),
+    pytest.param(
+        {"drop_section": "states", "extra": "states:\n  list_home: 7\n"},
+        "list_home",
+        id="states-спека-не-mapping",
+    ),
+    pytest.param(
+        {"replace": "    params:\n      tab: home",
+         "with_text": "    params:\n      tab: home\n    depth: 3"},
+        "неизвестные ключи",
+        id="states-неизвестный-ключ",
+    ),
+    pytest.param(
+        {"replace": "      tab: home", "with_text": "      tab: [home]"},
+        "params",
+        id="states-params-не-строки",
+    ),
+    pytest.param(
+        {"replace": (
+            "    signatures:\n"
+            "      - {kind: pixel_probe, points: [{at: [20, 20], color: [255, 220, 120]}]}\n"
+            "      - {kind: template, element: tab_home, variant: active}\n"
+            '      - {kind: ocr, region: window_title, expect: "Обзор лавок"}'),
+         "with_text": "    signatures: []"},
+        "signatures",
+        id="states-signatures-пусто",
+    ),
+    pytest.param(
+        {"replace": (
+            "    signatures:\n"
+            "      - {kind: pixel_probe, points: [{at: [20, 20], color: [255, 220, 120]}]}\n"
+            "      - {kind: template, element: tab_home, variant: active}\n"
+            '      - {kind: ocr, region: window_title, expect: "Обзор лавок"}'),
+         "with_text": "    signatures: {a: b}"},
+        "signatures",
+        id="states-signatures-не-список",
+    ),
+    # --- проверки (сигнатуры/verify) ---
+    pytest.param(
+        {"replace": "{kind: pixel_probe, points: [{at: [20, 20], color: [255, 220, 120]}]}",
+         "with_text": "строка"},
+        "ожидается mapping",
+        id="check-не-mapping",
+    ),
+    pytest.param(
+        {"replace": "points: [{at: [20, 20], color: [255, 220, 120]}]",
+         "with_text": "points: []"},
+        "points",
+        id="pixel_probe-points-пусто",
+    ),
+    pytest.param(
+        {"replace": "points: [{at: [20, 20], color: [255, 220, 120]}]",
+         "with_text": "points: [[20, 20]]"},
+        "at/color",
+        id="pixel_probe-точка-не-mapping",
+    ),
+    pytest.param(
+        {"replace": "points: [{at: [20, 20], color: [255, 220, 120]}]",
+         "with_text": "points: [{at: [20, 20], color: [255, 220, 120], radius: 3}]"},
+        "radius",
+        id="pixel_probe-неизвестный-ключ-точки",
+    ),
+    pytest.param(
+        {"replace": "points: [{at: [20, 20], color: [255, 220, 120]}]",
+         "with_text": "points: [{at: [20, 20], color: [255, 220]}]"},
+        "color",
+        id="pixel_probe-color-не-triplet",
+    ),
+    pytest.param(
+        {"replace": "- {kind: template, element: tab_home, variant: active}",
+         "with_text": "- {kind: template, variant: active}"},
+        "element",
+        id="template-element-отсутствует",
+    ),
+    pytest.param(
+        {"replace": '- {kind: ocr, region: window_title, expect: "Обзор лавок"}',
+         "with_text": '- {kind: ocr, expect: "Обзор лавок"}'},
+        "region",
+        id="ocr-region-отсутствует",
+    ),
+    pytest.param(
+        {"replace": '- {kind: ocr, region: window_title, expect: "Обзор лавок"}',
+         "with_text": "- {kind: ocr, region: window_title}"},
+        "expect",
+        id="ocr-expect-отсутствует",
+    ),
+    # --- transitions ---
+    pytest.param(
+        {"drop_section": "transitions", "extra": "transitions: просто текст\n"},
+        "список переходов",
+        id="transitions-не-список",
+    ),
+    pytest.param(
+        {"drop_section": "transitions", "extra": "transitions:\n  - просто строка\n"},
+        "ожидается mapping",
+        id="transition-спека-не-mapping",
+    ),
+    pytest.param(
+        {"replace": "    element: tab_equipment\n    expected: list_equipment",
+         "with_text": "    element: tab_equipment\n    wobble: 3\n    expected: list_equipment"},
+        "неизвестные ключи",
+        id="transition-неизвестный-ключ",
+    ),
+    pytest.param(
+        {"replace": "  - from: list_home\n    action: click",
+         "with_text": "  - action: click"},
+        "from",
+        id="transition-from-отсутствует",
+    ),
+    pytest.param(
+        {"replace": "    action: click", "with_text": "    action: wave"},
+        "action",
+        id="transition-action-неизвестен",
+    ),
+    pytest.param(
+        {"replace": "    element: tab_equipment\n    expected: list_equipment",
+         "with_text": "    expected: list_equipment"},
+        "click требует",
+        id="transition-click-без-element",
+    ),
+    pytest.param(
+        {"replace": "    element: tab_equipment\n    expected: list_equipment",
+         "with_text": "    element: tab_equipment\n    key: escape\n    expected: list_equipment"},
+        "key недопустим",
+        id="transition-key-при-click",
+    ),
+    pytest.param(
+        {"replace": "    action: key\n    key: escape", "with_text": "    action: key"},
+        "key-действие требует",
+        id="transition-key-без-key",
+    ),
+    pytest.param(
+        {"replace": "    key: escape\n    expected: closed",
+         "with_text": "    key: escape\n    element: tab_equipment\n    expected: closed"},
+        "element недопустим",
+        id="transition-element-при-key",
+    ),
+    pytest.param(
+        {"replace": "    expected: list_equipment\n    timeout: 5.0",
+         "with_text": "    timeout: 5.0"},
+        "expected",
+        id="transition-expected-отсутствует",
+    ),
+    pytest.param(
+        {"replace": "    timeout: 5.0", "with_text": "    timeout: -1"},
+        "timeout",
+        id="transition-timeout-отрицательный",
+    ),
+    pytest.param(
+        {"replace": "    timeout: 5.0", "with_text": "    timeout: true"},
+        "timeout",
+        id="transition-timeout-bool",
+    ),
+    pytest.param(
+        {"replace": "    on_fail: [press_esc, reopen_market]", "with_text": ""},
+        "on_fail",
+        id="transition-on_fail-отсутствует",
+    ),
+    pytest.param(
+        {"replace": "    on_fail: [press_esc, reopen_market]",
+         "with_text": "    on_fail: []"},
+        "on_fail",
+        id="transition-on_fail-пусто",
+    ),
+    pytest.param(
+        {"replace": "    on_fail: [press_esc, reopen_market]",
+         "with_text": "    on_fail: [press_esc, 42]"},
+        "on_fail",
+        id="transition-on_fail-не-строки",
+    ),
+    # --- ocr_regions ---
+    pytest.param(
+        {"drop_section": "ocr_regions", "extra": "ocr_regions: [window_title]\n"},
+        "ожидается mapping id: регион",
+        id="ocr_regions-не-mapping",
+    ),
+    pytest.param(
+        {"drop_section": "ocr_regions", "extra": "ocr_regions:\n  window_title: 9\n"},
+        "window_title",
+        id="ocr_region-спека-не-mapping",
+    ),
+    pytest.param(
+        {"replace": "    grammar: text",
+         "with_text": "    grammar: text\n    lang: ru"},
+        "неизвестные ключи",
+        id="ocr_region-неизвестный-ключ",
+    ),
+    pytest.param(
+        {"replace": "    grammar: text", "with_text": ""},
+        "имя грамматики",
+        id="ocr_region-grammar-отсутствует",
+    ),
+    # --- table_geometry ---
+    pytest.param(
+        {"replace": "  col_seps: [12, 240, 372, 500, 640, 780]",
+         "with_text": "  col_seps: [12]"},
+        "col_seps",
+        id="table_geometry-col_seps-коротко",
+    ),
+    pytest.param(
+        {"replace": "  col_seps: [12, 240, 372, 500, 640, 780]",
+         "with_text": "  col_seps: [12.5, 240]"},
+        "col_seps",
+        id="table_geometry-col_seps-не-целые",
+    ),
+    pytest.param(
+        {"replace": "  row_y0: 96", "with_text": "  row_y0: высоко"},
+        "row_y0",
+        id="table_geometry-row_y0-не-целое",
+    ),
+    pytest.param(
+        {"replace": "  row_pitch: 24", "with_text": "  row_pitch: 0"},
+        "row_pitch",
+        id="table_geometry-row_pitch-ноль",
+    ),
+    pytest.param(
+        {"replace": "  max_rows: 18", "with_text": "  max_rows: -1"},
+        "max_rows",
+        id="table_geometry-max_rows-отрицательное",
+    ),
+    pytest.param(
+        {"replace": (
+            "  columns:\n"
+            "    item:\n"
+            "      zone: [4, 2, 220, 20]\n"
+            "      grammar: text\n"
+            "    price:\n"
+            "      zone: [4, 2, 120, 20]\n"
+            "      grammar: price"),
+         "with_text": "  columns: [item, price]"},
+        "columns",
+        id="table_geometry-columns-не-mapping",
+    ),
+    pytest.param(
+        {"replace": (
+            "    item:\n"
+            "      zone: [4, 2, 220, 20]\n"
+            "      grammar: text"),
+         "with_text": "    item: 4"},
+        "columns.item",
+        id="table_geometry-column-спека-не-mapping",
+    ),
+    pytest.param(
+        {"replace": "      zone: [4, 2, 220, 20]\n      grammar: text",
+         "with_text": "      zone: [4, 2, 220, 20]\n      grammar: text\n      weight: 1"},
+        "weight",
+        id="table_geometry-column-неизвестный-ключ",
+    ),
+    # --- прочие базовые разборы ---
+    pytest.param(
+        {"replace": "    rect: [10, 40, 142, 42]",
+         "with_text": "    rect: [-1, 40, 142, 42]"},
+        "отрицательными",
+        id="rect-отрицательные-координаты",
+    ),
+    pytest.param(
+        {"replace": "click_point: [81, 61]", "with_text": "click_point: [-1, 61]"},
+        "отрицательными",
+        id="point-отрицательные-координаты",
+    ),
+    # --- grid_geometry ---
+    pytest.param(
+        {"extra": (
+            "grid_geometry:\n"
+            "  origin: [10, 20]\n"
+            "  pitch: [30, 10]\n"
+            "  cell: [28, 8]\n"
+            "  cols: 3\n"
+            "  rows: 2\n"
+            "  angle: 45\n")},
+        "неизвестные ключи",
+        id="grid_geometry-неизвестный-ключ",
+    ),
+]
+
+
+@pytest.mark.parametrize("kwargs, fragment", _FORMAT_CASES)
+def test_format_violations_all_branches_diagnosed(tmp_path, kwargs, fragment):
+    """Мутация формата -> ModelFormatError своей ветки парсера (9.1: аудит
+    покрытия — каждая проверка формата из loader.py имеет тест)."""
+    path = _write_model(tmp_path, **kwargs)
+    with pytest.raises(ModelFormatError) as excinfo:
+        load_model(path)
+    assert fragment in str(excinfo.value)
+
+
+# (yaml common, фрагмент диагностики): ветки _parse_grammar/_string_list/
+# _reject_unknown общего словаря (load_common).
+_COMMON_CASES = [
+    pytest.param(
+        'variants: [normal]\nroles: [click_target]\ngrammars: [price]\n',
+        "grammars",
+        id="common-grammars-не-mapping",
+    ),
+    pytest.param(
+        'variants: [normal]\nroles: [click_target]\n'
+        "grammars:\n  price: [kind, price]\n",
+        "ожидается mapping",
+        id="common-grammar-спека-не-mapping",
+    ),
+    pytest.param(
+        'variants: [normal]\nroles: [click_target]\n'
+        "grammars:\n  hex: {kind: hex}\n",
+        "неизвестный вид грамматики",
+        id="common-grammar-вид-неизвестен",
+    ),
+    pytest.param(
+        'variants: [normal]\nroles: [click_target]\n'
+        "grammars:\n  price: {kind: price, suffixes: [к]}\n",
+        "суффикс: множитель",
+        id="common-suffixes-не-mapping",
+    ),
+    pytest.param(
+        'variants: [normal]\nroles: [click_target]\n'
+        "grammars:\n  digits: {kind: digits, min: true}\n",
+        "min",
+        id="common-min-не-целое",
+    ),
+    pytest.param(
+        'variants: [normal]\nroles: [click_target]\n'
+        'grammars:\n  price: {kind: price, separators: ","}\n',
+        "separators",
+        id="common-separators-не-список",
+    ),
+    pytest.param(
+        'variants: normal\nroles: [click_target]\ngrammars: {}\n',
+        "непустой список строк",
+        id="common-variants-не-список",
+    ),
+    pytest.param(
+        'variants: [normal, normal]\nroles: [click_target]\ngrammars: {}\n',
+        "повторы",
+        id="common-variants-дубли",
+    ),
+    pytest.param(
+        'variants: [normal]\nroles: [click_target, 5]\ngrammars: {}\n',
+        "непустых строк",
+        id="common-roles-не-строки",
+    ),
+    pytest.param(
+        'variants: [normal]\nroles: [click_target]\ngrammars: {}\nextra: 1\n',
+        "неизвестные ключи",
+        id="common-неизвестный-ключ",
+    ),
+]
+
+
+@pytest.mark.parametrize("yaml_text, fragment", _COMMON_CASES)
+def test_common_format_violations_all_branches_diagnosed(tmp_path, yaml_text, fragment):
+    """Ветки диагностики общего словаря (load_common): каждая проверка
+    формата имеет тест (9.1: аудит покрытия)."""
+    path = tmp_path / "common.yaml"
+    path.write_text(yaml_text, encoding="utf-8")
+    with pytest.raises(ModelFormatError) as excinfo:
+        load_common(path)
+    assert fragment in str(excinfo.value)
 
 
 # --- Вспомогательные функции ---

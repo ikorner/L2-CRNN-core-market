@@ -3,8 +3,10 @@
 Покрывают: импорт кропов в assets/ (включая идемпотентность повторного
 прогона), сбор карточек элементов и состояний, diff-отчёт и политику
 слияния «ручное побеждает, машинное дополняет», пропуск ролей-сырья meta
-(decor/ocr_ground_truth) и круглый путь: сгенерированная модель
-распарсивается существующим load_model.
+(decor/ocr_ground_truth) и кропов с неизвестным вариантом, ветки
+MetaFormatError сырья, замечания (issues) о неоднозначностях импорта и
+круглый путь: сгенерированная модель распарсивается существующим
+load_model (задача 9.1: покрытие доведено до всех веток).
 """
 
 import json
@@ -14,7 +16,7 @@ import pytest
 import yaml
 
 from l2core.model import load_common, load_model
-from l2core.model.converter import convert
+from l2core.model.converter import MetaFormatError, convert
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 UI_MODEL = REPO_ROOT / "ui_model"
@@ -378,3 +380,178 @@ def test_shipped_models_generated_by_converter_parse():
     for window in ("market", "shop_buy", "shop_sell"):
         model = load_model(UI_MODEL / f"{window}.yaml", common)
         assert model.window.id == window
+
+
+# --- Задача 9.1: аудит покрытия — ветки MetaFormatError и diff-отчёта ---
+
+
+def _rewrite_meta(scr, mutate):
+    """Прочитать meta.json в workspace, применить mutate(meta) и записать."""
+    meta_path = scr / "meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    mutate(meta)
+    meta_path.write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return meta_path
+
+
+def test_broken_meta_json_raises(workspace):
+    scr, model_dir, assets = workspace
+    (scr / "meta.json").write_text("{ разорвано", encoding="utf-8")
+
+    with pytest.raises(MetaFormatError, match="не читается"):
+        convert(scr / "meta.json", scr, model_dir, assets)
+
+
+@pytest.mark.parametrize("section", ["screenshots", "crops"])
+def test_meta_missing_sections_raise(workspace, section):
+    scr, model_dir, assets = workspace
+    meta_path = _rewrite_meta(scr, lambda meta: meta.pop(section))
+
+    with pytest.raises(MetaFormatError, match="отсутствует секция"):
+        convert(meta_path, scr, model_dir, assets)
+
+
+def test_element_without_window_prefix_raises(workspace):
+    scr, model_dir, assets = workspace
+    meta_path = _rewrite_meta(
+        scr, lambda meta: meta["crops"]["s1_tab"].__setitem__("element", "lonely")
+    )
+
+    with pytest.raises(MetaFormatError, match="префикса окна"):
+        convert(meta_path, scr, model_dir, assets)
+
+
+def test_crop_with_broken_rect_raises(workspace):
+    scr, model_dir, assets = workspace
+    meta_path = _rewrite_meta(
+        scr, lambda meta: meta["crops"]["s1_tab"].__setitem__("rect", [1, 2, 3])
+    )
+
+    with pytest.raises(MetaFormatError, match="битый rect"):
+        convert(meta_path, scr, model_dir, assets)
+
+
+def test_element_id_sanitized_when_not_alpha(workspace):
+    """id элемента, не начинающийся с буквы, санитизируется префиксом el_."""
+    scr, model_dir, assets = workspace
+    meta_path = _rewrite_meta(
+        scr, lambda meta: meta["crops"]["s1_tab"].__setitem__("element", "obzor_lavok.9tab")
+    )
+    convert(meta_path, scr, model_dir, assets)
+
+    common = load_common(UI_MODEL / "common.yaml")
+    model = load_model(model_dir / "market.yaml", common)
+    assert "el_9tab" in model.elements
+
+
+def test_unknown_variant_crop_skipped_and_reported(workspace):
+    """Кроп с вариантом вне словаря модели не импортируется; пропуск — в
+    issues отчёта (честная деградация, не исключение)."""
+    scr, model_dir, assets = workspace
+    meta_path = _rewrite_meta(
+        scr, lambda meta: meta["crops"]["s1_tab"].__setitem__("variant", "weird")
+    )
+    report = convert(meta_path, scr, model_dir, assets)
+
+    assert not (assets / "market" / "s1_tab.png").exists()
+    assert any("weird" in issue for issue in report.issues)
+    common = load_common(UI_MODEL / "common.yaml")
+    model = load_model(model_dir / "market.yaml", common)
+    assert "tab" not in model.elements
+
+
+def test_second_observation_rect_discrepancy_issue(workspace):
+    """Второй кроп того же элемента с другим rect: в отчёте — замечание,
+    в модели — rect от первого наблюдения (детерминизм импорта)."""
+    scr, model_dir, assets = workspace
+
+    def mutate(meta):
+        meta["screenshots"]["s1"]["crops"].append("s1_tab2")
+        meta["crops"]["s1_tab2"] = _crop(
+            "s1_tab2",
+            "crops/obzor_lavok/s1_tab2.png",
+            "s1",
+            "obzor_lavok.tab",
+            [120, 160, 50, 20],  # первое наблюдение: [110, 150, 50, 20]
+            ["click_target"],
+            variant="hover",
+        )
+
+    meta_path = _rewrite_meta(scr, mutate)
+    (scr / "crops" / "obzor_lavok" / "s1_tab2.png").write_bytes(PNG_BYTES)
+    report = convert(meta_path, scr, model_dir, assets)
+
+    assert any("отличается от первого наблюдения" in i for i in report.issues)
+    common = load_common(UI_MODEL / "common.yaml")
+    model = load_model(model_dir / "market.yaml", common)
+    assert model.elements["tab"].rect == (10, 50, 50, 20)
+
+
+def test_fewer_than_two_signatures_issue(workspace):
+    """Мета даёт меньше двух template-сигнатур состояния (активный вариант
+    один) — досигнатура вручную фиксируется в issues (правило 2.3)."""
+    scr, model_dir, assets = workspace
+    report = convert(scr / "meta.json", scr, model_dir, assets)
+
+    assert any("меньше двух template-сигнатур" in i for i in report.issues)
+
+
+def test_window_section_mismatch_reported(workspace):
+    """Ручная window-секция, расходящаяся с машинной (size/title), не
+    перезаписывается; расхождение — в issues отчёта."""
+    scr, model_dir, assets = workspace
+    model_dir.mkdir()
+    manual = {
+        "window": {"id": "market", "title": "Обзор лавок", "size": [500, 300]},
+        "elements": {},
+        "states": {},
+        "transitions": [],
+        "ocr_regions": {},
+    }
+    (model_dir / "market.yaml").write_text(
+        yaml.safe_dump(manual, allow_unicode=True), encoding="utf-8"
+    )
+
+    report = convert(scr / "meta.json", scr, model_dir, assets)
+
+    assert any("секция window" in i for i in report.issues)
+    common = load_common(UI_MODEL / "common.yaml")
+    model = load_model(model_dir / "market.yaml", common)
+    assert model.window.size == (500, 300)  # ручное побеждает
+
+
+def test_existing_broken_model_yaml_is_replaced(workspace):
+    """Существующий файл модели не mapping (битый/не YAML-словарь) —
+    слиянию нечего беречь, модель перезаписывается машинной."""
+    scr, model_dir, assets = workspace
+    model_dir.mkdir()
+    (model_dir / "market.yaml").write_text("- просто\n- список\n", encoding="utf-8")
+
+    report = convert(scr / "meta.json", scr, model_dir, assets)
+
+    assert str(model_dir / "market.yaml") in report.written_models
+    common = load_common(UI_MODEL / "common.yaml")
+    model = load_model(model_dir / "market.yaml", common)
+    assert model.window.size == (400, 300)
+
+
+def test_unchanged_second_run_report_fields(workspace):
+    """Повторный прогон без изменений: файлы модели не тронуты (поле
+    written_models пусто), кропы отчитываются как совпадающие, замечание
+    «модель без изменений» — в issues (детали diff-отчёта поверх
+    байтовой идемпотентности test_second_run_is_idempotent)."""
+    scr, model_dir, assets = workspace
+    convert(scr / "meta.json", scr, model_dir, assets)
+    second = convert(scr / "meta.json", scr, model_dir, assets)
+
+    assert second.written_models == []
+    assert second.assets_added == []
+    assert second.assets_conflicts == []
+    assert second.assets_identical == [
+        "market/s1_tab.png",
+        "market/s1_win.png",
+        "market/s2_pic.png",
+    ]
+    assert any("без изменений" in i for i in second.issues)
