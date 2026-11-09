@@ -692,6 +692,36 @@ market-scenarios «Сценарий мониторинга своей лавки
 - Тесты: tests/test_monitor_shop.py (17 тестов: baseline/poll, дельты при
   серии продаж, переразметка, OCR-деградация, отмена, конфигурация, guard).
 
+### scenario_recover — сценарная точка входа recover (задача 6.4, spec
+market-scenarios «Сценарий recover как композиция примитивов без внутреннего
+состояния»)
+
+`l2core/scenarios/recover.py` — ТОНКАЯ ОБВЯЗКА поверх цепочки 5.8
+(primitives/recover.py, механика там не дублируется):
+`scenario_recover(cause, target, *, hud_model, hud_element, провайдеры...)`.
+
+- **Контракт вызова**: `cause` — результат примитива 5.x/сценария 6.1–6.3
+  со структурным типом `RecoverCause` (PrimitiveResult + needs_recover);
+  БЕЗ needs_recover (успех/отмена) — `ScenarioRecoverError` (fail fast,
+  цепочка не запускается; отмену стратегия ветвит до вызова). `target` —
+  id восстанавливаемого окна, `hud_element` — id HUD-иконки его открытия
+  (market.yaml): выбор пары — решение вызывающего слоя, маппинг сценарий
+  не выдумывает. cause протягивается в цепочку (needs_recover →
+  release_all первым HID-действием).
+- **Провайдеры — готовые, от вызывающего слоя** (паттерн 6.1): screen/hid/
+  cursor_pos/activate/window_status/find_anchor/goal_reached/
+  current_window/close_point/hud_locator/... сценарий адаптеры не создаёт,
+  wiring на детекторы 3.4/3.5 не собирает (это 7.1). Без внутреннего
+  состояния: каждый вызов — независимая композиция.
+- **Результат — RecoverResult как есть**: success / escalated (событие
+  уже ушло push-callback'ом on_escalation) / cancelled — сценарием не
+  перехватывается. Паттерн интеграции: сценарии 6.1–6.3 фиксируют
+  needs_recover и обрывают работу, recover вызывает стратегия через
+  scenario_recover.
+- Тесты: tests/test_scenario_recover.py (8 тестов: target протянут,
+  провайдеры/последовательность шагов ScriptedHid, release_all от cause,
+  прозрачная эскалация/отмена, fail fast, проброс RecoverError модели).
+
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
 `l2core/primitives/wait.py` — единственная sanctioned-точка блокирующего
