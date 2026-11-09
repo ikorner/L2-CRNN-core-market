@@ -1,6 +1,6 @@
 """Синхронный блокирующий API для стратегий (задача 7.1, spec
-core-api-events: «Синхронный блокирующий API для стратегий»; только раздел
-API — события/потоки 7.2/7.3 здесь НЕ реализуются, YAGNI).
+core-api-events: «Синхронный блокирующий API для стратегий»; события/потоки
+— 7.2/7.3: фасад подключает EventAPI через параметр events (bot.event_api)).
 
 L2CoreAPI — ТОНКИЙ ФАСАД поверх существующих сценариев 6.1–6.4 и примитивов
 5.x: каждый метод — композиция с провайдерами сборки ApiWiring
@@ -14,8 +14,11 @@ L2CoreAPI — ТОНКИЙ ФАСАД поверх существующих сц
 - read_shop_state — разовое чтение показателей лавки (паттерн монитора 6.3
   БЕЗ baseline: чтение, не детекция продажи);
 - get_state — текущее (window, state, params, status);
-- recover — сценарная точка входа 6.4 по сигналу needs_recover;
-- health — агрегат диагностики (окно игры/окно торговли/OCR/HID).
+- recover — сценарная точка входа 6.4 по сигналу needs_recover (публикует
+  события recovered/escalation по итогу цепочки, журнал 7.3);
+- health — агрегат диагностики (окно игры/окно торговли/OCR/HID);
+- on/wait_event/get_events — события двух форм и журнал (7.3, R14:
+  push — dispatcher-поток, pull — строго из потока стратегии).
 
 ОТКРЫТИЕ ОКОН ЧЕРЕЗ HUD (open_*): click_element 5.3 сюда НЕ подходит — его
 пролог требует якорь окна на кадре, а при закрытом обзоре якоря нет (это же
@@ -63,6 +66,7 @@ from typing import TYPE_CHECKING, Callable, Mapping, Optional, Tuple
 import numpy as np
 
 from l2core.adapters.hid import BTN_LEFT, HidError
+from l2core.api.events import EVENT_ESCALATION, EVENT_RECOVERED
 from l2core.detector.anchor import Anchor
 from l2core.detector.status import STATUS_NOT_FOUND
 from l2core.model import OcrRegionSpec, Rect, UiModel
@@ -90,6 +94,7 @@ from l2core.scenarios.setup_sell import (
 )
 
 if TYPE_CHECKING:  # циклическая связь: wiring.py собирает ApiWiring поверх core
+    from l2core.api.events import Event, EventAPI, EventSubscription
     from l2core.api.wiring import ApiWiring
 
 __all__ = [
@@ -250,9 +255,11 @@ class L2CoreAPI:
     """
 
     def __init__(self, wiring: "ApiWiring", *,
-                 owner_thread: Optional[threading.Thread] = None):
+                 owner_thread: Optional[threading.Thread] = None,
+                 events: Optional["EventAPI"] = None):
         self._w = wiring
         self._owner = owner_thread or threading.current_thread()
+        self._events = events
 
     # ------------------------------------------------------------------
     # Инфраструктура контракта
@@ -263,6 +270,35 @@ class L2CoreAPI:
         confirm_after_unknown стратегией (решение и ответственность — за
         стратегией, спека action-primitives)."""
         return self._w.guard
+
+    @property
+    def events(self) -> "EventAPI":
+        """События двух форм — push (on) и pull (wait_event) — и журнал
+        (задача 7.3, spec core-api-events; ruling R14). Сборка без API
+        событий — ApiError (fail fast; движок 7.2 подключает всегда)."""
+        if self._events is None:
+            raise ApiError(
+                "API событий не подключён (сборка без EventAPI): "
+                "события доступны через L2CoreBot (bot.event_api) — "
+                "создайте API через движок")
+        return self._events
+
+    def on(self, event_type: str, callback) -> "EventSubscription":
+        """Push-подписка: callback доставляется dispatcher-потоком (R14);
+        блокирующий API из callback вызывать нельзя (thread-owner)."""
+        return self.events.on(event_type, callback)
+
+    def wait_event(self, event_type: str,
+                   timeout: Optional[float] = None) -> Optional["Event"]:
+        """Pull-ожидание события: блокируется до события типа/таймаута;
+        строго из потока стратегии (thread-owner, R14)."""
+        self._check_thread()
+        return self.events.wait_event(event_type, timeout)
+
+    def get_events(self, since_seq: int = 0):
+        """Журнал событий ядра: записи с seq >= since_seq (справочник
+        payload'ов — docs/API.md)."""
+        return self.events.get_events(since_seq=since_seq)
 
     def _check_thread(self) -> None:
         """Дисциплина вызова спеки: блокирующий API — только из потока
@@ -801,7 +837,7 @@ class L2CoreAPI:
         self._check_thread()
         c = self._cancelled(cancelled)
         w = self._w
-        return scenario_recover(
+        result = scenario_recover(
             cause, target,
             hud_model=w.hud_model, hud_element=hud_element,
             screen=w.screen, hid=w.hid, cursor_pos=w.cursor_pos,
@@ -815,6 +851,21 @@ class L2CoreAPI:
             resume=resume, pause_timeout=pause_timeout,
             free_area_point=w.free_area_point, cancelled=c,
             rng=w.rng, clock=w.clock, sleep=w.sleep)
+        # События по итогу цепочки (spec core-api-events, журнал 7.3):
+        # успех — recovered, эскалация — escalation (payload — справочник
+        # docs/API.md); отмена — событий нет. Канал — единый: events.push
+        # -> EventQueue -> журнал + dispatcher.
+        if self._events is not None:
+            steps = tuple(step.name for step in result.steps)
+            if result.success:
+                self._events.push(EVENT_RECOVERED,
+                                  {"target": target, "steps": steps})
+            elif result.escalated:
+                self._events.push(EVENT_ESCALATION,
+                                  {"target": target,
+                                   "detail": result.escalation_detail,
+                                   "steps": steps})
+        return result
 
     def health(self) -> HealthResult:
         """Агрегат живости: окно игры (находилка 3.2), открытое окно

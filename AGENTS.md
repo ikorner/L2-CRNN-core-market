@@ -863,8 +863,7 @@ StateObserver / EventDispatcher; очередь — `l2core/api/events.py`
   контекстный менеджер. Доступ к API — только через `bot.api`: прямое
   использование исходного wiring с сырым HidDevice обходит guard
   (граница зафиксирована в докстринге engine.py).
-- YAGNI: kill switch (8.1), on()/wait_event() для стратегий, журнал
-  событий и API-справочник payload'ов — 7.3; AST-guard'а на observer
+- YAGNI: kill switch (8.1) — здесь только точка push; AST-guard'а на observer
   нет — сценарий «Observer не отправляет действия» покрыт интеграционно
   (tests/test_engine.py).
 - Тесты: tests/test_engine.py (очередь: порядок/seq/неизвестный тип/
@@ -874,6 +873,47 @@ StateObserver / EventDispatcher; очередь — `l2core/api/events.py`
   start/stop/restart-rejected/контекст/thread-owner/guard в wiring/
   observer HID не тронул). Потоки в тестах короткоживущие (интервалы
   0.01–0.05 с), join в каждом тесте — pytest не висит.
+
+### События двух форм и журнал (задача 7.3, spec core-api-events,
+инвариант 4)
+
+`l2core/api/events.py`: EventJournal (кольцевой буфер, лимит
+`DEFAULT_JOURNAL_LIMIT=1000` — константа, события редки; timestamp из
+инъецированных часов, в проде реальное время) + EventAPI поверх (queue,
+dispatcher). Журнал подключается к очереди: `EventQueue(journal=...)` —
+запись на push, ДО потребления.
+
+- **push `on(type, callback)` -> EventSubscription** (unsubscribe idempotent,
+  контекстный менеджер): доставка — **dispatcher-поток** (ruling R14,
+  ратификация отклонения от design 8 «доставка в поток стратегии» — буква
+  требовала event pump'а против блокирующей модели API; правка спеки —
+  commits 50cbb5e): не producer-поток, исключения callback'ов изолированы.
+  Callback НЕ вызывает блокирующий API (dispatcher-поток ≠ поток владельца,
+  RuntimeError по thread-owner).
+- **pull `wait_event(type, timeout)` -> Event | None**: блокировка по
+  журналу (события не теряются, забранные dispatcher'ом); строго из потока
+  стратегии (owner_thread, чужой поток — RuntimeError, R14); возвращает
+  первое событие типа, опубликованное ПОСЛЕ входа в вызов (прошлое —
+  только через журнал); таймаут — None.
+- **журнал `get_events(since_seq)`** — записи JournalEntry(event,
+  timestamp) с seq >= since_seq; ведёт ядро (spec), доступен стратегии.
+- **публикация**: единый канал — EventQueue.push. Источники: observer 7.2
+  (sold/window_closed/modal), `api.recover()` по итогу цепочки 5.8/6.4
+  (успех -> recovered `{"target", "steps"}`, эскалация -> escalation
+  `{"target", "detail", "steps"}`, отмена — без событий), `bot.push` /
+  `EventAPI.push` — внешним источникам (killed 8.1). Типы: sold,
+  window_closed, modal, recovered, escalation, killed (инфраструктура типа
+  killed готова, источник — 8.1).
+- **API-справочник — docs/API.md** (контракт payload'ов): sold ->
+  SoldPayload 6.3, window_closed -> `{"window"}`, modal -> ModalReport 3.6,
+  recovered/escalation -> dict по справочнику. Пины:
+  tests/test_event_api.py (28 тестов: журнал/лимит/since_seq, push-доставка/
+  отписка/изоляция, pull-фильтр/таймаут/thread-owner/доставка после
+  потребления dispatcher'ом, payload-поля, recovered/escalation от
+  api.recover, интеграция с L2CoreBot).
+- L2CoreAPI: методы `on/wait_event/get_events` и свойство `events`
+  делегируют EventAPI (параметр ctor `events`; сборка без него — ApiError,
+  fail fast); движок подключает: `bot.event_api` (== `bot.api.events`).
 
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 

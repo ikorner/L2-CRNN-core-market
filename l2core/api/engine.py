@@ -63,10 +63,9 @@ ApiWiring(...)/build_wiring(...) — точка расширения тесто�
 (глубокая инкапсуляция wiring — YAGNI). Доступ к блокирующему API — только
 через bot.api.
 
-YAGNI (задача 7.2): kill switch (8.1), on()/wait_event() для стратегий,
-журнал событий и API-справочник payload'ов — 7.3; подключение
-on_escalation wiring'а к очереди — точка push уже здесь, wiring решает
-вызывающий слой.
+YAGNI (задача 7.2): kill switch (8.1) — здесь только точка push; журнал
+событий и API-справочник payload'ов — 7.3 (реализовано: EventAPI в
+bot.event_api, журнал ведётся на push очереди).
 """
 from __future__ import annotations
 
@@ -85,6 +84,8 @@ from l2core.api.events import (
     EVENT_SOLD,
     EVENT_WINDOW_CLOSED,
     Event,
+    EventAPI,
+    EventJournal,
     EventQueue,
 )
 from l2core.api.hid_owner import OwnerGuardedHid
@@ -370,8 +371,10 @@ class L2CoreBot:
         self._owner = threading.current_thread()
         guarded = OwnerGuardedHid(wiring.hid, owner_thread=self._owner)
         self._wiring = dataclasses.replace(wiring, hid=guarded)
-        self._api = L2CoreAPI(self._wiring, owner_thread=self._owner)
-        self._queue = EventQueue()
+        # Журнал ведётся на push (до потребления): pull-форма wait_event
+        # не теряет события, забранные dispatcher'ом (7.3).
+        self._queue = EventQueue(journal=EventJournal())
+        self._event_api = None   # создан после dispatcher'а (см. ниже)
         interval = (poll_interval if poll_interval is not None
                     else wiring.config.timing.poll_interval)
         # Id окон наблюдения — из сборки моделей (дедупликация: модели
@@ -393,6 +396,13 @@ class L2CoreBot:
             window_ids=tuple(seen))
         self._dispatcher = EventDispatcher(self._queue,
                                            poll_interval=dispatch_interval)
+        # API событий (7.3): push-подписки — через dispatcher этой сборки;
+        # pull/journal — поверх очереди с журналом; владелец — поток
+        # стратегии (R14: wait_event строго из него).
+        self._event_api = EventAPI(self._queue, self._dispatcher,
+                                   owner_thread=self._owner)
+        self._api = L2CoreAPI(self._wiring, owner_thread=self._owner,
+                              events=self._event_api)
         self._cancelled = cancelled
         self._observer_thread: Optional[threading.Thread] = None
         self._dispatcher_thread: Optional[threading.Thread] = None
@@ -417,6 +427,14 @@ class L2CoreBot:
     def events(self) -> EventQueue:
         """Очередь событий ядра (pull-форма 7.3 строится поверх неё)."""
         return self._queue
+
+    @property
+    def event_api(self) -> EventAPI:
+        """События двух форм (7.3): on (push, dispatcher-поток, R14),
+        wait_event (pull, строго из потока стратегии), get_events (журнал),
+        push (внешним источникам, 8.1). Тот же объект виден через
+        bot.api.events."""
+        return self._event_api
 
     @property
     def observer(self) -> StateObserver:

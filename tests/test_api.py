@@ -475,11 +475,12 @@ def make_wiring(world, hid, *, clock, run_checks_calls=None,
     )
 
 
-def make_api(world=None, hid=None, clock=None, **wiring_kwargs):
+def make_api(world=None, hid=None, clock=None, events=None, **wiring_kwargs):
     clock = clock or FakeClock()
     world = world or World()
     hid = hid or ScriptedHid(clock, world)
-    return L2CoreAPI(make_wiring(world, hid, clock=clock, **wiring_kwargs))
+    return L2CoreAPI(make_wiring(world, hid, clock=clock, **wiring_kwargs),
+                     events=events)
 
 
 def actions(hid):
