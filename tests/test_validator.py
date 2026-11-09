@@ -218,6 +218,38 @@ def test_rects_inside_window_pass(tmp_path):
     assert not [v for v in validate_model(model, assets) if v.rule == "rect_in_window"]
 
 
+# --- Правило grid_in_window: сетка слотов лавки в окне (6.2) ---
+
+
+def test_grid_geometry_outside_window_rejected(tmp_path):
+    """Ячейки сетки, выходящие за окно, — нарушение (координаты от якоря)."""
+    broken = MINIMAL_MODEL + (
+        "grid_geometry:\n"
+        "  origin: [90, 90]\n"
+        "  pitch: [10, 10]\n"
+        "  cell: [20, 20]\n"
+        "  cols: 2\n"
+        "  rows: 1\n"
+    )
+    model, assets = _make_model(tmp_path, broken)
+    hits = [v for v in validate_model(model, assets) if v.rule == "grid_in_window"]
+    assert len(hits) == 1
+    assert hits[0].subject == "grid_geometry"
+
+
+def test_grid_geometry_inside_window_pass(tmp_path):
+    broken = MINIMAL_MODEL + (
+        "grid_geometry:\n"
+        "  origin: [10, 10]\n"
+        "  pitch: [20, 20]\n"
+        "  cell: [10, 10]\n"
+        "  cols: 2\n"
+        "  rows: 2\n"
+    )
+    model, assets = _make_model(tmp_path, broken)
+    assert not [v for v in validate_model(model, assets) if v.rule == "grid_in_window"]
+
+
 # --- Правило template_missing: шаблоны есть в assets/ ---
 
 

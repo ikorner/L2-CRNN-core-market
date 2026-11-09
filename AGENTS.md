@@ -598,6 +598,55 @@ tests/test_scan_market.py::TestNoLavkaOpeningGuard следят, что код
 сценария не содержит иконок открытия лавок и прямых hid.click; клики
 только по element id точек обхода (табы/фильтры/поиск/HUD-открытие).
 
+### setup_sell и start_sell/cancel_sell (задача 6.2, spec
+market-scenarios «Сценарий выставления лавки продажи», инварианты 2/4/9)
+
+`l2core/scenarios/setup_sell.py` — выставление лавки продажи:
+`setup_sell(items)` со списком `SellItem(slot, price)`, `start_sell()`,
+`cancel_sell()`; композиция примитивов 5.x без внутреннего состояния.
+
+- **Слоты из геометрии сетки** (контракт design.md: координаты ячейки
+  генерируются из геометрии сетки лавки, НЕ размечаются вручную):
+  параметрическая `GridGeometry(origin, pitch, cell, cols, rows)` —
+  опциональная секция `grid_geometry` модели окна (FORMAT.md, loader,
+  валидатор `grid_in_window`), константы от якоря окна; генератор
+  `slot_point(grid, index)` — центр ячейки, нумерация row-major.
+  Источник констант: параметр `grid` сценария, иначе секция модели;
+  нет ни того ни другого — SetupSellError (R4: не выдумывать). В
+  отгруженной shop_sell секция не размечена (мета поле `slot` не
+  описывает — KNOWN_GAPS п.9, Q26). Вне диапазона слота, повтор слота,
+  цена < 1 — SetupSellError (fail fast).
+- **setup_sell**: открытие лавки через HUD (клик по open_element —
+  open_sale_trade из модели market, verify снаружи: межокнные переходы
+  формат не выражает — KNOWN_GAPS п.3; open_element=None — лавка открыта
+  вызывающим слоем) → для каждого item: свежий якорь (слепой drag
+  запрещён) + target = якорь + slot_point → drag_item(verify=drag_verify)
+  → enter_price (OCR-регион поля цены в shop_sell не размечен —
+  price_region подшивается в копию модели, как search_region в 6.1; без
+  него SetupSellError) → итоговый verify (final_verify, свежий кадр).
+  Источник drag'а — точка предмета в ИНВЕНТАРЕ (вне окон модели):
+  даёт инъекция source_locator(item), заново на каждый предмет.
+  Отказ примитива — SetupSellResult.needs_recover (recover — 6.4,
+  вызывающий слой), отмена — cancelled=True.
+- **start_sell() — потенциально необратимое**: re-verify ПЕРЕД кликом
+  (FrameTransaction.reverify, 3.6: свежий grab + confirm_checks по свежему
+  якорю); не сошёлся — клик по кнопке «Начать продажу» НЕ выполняется
+  (no blind click на необратимое), StartSellResult(reverified=False,
+  outcome=None). Страж необратимых (5.7): guard.before/after вокруг
+  клика — UNKNOWN фиксирует блокировку повтора до явного
+  confirm_after_unknown стратегией (IrreversibleRepeatError проброшена);
+  outcome = to_outcome(ClickResult) в StartSellResult.
+- **cancel_sell()**: клик по кнопке отмены (элемент модели
+  cansel_sell_button, через click_element с verify); element_id=None —
+  честный fallback на ESC: пролог (activate OK + статус found, иначе
+  исключение, HID не трогается) → ESC → verify на свежем кадре → retry
+  → on_fail[].
+- Тесты: tests/test_setup_sell.py (скриптованные экран/HID/OCR:
+  набор цифр key_press'ами меняет «поле цены» экрана; пины slot-центров,
+  re-verify блокировки клика, стража UNKNOWN, ESC-fallback, отмены,
+  needs_recover); loader/валидатор grid_geometry — tests/test_model.py,
+  tests/test_validator.py.
+
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
 `l2core/primitives/wait.py` — единственная sanctioned-точка блокирующего

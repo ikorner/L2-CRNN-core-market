@@ -33,6 +33,9 @@
 - table_geometry_required — окно с текстовой таблицей списка
   (WINDOWS_WITH_LISTS, состав зафиксирован в 2.4 по мете) обязано иметь
   table_geometry.
+- grid_in_window — если задана опциональная секция grid_geometry (иконная
+  сетка слотов, 6.2), крайние ячейки сетки вписываются в окно (координаты
+  от якоря).
 
 Нарушения — структурированные записи Violation (правило, файл, субъект,
 деталь), а не строки: allowlist пробелов отгруженных моделей (ruling R10,
@@ -118,6 +121,27 @@ def validate_model(model: UiModel, assets_dir: Union[str, Path]) -> List[Violati
                 ),
             )
         )
+
+    # --- grid_geometry: крайние ячейки сетки в окне (опциональная секция) ---
+    if model.grid_geometry is not None:
+        grid = model.grid_geometry
+        extent_w = grid.origin[0] + (grid.cols - 1) * grid.pitch[0] + grid.cell[0]
+        extent_h = grid.origin[1] + (grid.rows - 1) * grid.pitch[1] + grid.cell[1]
+        if extent_w > width or extent_h > height:
+            violations.append(
+                Violation(
+                    rule="grid_in_window",
+                    file=file,
+                    subject="grid_geometry",
+                    detail=(
+                        f"сетка слотов выходит за окно {width}x{height}: "
+                        f"экстент {extent_w}x{extent_h} "
+                        f"(origin={list(grid.origin)}, pitch={list(grid.pitch)}, "
+                        f"cell={list(grid.cell)}, cols={grid.cols}, "
+                        f"rows={grid.rows})"
+                    ),
+                )
+            )
 
     # --- Состояния: сигнатуры, ссылки, точки проб ---
     for state in model.states.values():

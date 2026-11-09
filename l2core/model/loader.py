@@ -24,6 +24,7 @@ from .types import (
     CommonDicts,
     ElementSpec,
     GrammarSpec,
+    GridGeometry,
     OcrRegionSpec,
     ProbePoint,
     Rect,
@@ -264,7 +265,7 @@ def load_model(
         file,
         "корень",
         data,
-        required | {"table_geometry"},
+        required | {"table_geometry", "grid_geometry"},
     )
 
     window = _parse_window(file, data["window"])
@@ -275,6 +276,9 @@ def load_model(
     table_geometry = None
     if "table_geometry" in data:
         table_geometry = _parse_table_geometry(file, data["table_geometry"], common)
+    grid_geometry = None
+    if "grid_geometry" in data:
+        grid_geometry = _parse_grid_geometry(file, data["grid_geometry"])
 
     return UiModel(
         path=str(file),
@@ -284,6 +288,7 @@ def load_model(
         transitions=transitions,
         ocr_regions=ocr_regions,
         table_geometry=table_geometry,
+        grid_geometry=grid_geometry,
     )
 
 
@@ -588,6 +593,37 @@ def _parse_table_geometry(file: Path, raw: Any, common: CommonDicts) -> TableGeo
         max_rows=max_rows,
         columns=columns,
     )
+
+
+def _parse_grid_geometry(file: Path, raw: Any) -> GridGeometry:
+    """Геометрия иконной сетки слотов (опциональная секция, 6.2).
+
+    origin — точка [x, y] (от якоря окна), pitch — шаг [dx, dy] (оба > 0),
+    cell — размер ячейки [w, h] (положительный), cols/rows — целые > 0.
+    """
+    section = "grid_geometry"
+    if not isinstance(raw, dict):
+        raise ModelFormatError(file, section, "ожидается mapping ключ: значение")
+    _reject_unknown(file, section, raw, {"origin", "pitch", "cell", "cols", "rows"})
+
+    origin = _parse_point(file, f"{section}.origin", raw.get("origin"))
+    pitch = _parse_point(file, f"{section}.pitch", raw.get("pitch"))
+    if pitch[0] <= 0 or pitch[1] <= 0:
+        raise ModelFormatError(
+            file, f"{section}.pitch",
+            f"ожидаются положительные шаги [dx, dy] (получено {list(pitch)})",
+        )
+    cell = _parse_size(file, f"{section}.cell", raw.get("cell"))
+    cols = raw.get("cols")
+    rows = raw.get("rows")
+    for name, value in (("cols", cols), ("rows", rows)):
+        if not _is_int(value) or value <= 0:
+            raise ModelFormatError(
+                file, f"{section}.{name}",
+                f"ожидается целое число > 0 (получено {value!r})",
+            )
+    return GridGeometry(origin=origin, pitch=pitch, cell=cell,
+                        cols=cols, rows=rows)
 
 
 # --- Проверки (сигнатуры и verify) ---

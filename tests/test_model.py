@@ -200,6 +200,55 @@ def test_model_without_table_geometry_loads(tmp_path):
     assert model.table_geometry is None
 
 
+def test_grid_geometry_parsed(tmp_path):
+    """Опциональная секция grid_geometry (сетка слотов лавки, 6.2)."""
+    path = _write_model(
+        tmp_path,
+        base=SAMPLE_MODEL,
+        extra=(
+            "grid_geometry:\n"
+            "  origin: [10, 20]\n"
+            "  pitch: [30, 10]\n"
+            "  cell: [28, 8]\n"
+            "  cols: 3\n"
+            "  rows: 2\n"
+        ),
+    )
+    model = load_model(path)
+    grid = model.grid_geometry
+    assert grid is not None
+    assert grid.origin == (10, 20)
+    assert grid.pitch == (30, 10)
+    assert grid.cell == (28, 8)
+    assert grid.cols == 3
+    assert grid.rows == 2
+
+
+def test_model_without_grid_geometry_loads(tmp_path):
+    """Секция опциональна: не размечена — модель валидна (grid=None)."""
+    model = load_model(SAMPLE_MODEL)
+    assert model.grid_geometry is None
+
+
+@pytest.mark.parametrize("bad_section", [
+    "grid_geometry:\n  origin: [10, 20]\n  pitch: [0, 10]\n"
+    "  cell: [28, 8]\n  cols: 3\n  rows: 2\n",
+    "grid_geometry:\n  origin: [10, 20]\n  pitch: [30, 10]\n"
+    "  cell: [28, 8]\n  cols: 0\n  rows: 2\n",
+    "grid_geometry:\n  origin: [10, 20]\n  pitch: [30, 10]\n"
+    "  cell: [28, 8]\n  cols: 3\n",
+])
+def test_grid_geometry_bad_values_diagnosed(tmp_path, bad_section):
+    """Некорректная геометрия сетки — ошибка формата с секцией."""
+    path = _write_model(
+        tmp_path,
+        base=SAMPLE_MODEL,
+        extra=bad_section,
+    )
+    with pytest.raises(ModelFormatError, match="grid_geometry"):
+        load_model(path)
+
+
 def test_shipped_models_table_geometry_presence():
     """2.4: геометрия размечена у market; у shop_* текстовой таблицы нет."""
     common = load_common(UI_MODEL / "common.yaml")

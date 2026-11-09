@@ -159,6 +159,30 @@ class TableGeometry:
 
 
 @dataclass(frozen=True)
+class GridGeometry:
+    """Геометрия иконной сетки слотов окна (лавка: ячейки под предметы).
+
+    Координаты — от якоря окна (как rect'ы элементов). Сетка параметрична:
+    origin — верхний левый угол ячейки (0, 0), pitch — шаг между соседними
+    ячейками по x/y, cell — размер ячейки, cols/rows — число колонок/строк.
+    Нумерация слотов row-major: slot = row * cols + col. Центр ячейки
+    вычисляет генератор слоя сценариев (setup_sell, 6.2) — в формате
+    только константы, вычислений нет (как у table_geometry).
+    """
+
+    origin: Tuple[int, int]
+    pitch: Tuple[int, int]
+    cell: Tuple[int, int]
+    cols: int
+    rows: int
+
+    @property
+    def capacity(self) -> int:
+        """Число слотов сетки."""
+        return self.cols * self.rows
+
+
+@dataclass(frozen=True)
 class UiModel:
     """Модель одного окна: результат load_model()."""
 
@@ -169,6 +193,7 @@ class UiModel:
     transitions: Tuple[TransitionSpec, ...]
     ocr_regions: dict  # id -> OcrRegionSpec
     table_geometry: Optional[TableGeometry]
+    grid_geometry: Optional[GridGeometry] = None  # иконная сетка слотов
 
 
 @dataclass(frozen=True)
