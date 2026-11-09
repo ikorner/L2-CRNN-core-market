@@ -272,6 +272,14 @@ class L2CoreAPI:
         return self._w.guard
 
     @property
+    def dry_run(self) -> bool:
+        """Режим без HID (8.2, spec safety): True — экран читается и
+        состояние определяется, а действия только логируются как
+        намерения (DryRunHid), обращений к HID нет. Эффективный флаг
+        сборки: create_api — параметр dry_run, иначе config.dry_run."""
+        return self._w.dry_run
+
+    @property
     def events(self) -> "EventAPI":
         """События двух форм — push (on) и pull (wait_event) — и журнал
         (задача 7.3, spec core-api-events; ruling R14). Сборка без API

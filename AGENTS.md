@@ -974,6 +974,47 @@ CANCELLED-домен, не UNKNOWN); (2) `hid.release_all()` best-effort; (3) у
   хоткея).
   YAGNI: dry-run (8.2) и JSONL-лог (8.3) сюда не входят.
 
+### Dry-run режим без HID (задача 8.2, spec safety «Dry-run режим без HID»)
+
+`l2core/api/dryrun.py` — DryRunHid: самостоятельная реализация командного
+интерфейса HidDevice без железа и без инъекции реального устройства.
+Каждое действие (move_rel/click/scroll/keys/traj/release_all/connect/
+close) фиксируется как намерение — структурированно в лог
+`l2core.dry_run` и в список `intentions` в памяти (опционально внешний,
+инъекция для тестов/стратегии); возвраты — как у успешного no-op, чтобы
+примитивы проходили штатный путь до verify. Запросы состояния
+(is_connected/ping/get_version) — не действия: не логируются, адаптер
+отчитывается «живым» (True/(0, 0)) — в dry-run HID-путь доступен по
+построению, health() без изменений. `TRAJ_MAX_POINTS` — паритет вендора
+(валидация ёмкости traj), guard-тест паритета командной поверхности с
+HidDevice — tests/test_dryrun.py (новая команда вендора в dry-run не
+пропадёт молча).
+
+- **Точка включения — create_api** (параметр `dry_run=None`): эффективный
+  флаг — параметр, иначе `config.dry_run` (ключ уже в схеме 1.3).
+  Включённый режим поднимает DryRunHid вместо живого HidDevice (arduino
+  не трогается вообще — подключение/проверка прошивки пропускаются);
+  явно переданный hid побеждает режим (инъекция адаптера для тестов).
+  Флаг виден стратегии: `wiring.dry_run` и `api.dry_run`.
+- **Экран читается по-настоящему**: MssScreen и детекторы работают как
+  обычно, verify проверяет реальные кадры. Эффекта «клика» нет, поэтому
+  результаты примитивов честно уходят в FAILED (verify выполнялся,
+  эффект опровергнут) или UNKNOWN (якоря на кадрах не было); success
+  возможен, только если эффект и так присутствовал на экране (окно уже
+  открыто). Семантика для первых запусков на живой игре: детекция
+  работает, действия бы не сработали — намерения смотрим в логе.
+- **Thread-owner дисциплина не дублируется**: DryRunHid — устройство,
+  guard владения — OwnerGuardedHid (7.2), L2CoreBot применяет его к
+  wiring.hid независимо от режима (проверка владельца — одна точка;
+  санкционированный release_all при kill switch 8.1 сохраняется: в
+  dry-run это no-op с логом).
+- Тесты: tests/test_dryrun.py (23 теста: намерения/лог/release_all/
+  no-op-всех-команд/запросы/паритет traj и командной поверхности,
+  create_api — флаг конфига/победа параметра/победа явного hid,
+  композиция с OwnerGuardedHid, поведенческий open_market: FAILED/UNKNOWN/
+  OK-уже-открыто, накопление намерений).
+  YAGNI: JSONL-лог (8.3) и live-прогон (9.4) сюда не входят.
+
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
 `l2core/primitives/wait.py` — единственная sanctioned-точка блокирующего
@@ -1068,7 +1109,9 @@ null). Replay-модель эффектов: действие → записан
   engine.py: state observer / event dispatcher / HID-owner guard,
   events.py — очередь); события для стратегий (on/wait_event, журнал) —
   7.3; kill switch (хоткей/таймаут неактивности, release_all, курсор,
-  событие killed) — 8.1, killswitch.py + Win32HotkeySource (adapters/win32.py).
+  событие killed) — 8.1, killswitch.py + Win32HotkeySource (adapters/win32.py);
+  dry-run режим без HID (DryRunHid, намерения в логе вместо железа) — 8.2,
+  dryrun.py, точка включения — create_api.
 - `l2core/config.py` — схема и типизированный загрузчик `config.yaml`.
 - `tests/` — pytest; `ui_model/` — YAML UI-модель; `assets/` — шаблоны и
   golden-кропы (версионируются вместе с моделью); `base_screenshot/scr/` —

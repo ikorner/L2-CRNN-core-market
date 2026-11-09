@@ -61,6 +61,7 @@ from l2core.adapters.win32 import (
     ensure_dpi_aware,
 )
 from l2core.api.core import L2CoreAPI
+from l2core.api.dryrun import DryRunHid
 from l2core.config import CoreConfig, load_config
 from l2core.detector.anchor import Anchor, AnchorDetector, _to_gray
 from l2core.detector.states import StateDetector, StateReport
@@ -128,6 +129,7 @@ class ApiWiring:
     guard: IrreversibleGuard = field(default_factory=IrreversibleGuard)
     clock: Callable[[], float] = time.monotonic
     sleep: Callable[[float], None] = time.sleep
+    dry_run: bool = False  # режим без HID (8.2): действия только логируются
 
 
 def _load_hud_templates(models: Mapping[str, UiModel], assets_dir: Path) -> dict:
@@ -174,12 +176,15 @@ def build_wiring(*, config: CoreConfig,
                  note_activity: Optional[Callable[[], None]] = None,
                  rng: Optional[JitterRng] = None,
                  clock: Callable[[], float] = time.monotonic,
-                 sleep: Callable[[float], None] = time.sleep) -> ApiWiring:
+                 sleep: Callable[[float], None] = time.sleep,
+                 dry_run: Optional[bool] = None) -> ApiWiring:
     """Собрать провайдеров фасада из детекторов и адаптеров.
 
     models — модели трёх окон (market/shop_buy/shop_sell); детекторы по
     умолчанию строятся на них же (matcher/assets_dir), при желании
-    подменяются (тесты на скриптованных кадрах).
+    подменяются (тесты на скриптованных кадрах). dry_run (8.2): None —
+    флаг из config.dry_run, иначе явное значение (create_api передаёт
+    эффективный флаг с учётом приоритета параметр > конфиг).
     """
     missing = [name for name in _MODEL_NAMES if name not in models]
     if missing:
@@ -293,7 +298,8 @@ def build_wiring(*, config: CoreConfig,
         shop_regions=shop_regions, segmentation=segmentation,
         free_area_point=free_area_point, on_escalation=on_escalation,
         cancelled=cancelled, note_activity=note_activity,
-        rng=rng, clock=clock, sleep=sleep)
+        rng=rng, clock=clock, sleep=sleep,
+        dry_run=config.dry_run if dry_run is None else dry_run)
 
 
 def create_api(config, *, models_dir="ui_model", assets_dir="assets",
@@ -309,7 +315,8 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
                note_activity: Optional[Callable[[], None]] = None,
                rng: Optional[JitterRng] = None,
                clock: Callable[[], float] = time.monotonic,
-               sleep: Callable[[float], None] = time.sleep) -> L2CoreAPI:
+               sleep: Callable[[float], None] = time.sleep,
+               dry_run: Optional[bool] = None) -> L2CoreAPI:
     """Фабрика живой сборки: конфиг (путь или CoreConfig), модели из
     ui_model/, живые адаптеры (MssScreen / HidDevice / TorchOcr /
     PyWin32Gateway) и детекторы 3.3–3.5; вернуть готовый L2CoreAPI.
@@ -318,9 +325,18 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
     тестов и не-Windows окружений; kill switch (8.1) подключается через
     cancelled. Действия HID выполняются только внутри блокирующих вызовов
     фасада из потока-владельца (owner_thread).
+
+    Dry-run (8.2): эффективный флаг — параметр dry_run, если задан,
+    иначе config.dry_run. Включённый режим поднимает DryRunHid вместо
+    живого HidDevice (обращений к arduino нет, действия логируются
+    как намерения); явно переданный hid побеждает режим — инъекция
+    адаптера для тестов. Экран читается по-настоящему: verify работает
+    на реальных кадрах, результаты примитивов честно уходят в
+    FAILED/UNKNOWN (эффекта нет) — семантика для первых запусков.
     """
     if isinstance(config, (str, Path)):
         config = load_config(config)
+    effective_dry_run = config.dry_run if dry_run is None else dry_run
     models_dir = Path(models_dir)
     models = {name: load_model(models_dir / f"{name}.yaml")
               for name in model_names}
@@ -328,8 +344,11 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
     ensure_dpi_aware(gateway)
     screen = screen or MssScreen()
     if hid is None:
-        hid = HidDevice(config.paths.arduino_port)
-        hid.connect()   # порт + проверка прошивки (жизненный цикл — у фасада)
+        if effective_dry_run:
+            hid = DryRunHid()
+        else:
+            hid = HidDevice(config.paths.arduino_port)
+            hid.connect()   # порт + проверка прошивки (жизненный цикл — у фасада)
     ocr = ocr or create_ocr_client("torch", model_path=config.paths.model)
     finder = GameWindowFinder(
         gateway, title=config.window.title,
@@ -344,5 +363,5 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
         search_region=search_region, price_region=price_region,
         shop_regions=shop_regions, segmentation=segmentation,
         cancelled=cancelled, note_activity=note_activity,
-        rng=rng, clock=clock, sleep=sleep)
+        rng=rng, clock=clock, sleep=sleep, dry_run=effective_dry_run)
     return L2CoreAPI(wiring, owner_thread=owner_thread)
