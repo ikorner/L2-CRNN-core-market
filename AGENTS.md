@@ -733,7 +733,7 @@ market-scenarios «Сценарий recover как композиция прим
   перехватывается. Паттерн интеграции: сценарии 6.1–6.3 фиксируют
   needs_recover и обрывают работу, recover вызывает стратегия через
   scenario_recover.
-- Тесты: tests/test_scenario_recover.py (8 тестов: target протянут,
+- Тесты: tests/test_scenario_recover.py (9 тестов: target протянут,
   провайдеры/последовательность шагов ScriptedHid, release_all от cause,
   прозрачная эскалация/отмена, fail fast, проброс RecoverError модели).
 

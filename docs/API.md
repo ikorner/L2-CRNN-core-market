@@ -23,7 +23,7 @@
 ## Две формы
 
 ```python
-api = bot.api                       # L2CoreAPI (тот же объект: bot.event_api)
+api = bot.api                       # L2CoreAPI (события: bot.api.events == bot.event_api)
 
 # push: подписка, доставка dispatcher-потоком
 sub = api.on("sold", lambda event: ...)
@@ -129,7 +129,7 @@ UNKNOWN), выполнил `hid.release_all()` (best-effort) и увёл кур�
 
 | Состояние / причина | Сигнал стратегии | HID |
 |---|---|---|
-| Окно игры не найдено / свёрнуто / без клиентской области (3.2: `window_not_found` / `window_minimized` / `no_client_area`) | исключение `ActivateGameError` с `reason` (при действии); `get_state()` → `status=not_found`, `detail` = reason; `health().game_window.ok=False` с reason | не тронут (SetForeground не вызывался) |
+| Окно игры не найдено / свёрнуто / без клиентской области (3.2: `window_not_found` / `window_minimized` / `no_client_area`) | исключение `ActivateGameError` с `reason` (при действии); `get_state()` → `status=not_found`, `detail` = reason; `health().game_window=False`, reason в `health().game_detail` | не тронут (SetForeground не вызывался) |
 | Фокус не получен: `SetForeground` исчерпал retry (`focus_not_acquired`) | исключение `ActivateGameError(reason="focus_not_acquired", detail)` — сигнал эскалации; recover-цепочка — решение вызывающего слоя | не тронут |
 | Окно торговли не найдено/не стабильно при действии (статус ≠ `found`) | исключение `ClickPreconditionError` / `EnterPreconditionError` / `ScrollPreconditionError` / `DragPreconditionError` (5.3–5.6, пролог activate+found) | не тронут |
 | Устойчивая деградация `occluded_or_unstable` (`anchor_lost` / `anchor_moved` / `anchor_appeared`, перекрытие тултипом/окном; ≥3 кадров подряд) | событие `escalation` от observer: `{"target": <окно>, "detail": <reason 3.5>, "steps": ()}` — одно за эпизод; при действии в этот момент — precondition-исключение | observer HID не получает; действия отклонены прологом |
