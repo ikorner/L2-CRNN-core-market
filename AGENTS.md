@@ -794,12 +794,77 @@ cancel_sell (6.2 + страж 5.7), read_shop_state (разовое чтение
   адаптеры подменяемы (тесты); регионы KNOWN_GAPS — параметрами.
 - Win32Gateway расширен get_cursor_pos() (позиция курсора для относительных
   дельт HID; см. activate_game 5.2).
-- YAGNI: никакого event dispatcher (7.3), executor/observer (7.2), kill
-  switch (8.1) — здесь только синхронный фасад.
+- **YAGNI**: никакого event dispatcher (7.3), kill
+  switch (8.1) — здесь только синхронный фасад. Потоки — L2CoreBot (7.2,
+  engine.py ниже), не здесь.
 - Тесты: tests/test_api.py (контракт всех методов на скриптованном мире:
   делегирование, OK/FAILED/UNKNOWN, thread-owner, отмена, страж),
   tests/test_wiring.py (математика провайдеров, create_api с подменой
   адаптеров на реальных моделях).
+
+### Модель потоков: executor, observer, dispatcher (задача 7.2, spec
+core-api-events, сценарий «Observer не отправляет действия»)
+
+`l2core/api/engine.py` — L2CoreBot (orchestrator потоков) и компоненты
+StateObserver / EventDispatcher; очередь — `l2core/api/events.py`
+(EventQueue/Event, типы `sold`, `window_closed`, `modal`, `recovered`,
+`escalation`, `killed` — инфраструктура типы знает, источники
+подключаемы); HID-owner guard — `l2core/api/hid_owner.py`
+(вендоренный `adapters/hid.py` не трогается — обёртка снаружи).
+
+- **Action executor — поток стратегии (вариант Б из design-развилки)**:
+  API синхронен и блокирующий (7.1) и по спеке вызывается только из
+  потока стратегии — отдельный executor-поток с очередью команд при
+  однопоточной стратегии потребителя не имеет (async-слой без выгоды).
+  Владение HID — ИСПОЛНЯЕМОЕ: wiring.hid оборачивается OwnerGuardedHid
+  (владелец — поток конструктора L2CoreBot); HID-команда из чужого
+  потока → HidOwnershipError до железа (инвариант 9). Многопоточные
+  стратегии — не-цель v1.
+- **State observer — фоновый поток, только чтение**: grab, детекция
+  окна/статуса/состояния (3.4/3.5), перехватчик модалок (3.6), монитор
+  лавки (6.3). HID observer не получает ВООБЩЕ (в конструктор не
+  принимается) — сценарий спеки выполнен по построению (интеграционно:
+  wiring.hid=RecordingHid после прогона движка чист). Публикует в
+  EventQueue: `window_closed` (открытое окно исчезло), `modal`
+  (перехватчик сработал), `sold` (монитор детектировал продажу). Пауза
+  между циклами — wait_until с предикатом stop/cancelled (инвариант 1,
+  kill switch 8.1 через cancelled); интервал — `timing.poll_interval`
+  (новый ключ конфига, дефолт 1.0 с). Внутреннее состояние observer'а —
+  допустимое исключение (монитор, design 8): последний снапшот
+  (`observer.snapshot`: окно/статус/состояние/деталь) и факт открытого
+  окна для детекции закрытия. Исключение итерации не роняет поток
+  (лог, цикл продолжается — наблюдатель переживает деградации).
+- **Event dispatcher — поток доставки**: EventQueue → callbacks
+  (`dispatcher.subscribe/unsubscribe`); callback получает Event
+  (type/payload/seq). Callbacks исполняются В ПОТОКЕ DISPATCHER'А
+  (отклонение от буквы design 8 «в поток стратегии»: поток стратегии
+  блокирован в API-вызовах, event pump противоречит блокирующей модели;
+  зафиксировано в отчёте 7.2) — ключевое требование «не в observer-
+  потоке» выполнено, pull-форма, исполняемая строго в потоке стратегии,
+  — `wait_event` (7.3) поверх той же очереди. Исключение callback'а
+  изолируется: лог, остальные доставлены; поток не умирает от чужого
+  кода. Callback не должен вызывать блокирующий API (чужой поток →
+  RuntimeError по thread-owner 7.1).
+- **L2CoreBot**: создаётся в потоке стратегии с готовым ApiWiring;
+  `bot.api` — фасад поверх guard-сборки (thread-owner 7.1),
+  `bot.events` — очередь, `bot.push(type, payload)` — внешние источники
+  (escalation от recover через on_escalation wiring'а, killed от 8.1);
+  `start()` порождает оба потока, `stop(timeout)` — stop-флаги + join
+  (idempotent; повторный start — EngineError, жизненный цикл один);
+  контекстный менеджер. Доступ к API — только через `bot.api`: прямое
+  использование исходного wiring с сырым HidDevice обходит guard
+  (граница зафиксирована в докстринге engine.py).
+- YAGNI: kill switch (8.1), on()/wait_event() для стратегий, журнал
+  событий и API-справочник payload'ов — 7.3; AST-guard'а на observer
+  нет — сценарий «Observer не отправляет действия» покрыт интеграционно
+  (tests/test_engine.py).
+- Тесты: tests/test_engine.py (очередь: порядок/seq/неизвестный тип/
+  конкурентность; guard: делегирование/чужой поток/явный владелец;
+  dispatcher: порядок/изоляция исключений/unsubscribe/join; observer:
+  window_closed/sold/modal/стабильность/отмена до кадра; движок:
+  start/stop/restart-rejected/контекст/thread-owner/guard в wiring/
+  observer HID не тронул). Потоки в тестах короткоживущие (интервалы
+  0.01–0.05 с), join в каждом тесте — pytest не висит.
 
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
@@ -891,8 +956,10 @@ null). Replay-модель эффектов: действие → записан
   7.1): L2CoreAPI — тонкий фасад, композирующий сценарии 6.1–6.4 и
   примитивы 5.x поверх провайдеров сборки ApiWiring (l2core/api/wiring.py —
   build_wiring из детекторов 3.3–3.5 и create_api с живыми адаптерами:
-  MssScreen/HidDevice/TorchOcr/PyWin32Gateway). События/потоки 7.2–7.3 —
-  не здесь (YAGNI).
+  MssScreen/HidDevice/TorchOcr/PyWin32Gateway). Потоки — L2CoreBot (7.2,
+  engine.py: state observer / event dispatcher / HID-owner guard,
+  events.py — очередь); события для стратегий (on/wait_event, журнал) —
+  7.3, kill switch — 8.1.
 - `l2core/config.py` — схема и типизированный загрузчик `config.yaml`.
 - `tests/` — pytest; `ui_model/` — YAML UI-модель; `assets/` — шаблоны и
   golden-кропы (версионируются вместе с моделью); `base_screenshot/scr/` —

@@ -64,6 +64,7 @@ def test_defaults_without_file():
     assert config.timing.verify_interval > 0
     assert config.timing.hover_pause > 0
     assert config.timing.click_retry_count >= 0
+    assert config.timing.poll_interval > 0
     assert 0.0 <= config.behavior.numpad_fraction <= 1.0
     assert 0.0 <= config.behavior.enter_fraction <= 1.0
     assert config.behavior.press_delay_min_ms <= config.behavior.press_delay_max_ms
@@ -144,6 +145,7 @@ def test_empty_file_gives_defaults(tmp_path):
         ("timing:\n  wait_default_timeout: -1.0\n", "timing.wait_default_timeout"),
         ("timing:\n  verify_interval: -0.1\n", "timing.verify_interval"),
         ("timing:\n  hover_pause: -0.5\n", "timing.hover_pause"),
+        ("timing:\n  poll_interval: 0.0\n", "timing.poll_interval"),
         # Доля вне [0, 1]
         ("behavior:\n  numpad_fraction: 1.5\n", "behavior.numpad_fraction"),
         ("behavior:\n  numpad_fraction: -0.1\n", "behavior.numpad_fraction"),

@@ -40,6 +40,7 @@ class TimingConfig:
     verify_interval: float = 0.2  # интервал опроса predicate в wait_until
     hover_pause: float = 0.4  # пауза после hover до verify (тултип/подсветка)
     click_retry_count: int = 2  # число повторов действия при неподтверждении
+    poll_interval: float = 1.0  # пауза между циклами state observer (7.2)
 
 
 @dataclass(frozen=True)
@@ -265,6 +266,7 @@ def load_config(path: str | Path | None = None) -> CoreConfig:
             "wait_default_timeout": _positive_float,
             "verify_interval": _positive_float,
             "hover_pause": _positive_float,
+            "poll_interval": _positive_float,
             "click_retry_count": _nonnegative_int,
         },
     )

@@ -8,6 +8,7 @@ timing:
   verify_interval: 0.2  # интервал опроса predicate в wait_until
   hover_pause: 0.4  # пауза после hover до verify (тултип/подсветка элемента)
   click_retry_count: 2  # число повторов действия при неподтверждении эффекта
+  poll_interval: 1.0  # пауза между циклами state observer (фоновое наблюдение, 7.2)
 
 ocr:
   confidence_threshold: 0.85  # порог confidence OCR, [0, 1]
