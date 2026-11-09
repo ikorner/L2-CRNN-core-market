@@ -19,8 +19,11 @@
   двусторонним совпадением множеств.
 
 Конфликт сигнатур (несколько подтверждённых состояний -> unknown +
-журнал конфликта) покрыт синтетикой tests/test_states.py::TestConflict и
-здесь не дублируется.
+журнал конфликта) покрыт механизмом синтетикой
+tests/test_states.py::TestConflict; на реальных кадрах конфликт по построению
+не возникает (строгое «все сигнатуры») — здесь это закреплено исполняемо:
+conflicts обязан быть пуст на всех 39 кадрах, иначе unknown в HONEST_UNKNOWN
+перестал бы быть честным (это конфликт признаков, а не недоразмеченность).
 
 Прогон: один проход детекции по 39 кадрам (~6 с, OpenCV-матчер);
 кадры кэшируются между параметризованными случаями (lru_cache).
@@ -179,6 +182,12 @@ def test_detector_covers_meta_screenshots(real_detector, shipped_models, name):
 
     expect_state, expect_params = expected
     report = state_detector.detect(frame, anchor)
+    assert report.conflicts == (), (
+        f"{name}: конфликт сигнатур {report.conflicts} на реальном кадре — "
+        f"строгое «все сигнатуры» конфликт не даёт; unknown здесь должен "
+        f"быть честным (неподтверждение), иначе это расхождение признаков "
+        f"модели, а не недоразмеченность (см. TestConflict для механизма)"
+    )
     assert report.state == expect_state, (
         f"{name}: факт {report.state!r} != ожидание {expect_state!r} "
         f"(мета state={entry['state']!r}, params={entry['state_params']}); "

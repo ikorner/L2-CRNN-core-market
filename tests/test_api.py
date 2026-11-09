@@ -432,13 +432,14 @@ def make_wiring(world, hid, *, clock, run_checks_calls=None,
                 segmentation=None, search_region=None, price_region=None,
                 shop_regions=None, detect_state=None, current_window=None,
                 game_window=None, ocr_health=None, hid_health=None,
-                cancelled=None):
+                cancelled=None, run_checks=None, hud_locator=None):
     market = make_market_model()
     anchors = anchor_script or AnchorScript({
         "market": MARKET_ANCHOR, "shop_sell": SELL_ANCHOR,
         "shop_buy": BUY_ANCHOR})
     rc_calls = run_checks_calls if run_checks_calls is not None else []
-    hud = make_hud_locator(world, hud_calls if hud_calls is not None else [])
+    hud = hud_locator or make_hud_locator(
+        world, hud_calls if hud_calls is not None else [])
     return ApiWiring(
         config=make_config(),
         screen=screen or FakeScreen(),
@@ -455,7 +456,7 @@ def make_wiring(world, hid, *, clock, run_checks_calls=None,
         window_status=lambda frame, window_id: WindowStatus(
             status=STATUS_FOUND, reason=None,
             anchor=MARKET_ANCHOR, content_loaded=True, content_detail="ok"),
-        run_checks=make_run_checks(world, rc_calls),
+        run_checks=run_checks or make_run_checks(world, rc_calls),
         detect_state=detect_state,
         current_window=current_window or (lambda frame: world.current),
         close_point=lambda window_id, frame: RECOVER_CLOSE_POINT,
@@ -608,6 +609,22 @@ class TestOpenMarket:
         assert result.outcome is None
         assert hid.log == []
 
+    def test_hud_icon_not_located_is_failed_without_click(self):
+        # Иконку HUD не нашли — клик НЕ выполнялся (слепых кликов нет):
+        # честный FAILED (эффект отсутствует), не UNKNOWN.
+        world, clock = World(), FakeClock()
+        hid = ScriptedHid(clock, world)
+        api = make_api(world, hid, clock=clock,
+                       hud_locator=lambda element, variant, frame: None)
+
+        result = api.open_market()
+
+        assert not result.success
+        assert result.outcome is ActionOutcome.FAILED
+        assert not result.unconfirmed
+        assert "не локализована" in result.failures[0]
+        assert "click" not in actions(hid)
+
 
 class TestCloseMarket:
     def test_close_success(self):
@@ -654,6 +671,51 @@ class TestOpenShop:
         api = make_api()
         with pytest.raises(ApiError):
             api.open_shop_buy()
+
+    @pytest.mark.parametrize("method", ["open_shop_buy", "open_shop_sell"])
+    def test_open_shop_verify_timeout_is_failed(self, method):
+        # Сигнатура лавки не сошлась за таймаут (verify от стратегии не
+        # подтверждён): FAILED (якорь был, verify выполнялся), без повторных
+        # кликов — общий _open_via_hud, ветки как у open_market.
+        world, clock = World(), FakeClock()
+        hid = ScriptedHid(clock, world)
+
+        def run_checks(checks, frame, anchor):
+            for check in checks:
+                if check.element == "shop_open_marker":
+                    return CheckReport(
+                        False, ("признак открытия лавки не найден",))
+            return CheckReport(True, ())
+
+        api = make_api(world, hid, clock=clock, run_checks=run_checks)
+        verify = VerifySpec(checks=(
+            Check(kind="template", element="shop_open_marker"),))
+
+        result = getattr(api, method)(verify=verify)
+
+        assert not result.success
+        assert result.outcome is ActionOutcome.FAILED
+        assert not result.unconfirmed
+        assert result.needs_recover
+        assert len([a for a in actions(hid) if a == "click"]) == 1
+
+    @pytest.mark.parametrize("method", ["open_shop_buy", "open_shop_sell"])
+    def test_open_shop_anchor_lost_after_click_is_unknown(self, method):
+        # Якоря лавки ни разу не было на кадрах после клика: клик ушёл,
+        # подтвердить нельзя — UNKNOWN (инвариант 4), не FAILED.
+        world, clock = World(), FakeClock()
+        hid = ScriptedHid(clock, world)
+        script = AnchorScript({"shop_buy": BUY_ANCHOR,
+                               "shop_sell": SELL_ANCHOR})
+        hid.on_click = lambda: setattr(script, "lose_all", True)
+        api = make_api(world, hid, clock=clock, anchor_script=script)
+
+        result = getattr(api, method)(verify=VerifySpec(checks=()))
+
+        assert not result.success
+        assert result.outcome is ActionOutcome.UNKNOWN
+        assert result.unconfirmed
+        assert result.needs_recover
 
 
 class TestSetTabSetFilter:

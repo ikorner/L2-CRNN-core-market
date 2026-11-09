@@ -218,18 +218,22 @@ class FakeCursor:
 
 
 class FakeRunner:
-    """Оценка проверок: стрелки — по позиции скролла, остальное — проходит."""
+    """Оценка проверок: стрелки — по позиции скролла, fail_always —
+    принудительный провал (ветки отказов обхода), остальное — проходит."""
 
-    def __init__(self, screen, disabled_by_pos=None):
+    def __init__(self, screen, disabled_by_pos=None, fail_always=()):
         self.screen = screen
         self.disabled_by_pos = disabled_by_pos or {}
+        self.fail_always = set(fail_always)
 
     def __call__(self, checks, frame, anchor):
         disabled = self.disabled_by_pos.get(self.screen.position, set())
         failures = []
         for c in checks:
-            if c.element in (UP_ARROW_DISABLED_ELEMENT,
-                             DOWN_ARROW_DISABLED_ELEMENT):
+            if c.element in self.fail_always:
+                ok = False
+            elif c.element in (UP_ARROW_DISABLED_ELEMENT,
+                               DOWN_ARROW_DISABLED_ELEMENT):
                 ok = c.element in disabled
             else:
                 ok = True
@@ -284,13 +288,14 @@ def frame_with_search():
 
 def run_scan(points, *, frames, disabled_by_pos=None, search_region=None,
              field_element=FIELD_ELEMENT, button_element=BUTTON_ELEMENT,
-             cancelled=None, rng_seed=7, ocr=None):
+             cancelled=None, rng_seed=7, ocr=None, fail_always=(),
+             max_scrolls=200, find_anchor=None):
     clock = FakeClock()
     screen = ScrollScreen(frames)
     hid = ScriptedHid(clock, screen)
     cursor = FakeCursor()
     cursor.track(hid)
-    checker = FakeRunner(screen, disabled_by_pos)
+    checker = FakeRunner(screen, disabled_by_pos, fail_always)
     result = scan_market(
         points,
         model=make_model(),
@@ -301,7 +306,7 @@ def run_scan(points, *, frames, disabled_by_pos=None, search_region=None,
         activate=lambda: ActivateResult(hwnd=1, already_active=True,
                                         attempts=0, cancelled=False),
         window_status=found_status,
-        find_anchor=lambda frame: ANCHOR,
+        find_anchor=find_anchor or (lambda frame: ANCHOR),
         run_checks=checker,
         config=make_config(),
         hud_locator=hud_locator,
@@ -309,6 +314,7 @@ def run_scan(points, *, frames, disabled_by_pos=None, search_region=None,
         search_field_element=field_element,
         search_button_element=button_element,
         scroll_chunk=1,
+        max_scrolls=max_scrolls,
         cancelled=cancelled,
         rng=random.Random(rng_seed),
         clock=clock.monotonic,
@@ -427,6 +433,96 @@ class TestScanMarket:
                 clock=clock.monotonic,
                 sleep=clock.sleep,
             )
+
+
+class TestScanFailures:
+    """Трёхзначный результат в композиции сценария (task 9.3): отказ
+    примитива фиксируется в ScanResult.failures и обрывает обход — recover
+    исполняет вызывающий слой, слепых действий/чтения нет (инвариант 9)."""
+
+    def test_opening_not_confirmed_aborts_scan(self):
+        # Verify открытия (tab_home_marker) не сходится: обход не начался,
+        # точек нет, wheel не уходил.
+        result, hid = run_scan(
+            [ScanPoint(verify=POINT_VERIFY)],
+            frames=[frame_pos0()],
+            fail_always={"tab_home_marker"},
+        )
+        assert result.points == ()
+        assert result.needs_recover
+        assert not result.cancelled
+        assert "открытие обзора" in result.failures[0]
+        assert "tab_home_marker" in result.failures[0]
+        assert "scroll" not in [a for _, a, _ in hid.log]
+
+    def test_tab_not_confirmed_aborts_point(self):
+        # Клик по табу прошёл, verify точки (list_marker) не сошёлся:
+        # точка зафиксирована пустой, обход оборван, строк не прочитано.
+        result, hid = run_scan(
+            [ScanPoint(verify=POINT_VERIFY, tab=TAB_ELEMENT)],
+            frames=[frame_pos0()],
+            fail_always={"list_marker"},
+        )
+        assert result.needs_recover
+        assert len(result.points) == 1
+        assert result.points[0].rows == ()
+        assert result.points[0].snapshots == ()
+        assert f"элемент {TAB_ELEMENT!r} не подтверждён" in result.failures[0]
+        assert "scroll" not in [a for _, a, _ in hid.log]
+
+    def test_anchor_lost_on_read_frame_aborts_point(self):
+        # Якорь есть на кадрах открытия (3 вызова find_anchor у успешного
+        # клика: hover-кадр, re-verify после hover, verify после клика —
+        # l2core/primitives/click.py), теряется на первом же кадре чтения
+        # строк — чтение обрывается честной фиксацией, слепого чтения нет.
+        seen = {"n": 0}
+
+        def find_anchor(frame):
+            seen["n"] += 1
+            return ANCHOR if seen["n"] <= 3 else None
+
+        result, _ = run_scan(
+            [ScanPoint(verify=POINT_VERIFY)],
+            frames=[frame_pos0()],
+            find_anchor=find_anchor,
+        )
+        assert result.needs_recover
+        assert "якорь не найден на кадре чтения строк" in result.failures[0]
+
+    def test_max_scrolls_guard_aborts_when_end_marker_never_comes(self):
+        # Скролл подтверждается (кадры различаются), но признак конца из
+        # модели (disabled-стрелка) не получен: предохранитель max_scrolls
+        # обрывает обход с честной фиксацией.
+        frame_pos2 = make_frame(rows={
+            0: {"texts": {"item": COLOR_ITEM_B, "price": COLOR_PRICE_A,
+                          "seller": COLOR_SELLER}, "icon": ICON_B},
+            1: {"texts": {"item": COLOR_ITEM_A, "price": COLOR_PRICE_B,
+                          "seller": COLOR_SELLER}, "icon": ICON_A},
+        })
+        result, hid = run_scan(
+            [ScanPoint(verify=POINT_VERIFY)],
+            frames=[frame_pos0(), frame_pos1(), frame_pos2],
+            disabled_by_pos={},
+            max_scrolls=2,
+        )
+        wheels = [a for _, a, _ in hid.log if a == "scroll"]
+        assert len(wheels) == 2  # дальше предохранителя не крутим
+        assert result.needs_recover
+        assert "max_scrolls=2" in result.failures[0]
+
+    def test_scroll_not_confirmed_aborts_point(self):
+        # Wheel ушёл, но нижняя строка не менялась и край не достигнут
+        # (замороженный кадр, стрелка активна): скролл needs_recover —
+        # точка зафиксирована прочитанным, обход оборван.
+        result, hid = run_scan(
+            [ScanPoint(verify=POINT_VERIFY)],
+            frames=[frame_pos0()],
+            disabled_by_pos={},
+        )
+        assert result.needs_recover
+        assert len(result.points) == 1
+        assert len(result.points[0].snapshots) == 1  # чтение до скролла
+        assert "скролл не подтверждён" in result.failures[0]
 
 
 class TestNoLavkaOpeningGuard:
