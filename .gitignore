@@ -1,0 +1,23 @@
+# Внешний чекпоинт CRNN — не коммитится, путь задаётся в config.yaml
+crnn_best.pt
+*.pt
+# Фейковый чекпоинт guard-тестов OCR (задача 4.1) — коммитится
+!tests/fixtures/ocr_vendor/*.pt
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Виртуальные окружения
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/

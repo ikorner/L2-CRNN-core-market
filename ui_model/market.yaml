@@ -1,0 +1,535 @@
+# UI-модель окна market. Импорт конвертером (l2core.model.converter) из base_screenshot/scr/meta.json.
+# Политика слияния: ручные правки побеждают, машинное дополняет; diff-отчёт — `python -m l2core.model.converter`.
+# rect'ы элементов батча scr_153901+ пересчитаны вручную от истинного якоря
+# (202,103), а не эвристического (207,77) конвертера (задача 3.3b;
+# guard-тест — tests/test_anchor.py::TestAnchorModelConsistency::test_market_batch2_rects_match_meta).
+# table_geometry откалибрована из меты под 1920x1080 (задача 2.4, метод — в отчёте 2.4).
+# Сигнатуры состояний и семантика подтверждённых переходов размечены (2.3-2.5,
+# обоснование — в отчёте 2.5); OCR-регионы и неподтверждённая семантика —
+# в KNOWN_GAPS.yaml и docs/OWNER_QUESTIONS.md.
+window:
+  id: market
+  title: Обзор лавок
+  size: [1008, 674]
+elements:
+  acces_active:
+    rect: [363, 207, 110, 27]
+    role: click_target
+    variants:
+      active: {template: market/scr_153656_acces_active.png}
+  all_pusto:
+    rect: [357, 105, 47, 27]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153611_all_pusto.png}
+  armor_active:
+    rect: [247, 206, 112, 29]
+    role: click_target
+    variants:
+      active: {template: market/scr_153646_armor_active.png}
+  artef_all_passive:
+    rect: [21, 206, 108, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153731_artef_all_passive.png}
+  artef_atack_active:
+    rect: [133, 207, 109, 26]
+    role: click_target
+    variants:
+      active: {template: market/scr_153722_artef_atack_active.png}
+  artef_atack_passive:
+    rect: [133, 207, 110, 27]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153712_artef_atack_passive.png}
+  artef_balance_active:
+    rect: [477, 206, 112, 29]
+    role: click_target
+    variants:
+      active: {template: market/scr_153750_artef_balance_active.png}
+  artef_balance_passive:
+    rect: [478, 208, 110, 26]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153712_artef_balance_passive.png}
+  artef_def_active:
+    rect: [248, 207, 111, 29]
+    role: click_target
+    variants:
+      active: {template: market/scr_153731_artef_def_active.png}
+  artef_defence_passive:
+    rect: [248, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153712_artef_defence_passive.png}
+  artef_support_active:
+    rect: [361, 207, 113, 27]
+    role: click_target
+    variants:
+      active: {template: market/scr_153740_artef_support_active.png}
+  artef_support_paccive:
+    rect: [363, 207, 111, 27]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153712_artef_support_paccive.png}
+  atref_all_active:
+    rect: [18, 207, 111, 29]
+    role: click_target
+    variants:
+      active: {template: market/scr_153712_atref_all_active.png}
+  atrifacts_passive:
+    rect: [292, 154, 142, 42]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153551_atrifacts_passive.png}
+  collection_active:
+    rect: [856, 154, 139, 44]
+    role: click_target
+    variants:
+      active: {template: market/scr_154103_collection_active.png}
+  collection_all_active:
+    rect: [18, 207, 109, 28]
+    role: click_target
+    variants:
+      active: {template: market/scr_154103_collection_all_active.png}
+  collection_passive:
+    rect: [857, 153, 138, 47]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153551_collection_passive.png}
+  filter_button_all_active:
+    rect: [358, 108, 45, 24]
+    role: icon_sample
+    variants:
+      active: {template: market/scr_153600_filter_button_all_active.png}
+  filter_button_buy_passive:
+    rect: [607, 110, 65, 20]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153600_filter_button_buy_passive.png}
+  filter_button_sell_passive:
+    rect: [481, 107, 72, 25]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153600_filter_button_sell_passive.png}
+  game_window_active:
+    role: icon_sample
+    hud: true
+    search_area: [9, 7, 89, 22]
+    variants:
+      active: {template: market/scr_153527_game_window_active.png}
+  game_window_not_active:
+    role: icon_sample
+    hud: true
+    search_area: [10, 6, 83, 25]
+    variants:
+      active: {template: market/scr_153511_game_window_not_active.png}
+  gorod:
+    rect: [832, 246, 45, 17]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153600_gorod.png}
+  krujok_empty:
+    rect: [606, 108, 21, 22]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153600_krujok_empty.png}
+  krujok_ne_pusty:
+    rect: [359, 107, 20, 23]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_krujok_ne_pusty.png}
+  main_market_close_button:
+    rect: [974, 8, 26, 27]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153551_main_market_close_button.png}
+  main_not_active:
+    rect: [12, 154, 137, 42]
+    role: click_target
+    variants:
+      active: {template: market/scr_153712_main_not_active.png}
+  market_main_button_active:
+    rect: [12, 155, 137, 42]
+    role: click_target
+    variants:
+      active: {template: market/scr_153551_market_main_button_active.png}
+  market_main_menu:
+    rect: [0, 0, 1008, 674]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153551_market_main_menu.png}
+  market_other_button_passive:
+    rect: [714, 154, 140, 42]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153551_market_other_button_passive.png}
+  market_pic:
+    # Ручная правка поверх импорта: геометрически кроп вписывается в окно,
+    # но это HUD-иконка открытия «Обзора лавок» (spec ui-model). Область
+    # поиска и точка клика выведены из меты: rect кропа [1072, 473, 29, 22]
+    # -> центр (1086, 484), от угла области (1000, 420) = (86, 64).
+    role: icon_sample
+    hud: true
+    search_area: [1000, 420, 200, 160]
+    variants:
+      normal: {template: market/scr_153511_market_pic.png, click_point: [86, 64]}
+  market_snar_passive:
+    rect: [151, 155, 139, 44]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153551_market_snar_passive.png}
+  market_update_button:
+    rect: [871, 207, 118, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_market_update_button.png}
+  open_buy_trade:
+    role: icon_sample
+    hud: true
+    search_area: [751, 920, 34, 24]
+    variants:
+      normal: {template: market/scr_153511_open_buy_trade.png}
+  open_sale_trade:
+    role: icon_sample
+    hud: true
+    search_area: [751, 871, 34, 24]
+    variants:
+      normal: {template: market/scr_153511_open_sale_trade.png}
+  other_active:
+    rect: [715, 154, 139, 43]
+    role: click_target
+    variants:
+      active: {template: market/scr_154002_other_active.png}
+  other_all_active:
+    rect: [19, 208, 108, 26]
+    role: click_target
+    variants:
+      active: {template: market/scr_154002_other_all_active.png}
+  other_collors_passive:
+    rect: [249, 207, 108, 28]
+    role: click_target
+    variants:
+      normal: {template: market/scr_154002_other_collors_passive.png}
+  other_colors_active:
+    rect: [248, 206, 110, 29]
+    role: click_target
+    variants:
+      active: {template: market/scr_154021_other_colors_active.png}
+  other_other_active:
+    rect: [479, 208, 108, 26]
+    role: click_target
+    variants:
+      active: {template: market/scr_154049_other_other_active.png}
+  other_other_passive:
+    rect: [478, 207, 109, 27]
+    role: click_target
+    variants:
+      normal: {template: market/scr_154002_other_other_passive.png}
+  other_scroll_active:
+    rect: [478, 206, 109, 30]
+    role: click_target
+    variants:
+      active: {template: market/scr_153840_other_scroll_active.png}
+  other_stones_active:
+    rect: [137, 207, 106, 28]
+    role: click_target
+    variants:
+      active: {template: market/scr_154012_other_stones_active.png}
+  other_stones_passive:
+    rect: [134, 205, 108, 30]
+    role: click_target
+    variants:
+      normal: {template: market/scr_154002_other_stones_passive.png}
+  other_up_stuff_active:
+    rect: [363, 207, 109, 28]
+    role: click_target
+    variants:
+      active: {template: market/scr_154033_other_up_stuff_active.png}
+  other_up_stuff_passive:
+    rect: [364, 206, 109, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_154002_other_up_stuff_passive.png}
+  personaj:
+    rect: [685, 245, 59, 18]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_personaj.png}
+  pokupka_ne_pusto:
+    rect: [606, 107, 65, 24]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153619_pokupka_ne_pusto.png}
+  predmet:
+    rect: [242, 245, 53, 18]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_predmet.png}
+  price:
+    rect: [514, 246, 39, 17]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_price.png}
+  pripas_passive:
+    rect: [573, 152, 142, 47]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153551_pripas_passive.png}
+  pripasi_active:
+    rect: [572, 154, 141, 42]
+    role: click_target
+    variants:
+      active: {template: market/scr_153901_pripasi_active.png}
+  pripasi_all_active:
+    rect: [17, 205, 110, 31]
+    role: click_target
+    variants:
+      active: {template: market/scr_153901_pripasi_all_active.png}
+  pripasi_all_passive:
+    rect: [19, 206, 108, 28]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153929_pripasi_all_passive.png}
+  pripasi_rashodka_active:
+    rect: [364, 206, 109, 28]
+    role: click_target
+    variants:
+      active: {template: market/scr_153949_pripasi_rashodka_active.png}
+  pripasi_rashodka_passive:
+    rect: [363, 207, 109, 28]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153901_pripasi_rashodka_passive.png}
+  pripasi_soulshot_active:
+    rect: [134, 206, 109, 29]
+    role: click_target
+    variants:
+      active: {template: market/scr_153929_pripasi_soulshot_active.png}
+  pripasi_soulshot_passive:
+    rect: [133, 208, 109, 25]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153901_pripasi_soulshot_passive.png}
+  pripasi_spiritshot_active:
+    rect: [248, 207, 109, 27]
+    role: click_target
+    variants:
+      active: {template: market/scr_153941_pripasi_spiritshot_active.png}
+  pripasi_spitirshot_passive:
+    rect: [248, 206, 111, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153901_pripasi_spitirshot_passive.png}
+  prodaja_ne_pusto:
+    rect: [480, 107, 73, 26]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153611_prodaja_ne_pusto.png}
+  prokrutka_vniz:
+    rect: [973, 642, 16, 15]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_prokrutka_vniz.png}
+  prokrutka_vniz_not_active:
+    rect: [973, 641, 17, 15]
+    role: click_target
+    variants:
+      active: {template: market/scr_153722_prokrutka_vniz_not_active.png}
+  prokrutka_vverh:
+    rect: [973, 263, 16, 16]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_prokrutka_vverh.png}
+  prokrutka_vverh_not_active:
+    rect: [973, 263, 16, 15]
+    role: click_target
+    variants:
+      active: {template: market/scr_153722_prokrutka_vverh_not_active.png}
+  scroll_bless_active:
+    rect: [248, 206, 111, 31]
+    role: click_target
+    variants:
+      active: {template: market/scr_153819_scroll_bless_active.png}
+  scroll_bless_passive:
+    rect: [248, 206, 110, 30]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153802_scroll_bless_passive.png}
+  scroll_common_active:
+    rect: [133, 207, 110, 29]
+    role: click_target
+    variants:
+      active: {template: market/scr_153810_scroll_common_active.png}
+  scroll_comon_passive:
+    rect: [132, 205, 112, 32]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153802_scroll_comon_passive.png}
+  scroll_giant_active:
+    rect: [363, 205, 110, 32]
+    role: click_target
+    variants:
+      active: {template: market/scr_153830_scroll_giant_active.png}
+  scroll_giant_passive:
+    rect: [364, 207, 109, 28]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153802_scroll_giant_passive.png}
+  scroll_other_passive:
+    rect: [478, 206, 110, 30]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153802_scroll_other_passive.png}
+  scrolls_active:
+    rect: [434, 153, 140, 46]
+    role: click_target
+    variants:
+      active: {template: market/scr_153802_scrolls_active.png}
+  scrolls_all_active:
+    rect: [19, 207, 109, 28]
+    role: click_target
+    variants:
+      active: {template: market/scr_153802_scrolls_all_active.png}
+  scrolls_passive:
+    rect: [432, 154, 141, 45]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153551_scrolls_passive.png}
+  search_pole_clear:
+    rect: [255, 63, 416, 31]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_search_pole_clear.png}
+  search_pole_clear_button:
+    rect: [666, 63, 31, 32]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153600_search_pole_clear_button.png}
+  search_pole_search_button:
+    rect: [698, 62, 118, 33]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_search_pole_search_button.png}
+  snaryag_acces_passive:
+    rect: [363, 206, 110, 30]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_snaryag_acces_passive.png}
+  snaryag_all_active:
+    rect: [18, 207, 111, 28]
+    role: click_target
+    variants:
+      active: {template: market/scr_153600_snaryag_all_active.png}
+  snaryag_armor_passive:
+    rect: [248, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_snaryag_armor_passive.png}
+  snaryag_weapon_passive:
+    rect: [133, 206, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_snaryag_weapon_passive.png}
+  snaryg_active:
+    rect: [151, 154, 141, 45]
+    role: click_target
+    variants:
+      active: {template: market/scr_153600_snaryg_active.png}
+  type:
+    rect: [54, 246, 30, 17]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153600_type.png}
+  weapon_active:
+    rect: [133, 207, 110, 29]
+    role: click_target
+    variants:
+      active: {template: market/scr_153631_weapon_active.png}
+states:
+  list__filter_all__global_filter_all__tab_equipment:
+    params: {filter: all, global_filter: all, tab: equipment}
+    signatures:
+    - {kind: template, element: filter_button_all_active, variant: active}
+    - {kind: template, element: snaryag_all_active, variant: active}
+    - {kind: template, element: snaryg_active, variant: active}
+  list__tab_home:
+    params: {tab: home}
+    signatures:
+    - {kind: template, element: market_main_button_active, variant: active}
+    # Второй признак (пробел KNOWN_GAPS закрыт правкой модели): открытое
+    # окно целиком, scr_153551 (мета второй признак не знала).
+    - {kind: template, element: market_main_menu, variant: normal}
+  recover_closed:
+    # «Все окна торговли закрыты» (scr_153511, scr_all_close). Сигнатуры —
+    # видимость HUD-иконок открытия (они импортированы в эту модель).
+    # Состояние глобальное (не окна market), живёт здесь, т.к. HUD-иконки
+    # импортом лежат в market.yaml; моделирование — вопрос владельцу (Q3,
+    # docs/OWNER_QUESTIONS.md).
+    params: {}
+    signatures:
+    - {kind: template, element: market_pic, variant: normal}
+    - {kind: template, element: open_buy_trade, variant: normal}
+# Семантика переходов (задача 2.5). Заполнены ТОЛЬКО переходы, подтверждённые
+# метой/скриншотами (R4: в мете click_leads_to: null всюду). Обоснование по
+# каждому переходу — в отчёте 2.5 и docs/OWNER_QUESTIONS.md. verify — наблюдаемые
+# признаки целевого состояния; on_fail — локальные пассивные шаги (design,
+# решение 6: ESC -> клик в свободную область); точная цепочка recover — рантайм
+# 5.8. timeout не задан — берётся из конфига при исполнении.
+transitions:
+  # scr_153511 (окон нет, иконка на HUD) -> scr_153551 (tab=home активен).
+  # Оговорка меты: при повторном открытии открывается последний tab —
+  # вопрос владельцу (Q2).
+  - from: recover_closed
+    action: click
+    element: market_pic
+    expected: list__tab_home
+    verify:
+      - {kind: template, element: market_main_button_active, variant: active}
+      - {kind: template, element: market_main_menu, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  # scr_153551 (tab=home) -> scr_153600 (tab=equipment, фильтр «Все» активен).
+  - from: list__tab_home
+    action: click
+    element: market_snar_passive
+    expected: list__filter_all__global_filter_all__tab_equipment
+    verify:
+      - {kind: template, element: snaryg_active, variant: active}
+      - {kind: template, element: filter_button_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  # Обратный таб: scr_153600 -> scr_153551. Элемент — таб «Главная» в
+  # невыбранном виде (scr_153712, в мете вариант помечен active по ошибке
+  # слота — описание кропа «пассивный»).
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: main_not_active
+    expected: list__tab_home
+    verify:
+      - {kind: template, element: market_main_button_active, variant: active}
+      - {kind: template, element: market_main_menu, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  # scr_153551 (кнопка есть) -> scr_all_close (окон нет).
+  - from: list__tab_home
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+ocr_regions: {}
+# Геометрия нарезки таблицы списка лавок. Калибровка под 1920x1080 из меты
+# (задача 2.4, метод и числа — в отчёте 2.4; golden-тесты —
+# tests/test_table_geometry.py). col_seps: 1px линии заголовка
+# (117/417/648/778) и правый край контента перед скроллбаром (967).
+# zone: x — от якоря окна, y — от верха строки.
+table_geometry:
+  col_seps: [117, 417, 648, 778, 967]
+  row_y0: 263
+  row_pitch: 56
+  max_rows: 8
+  columns:
+    item: {zone: [161, 10, 256, 38], grammar: text}
+    price: {zone: [437, 10, 181, 38], grammar: price}
+    seller: {zone: [655, 10, 118, 38], grammar: text}
+    deal: {zone: [790, 10, 140, 38], grammar: text}

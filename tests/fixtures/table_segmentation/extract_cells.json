@@ -1,0 +1,542 @@
+[
+ {
+  "key": "24450f9be728705db3367ea7efaa4daa2f9376f4",
+  "col": "type",
+  "row": -1,
+  "rect": [
+   21,
+   251,
+   79,
+   269
+  ],
+  "pixel_key": "8cac5ec482982e7c2759e0f16efbb437f327e88f",
+  "image": "cell_000",
+  "shape": [
+   18,
+   58,
+   3
+  ]
+ },
+ {
+  "key": "f19ad8228f5a7658dcd59774d4f1e6de9ea0a62f",
+  "col": "name",
+  "row": -1,
+  "rect": [
+   126,
+   251,
+   541,
+   269
+  ],
+  "pixel_key": "ab074cb47ef9bb1dedb93c3cb4a67d5c0dedbf06",
+  "image": "cell_001",
+  "shape": [
+   18,
+   415,
+   3
+  ]
+ },
+ {
+  "key": "f19ebc45b8e90f78076bb8ff9f5fca0724af862e",
+  "col": "price",
+  "row": -1,
+  "rect": [
+   563,
+   251,
+   743,
+   269
+  ],
+  "pixel_key": "2fcfc9e4c834e64c9cad8741511c4635dbcc7389",
+  "image": "cell_002",
+  "shape": [
+   18,
+   180,
+   3
+  ]
+ },
+ {
+  "key": "9442426796b4d4da04bf874de809a77ff8641901",
+  "col": "seller",
+  "row": -1,
+  "rect": [
+   771,
+   251,
+   919,
+   269
+  ],
+  "pixel_key": "64fa352505c0fb24e357ff4742da68d8866d029b",
+  "image": "cell_003",
+  "shape": [
+   18,
+   148,
+   3
+  ]
+ },
+ {
+  "key": "a52397375ad842ca6151fe2c00ebd3ffb4b407bd",
+  "col": "deal",
+  "row": -1,
+  "rect": [
+   919,
+   251,
+   942,
+   269
+  ],
+  "pixel_key": "90dd0615c2eed1746702baf778a6113e97b6ce77",
+  "image": "cell_004",
+  "shape": [
+   18,
+   23,
+   3
+  ]
+ },
+ {
+  "key": "70f89b372a967b1a44190ea382de2444e284c746",
+  "col": "type",
+  "row": 0,
+  "rect": [
+   21,
+   270,
+   79,
+   325
+  ],
+  "pixel_key": "6445fa0270da1ed7083ffc7e37106ca32afde449",
+  "image": "cell_005",
+  "shape": [
+   55,
+   58,
+   3
+  ]
+ },
+ {
+  "key": "2c70acf5c92bc2dc21cf39f4f6875e4198fdd6d7",
+  "col": "name",
+  "row": 0,
+  "rect": [
+   126,
+   270,
+   541,
+   325
+  ],
+  "pixel_key": "e077a3825cb0ae090e6da72c1d4f475d6acf565c",
+  "image": "cell_006",
+  "shape": [
+   55,
+   415,
+   3
+  ]
+ },
+ {
+  "key": "de88124f6b08a1720265fdfe25964c29c5463a6c",
+  "col": "price",
+  "row": 0,
+  "rect": [
+   563,
+   270,
+   743,
+   325
+  ],
+  "pixel_key": "852d008b39a727e422da86c0ec32e11c726da76f",
+  "image": "cell_007",
+  "shape": [
+   55,
+   180,
+   3
+  ]
+ },
+ {
+  "key": "6a730e99f29000d270786c29108daebfad77c904",
+  "col": "seller",
+  "row": 0,
+  "rect": [
+   771,
+   270,
+   919,
+   325
+  ],
+  "pixel_key": "c9a63409e4e3a963dc8918b768d2f4b21cad272c",
+  "image": "cell_008",
+  "shape": [
+   55,
+   148,
+   3
+  ]
+ },
+ {
+  "key": "1f8cff58aeda9df45a4f4532c810a4b7030a89c9",
+  "col": "deal",
+  "row": 0,
+  "rect": [
+   919,
+   270,
+   942,
+   325
+  ],
+  "pixel_key": "20888abe55aa6e4c67d5ab64439756ea230483ea",
+  "image": "cell_009",
+  "shape": [
+   55,
+   23,
+   3
+  ]
+ },
+ {
+  "key": "70f89b372a967b1a44190ea382de2444e284c746",
+  "col": "type",
+  "row": 1,
+  "rect": [
+   21,
+   326,
+   79,
+   381
+  ],
+  "pixel_key": "81861bfc4f3f124a33c103875220daf046e1971d",
+  "image": "cell_010",
+  "shape": [
+   55,
+   58,
+   3
+  ]
+ },
+ {
+  "key": "2c70acf5c92bc2dc21cf39f4f6875e4198fdd6d7",
+  "col": "name",
+  "row": 1,
+  "rect": [
+   126,
+   326,
+   541,
+   381
+  ],
+  "pixel_key": "e077a3825cb0ae090e6da72c1d4f475d6acf565c",
+  "image": "cell_011",
+  "shape": [
+   55,
+   415,
+   3
+  ]
+ },
+ {
+  "key": "de88124f6b08a1720265fdfe25964c29c5463a6c",
+  "col": "price",
+  "row": 1,
+  "rect": [
+   563,
+   326,
+   743,
+   381
+  ],
+  "pixel_key": "852d008b39a727e422da86c0ec32e11c726da76f",
+  "image": "cell_012",
+  "shape": [
+   55,
+   180,
+   3
+  ]
+ },
+ {
+  "key": "6a730e99f29000d270786c29108daebfad77c904",
+  "col": "seller",
+  "row": 1,
+  "rect": [
+   771,
+   326,
+   919,
+   381
+  ],
+  "pixel_key": "69e498e385df0bcea7a2df3621c942dcc466a0c4",
+  "image": "cell_013",
+  "shape": [
+   55,
+   148,
+   3
+  ]
+ },
+ {
+  "key": "1f8cff58aeda9df45a4f4532c810a4b7030a89c9",
+  "col": "deal",
+  "row": 1,
+  "rect": [
+   919,
+   326,
+   942,
+   381
+  ],
+  "pixel_key": "5503ef93086efb62ebba29e08e1bda5add9a8ba3",
+  "image": "cell_014",
+  "shape": [
+   55,
+   23,
+   3
+  ]
+ },
+ {
+  "key": "70f89b372a967b1a44190ea382de2444e284c746",
+  "col": "type",
+  "row": 2,
+  "rect": [
+   21,
+   382,
+   79,
+   437
+  ],
+  "pixel_key": "9f45384cf63029abbbba7875211555b2751e6177",
+  "image": "cell_015",
+  "shape": [
+   55,
+   58,
+   3
+  ]
+ },
+ {
+  "key": "2c70acf5c92bc2dc21cf39f4f6875e4198fdd6d7",
+  "col": "name",
+  "row": 2,
+  "rect": [
+   126,
+   382,
+   541,
+   437
+  ],
+  "pixel_key": "e077a3825cb0ae090e6da72c1d4f475d6acf565c",
+  "image": "cell_016",
+  "shape": [
+   55,
+   415,
+   3
+  ]
+ },
+ {
+  "key": "de88124f6b08a1720265fdfe25964c29c5463a6c",
+  "col": "price",
+  "row": 2,
+  "rect": [
+   563,
+   382,
+   743,
+   437
+  ],
+  "pixel_key": "852d008b39a727e422da86c0ec32e11c726da76f",
+  "image": "cell_017",
+  "shape": [
+   55,
+   180,
+   3
+  ]
+ },
+ {
+  "key": "6a730e99f29000d270786c29108daebfad77c904",
+  "col": "seller",
+  "row": 2,
+  "rect": [
+   771,
+   382,
+   919,
+   437
+  ],
+  "pixel_key": "64ca1106d74491591abba8f878db0521dc6e53b3",
+  "image": "cell_018",
+  "shape": [
+   55,
+   148,
+   3
+  ]
+ },
+ {
+  "key": "1f8cff58aeda9df45a4f4532c810a4b7030a89c9",
+  "col": "deal",
+  "row": 2,
+  "rect": [
+   919,
+   382,
+   942,
+   437
+  ],
+  "pixel_key": "c6a3184832e3bc318f48aa84cab729924656713c",
+  "image": "cell_019",
+  "shape": [
+   55,
+   23,
+   3
+  ]
+ },
+ {
+  "key": "70f89b372a967b1a44190ea382de2444e284c746",
+  "col": "type",
+  "row": 3,
+  "rect": [
+   21,
+   438,
+   79,
+   493
+  ],
+  "pixel_key": "058422cc02230f3dcb924052e77883aaa3815ece",
+  "image": "cell_020",
+  "shape": [
+   55,
+   58,
+   3
+  ]
+ },
+ {
+  "key": "2c70acf5c92bc2dc21cf39f4f6875e4198fdd6d7",
+  "col": "name",
+  "row": 3,
+  "rect": [
+   126,
+   438,
+   541,
+   493
+  ],
+  "pixel_key": "e077a3825cb0ae090e6da72c1d4f475d6acf565c",
+  "image": "cell_021",
+  "shape": [
+   55,
+   415,
+   3
+  ]
+ },
+ {
+  "key": "de88124f6b08a1720265fdfe25964c29c5463a6c",
+  "col": "price",
+  "row": 3,
+  "rect": [
+   563,
+   438,
+   743,
+   493
+  ],
+  "pixel_key": "852d008b39a727e422da86c0ec32e11c726da76f",
+  "image": "cell_022",
+  "shape": [
+   55,
+   180,
+   3
+  ]
+ },
+ {
+  "key": "6a730e99f29000d270786c29108daebfad77c904",
+  "col": "seller",
+  "row": 3,
+  "rect": [
+   771,
+   438,
+   919,
+   493
+  ],
+  "pixel_key": "d77746ab04e330e364aea8a84ee5f67e3340b0a6",
+  "image": "cell_023",
+  "shape": [
+   55,
+   148,
+   3
+  ]
+ },
+ {
+  "key": "1f8cff58aeda9df45a4f4532c810a4b7030a89c9",
+  "col": "deal",
+  "row": 3,
+  "rect": [
+   919,
+   438,
+   942,
+   493
+  ],
+  "pixel_key": "6385fc80c6dfe331739620d16f37ee69e41e9662",
+  "image": "cell_024",
+  "shape": [
+   55,
+   23,
+   3
+  ]
+ },
+ {
+  "key": "8b4d40902b77b5db4ea296e58a06a6201bcdeb41",
+  "col": "type",
+  "row": 4,
+  "rect": [
+   21,
+   494,
+   79,
+   505
+  ],
+  "pixel_key": "fdad2c665c14016d3c6904f34b7e3c72d7a75bee",
+  "image": "cell_025",
+  "shape": [
+   11,
+   58,
+   3
+  ]
+ },
+ {
+  "key": "2c70acf5c92bc2dc21cf39f4f6875e4198fdd6d7",
+  "col": "name",
+  "row": 4,
+  "rect": [
+   126,
+   494,
+   541,
+   549
+  ],
+  "pixel_key": "e077a3825cb0ae090e6da72c1d4f475d6acf565c",
+  "image": "cell_026",
+  "shape": [
+   55,
+   415,
+   3
+  ]
+ },
+ {
+  "key": "de88124f6b08a1720265fdfe25964c29c5463a6c",
+  "col": "price",
+  "row": 4,
+  "rect": [
+   563,
+   494,
+   743,
+   549
+  ],
+  "pixel_key": "852d008b39a727e422da86c0ec32e11c726da76f",
+  "image": "cell_027",
+  "shape": [
+   55,
+   180,
+   3
+  ]
+ },
+ {
+  "key": "e3afb77a8bd073637022d61d65c232d96afe14f7",
+  "col": "seller",
+  "row": 4,
+  "rect": [
+   771,
+   494,
+   919,
+   505
+  ],
+  "pixel_key": "0c890523d335f926da97c723cc993eed6bd9f3b0",
+  "image": "cell_028",
+  "shape": [
+   11,
+   148,
+   3
+  ]
+ },
+ {
+  "key": "b9cabc9aebd66653fc0c340b92cb899039a68612",
+  "col": "deal",
+  "row": 4,
+  "rect": [
+   919,
+   494,
+   942,
+   505
+  ],
+  "pixel_key": "41493cf1041cd1f0d93bcd761b55d4ca14531c98",
+  "image": "cell_029",
+  "shape": [
+   11,
+   23,
+   3
+  ]
+ }
+]

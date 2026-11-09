@@ -1,0 +1,426 @@
+"""Схема конфигурации ядра и типизированный загрузчик.
+
+Единственная точка, через которое ядро получает тайминги, пороги OCR,
+поведенческий профиль, пути и настройки kill switch.
+
+Структура зеркалит config.yaml (см. design.md, решение 20):
+- timing — тайминги/таймауты для wait_until и повторов действий;
+- ocr — порог confidence и число перечитываний;
+- behavior — поведенческий профиль (доли способов ввода, джиттеры,
+  человеческие тайминги HID);
+- paths — пути (чекпоинт CRNN, порт arduino);
+- kill_switch — хоткей, глобальный таймаут неактивности и безопасная
+  точка курсора;
+- resolution — референсное разрешение клиентской области;
+- window — критерии поиска окна игры (заголовок/класс, задача 3.2);
+- log — JSONL-лог действий (log_dir, лимиты ротации, политика ключевых
+  кадров, задача 8.3);
+- dry_run — режим без HID (действия только логируются).
+
+Частичный YAML накладывается поверх дефолтов (dataclass-поля);
+неизвестные ключи и значения вне диапазонов отклоняются с ConfigError.
+"""
+
+from dataclasses import dataclass, field, fields
+from pathlib import Path
+from typing import Any, Callable, Optional
+
+import yaml
+
+
+class ConfigError(Exception):
+    """Некорректный config.yaml: валидация или структура."""
+
+
+# --- Секции конфигурации (значения по умолчанию — зеркало config.yaml) ---
+
+
+@dataclass(frozen=True)
+class TimingConfig:
+    """Тайминги/таймауты (секунды, если не сказано иное)."""
+
+    wait_default_timeout: float = 10.0  # таймаут wait_until по умолчанию
+    verify_interval: float = 0.2  # интервал опроса predicate в wait_until
+    hover_pause: float = 0.4  # пауза после hover до verify (тултип/подсветка)
+    click_retry_count: int = 2  # число повторов действия при неподтверждении
+    poll_interval: float = 1.0  # пауза между циклами state observer (7.2)
+
+
+@dataclass(frozen=True)
+class OcrConfig:
+    confidence_threshold: float = 0.85  # порог confidence OCR, [0, 1]
+    reread_count: int = 2  # число перечитываний при низком conf/несовпадении
+
+
+@dataclass(frozen=True)
+class BehaviorConfig:
+    """Поведенческий профиль (антидетект): распределения и человеческие тайминги."""
+
+    numpad_fraction: float = 0.5  # доля ввода цены экранным нумпадом, [0, 1]
+    enter_fraction: float = 0.5  # доля Enter против кнопки «Поиск», [0, 1]
+    click_jitter_px: int = 3  # джиттер точки клика, пиксели
+    move_jitter_px: int = 8  # джиттер траектории движения курсора, пиксели
+    press_delay_min_ms: int = 40  # задержка нажатия кнопки мыши, мин
+    press_delay_max_ms: int = 120  # ... макс
+    key_delay_min_ms: int = 60  # пауза между клавишами, мин
+    key_delay_max_ms: int = 180  # ... макс
+    move_step_delay_min_ms: int = 8  # пауза между шагами траектории drag, мин
+    move_step_delay_max_ms: int = 24  # ... макс
+    drag_midpoints_min: int = 1  # промежуточные точки траектории drag, мин
+    drag_midpoints_max: int = 3  # ... макс
+
+
+@dataclass(frozen=True)
+class PathsConfig:
+    model: str = "crnn_best.pt"  # чекпоинт CRNN (файл вне git)
+    arduino_port: str = "COM3"  # порт HID-адаптера arduino
+
+
+@dataclass(frozen=True)
+class LogPolicy:
+    """Политика ключевых кадров JSONL-лога действий (задача 8.3): для каких
+    записей сохраняются PNG-снимки (спека replay-logging — «только ключевые
+    кадры»; обычные успешные записи идут без кадров)."""
+
+    all_failures: bool = True   # кадры для всех не-OK исходов (FAILED/UNKNOWN)
+    irreversible: bool = True   # кадры для необратимых действий (start_sell)
+
+
+@dataclass(frozen=True)
+class LogConfig:
+    """JSONL-лог действий (задача 8.3): log_dir, лимиты ротации, политика.
+
+    Файлы log_dir/actions-NNNN.jsonl + log_dir/frames/*.png (снимки по хэшу
+    содержимого). Ротация: текущий файл превысил max_bytes → следующий
+    записи идут в новый файл; файлов старше keep_files не хранится
+    (ключевые записи старших файлов мигрируют в новейший)."""
+
+    enabled: bool = True              # логирование действий (create_api)
+    dir: str = "logs/actions"         # log_dir
+    max_bytes: int = 20_000_000       # ротация текущего jsonl при превышении
+    keep_files: int = 5               # хранить столько файлов лога
+    policy: LogPolicy = field(default_factory=LogPolicy)
+
+
+@dataclass(frozen=True)
+class KillSwitchConfig:
+    hotkey: str = "ctrl+shift+k"  # локальный хоткей мгновенной остановки
+    inactivity_timeout: float = 300.0  # глобальный таймаут неактивности, сек
+    safe_point: tuple[int, int] | None = (8, 8)  # безопасная точка курсора
+    # (x, y) при kill (угол экрана — вне клиентской области игры);
+    # None — курсор не уводится
+
+
+@dataclass(frozen=True)
+class ResolutionConfig:
+    width: int = 1920  # референсное разрешение клиентской области
+    height: int = 1080
+
+
+@dataclass(frozen=True)
+class WindowConfig:
+    """Критерии поиска окна игры (задача 3.2)."""
+
+    title: str = "Lineage II"  # точный заголовок окна игры (уточняется у владельца)
+    class_name: str | None = None  # опциональный класс окна для фильтрации
+
+
+@dataclass(frozen=True)
+class CoreConfig:
+    """Корневой конфиг ядра."""
+
+    timing: TimingConfig = field(default_factory=TimingConfig)
+    ocr: OcrConfig = field(default_factory=OcrConfig)
+    behavior: BehaviorConfig = field(default_factory=BehaviorConfig)
+    paths: PathsConfig = field(default_factory=PathsConfig)
+    kill_switch: KillSwitchConfig = field(default_factory=KillSwitchConfig)
+    resolution: ResolutionConfig = field(default_factory=ResolutionConfig)
+    window: WindowConfig = field(default_factory=WindowConfig)
+    log: LogConfig = field(default_factory=LogConfig)
+    dry_run: bool = False  # действия только логируются, без HID
+
+
+# --- Вспомогательные проверки значений ---
+
+
+def _fail(key: str, value: Any, why: str) -> ConfigError:
+    return ConfigError(f"{key}: {why} (получено {value!r})")
+
+
+def _as_number(key: str, value: Any) -> float:
+    """Число из YAML; bool и не-числа отклоняются."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise _fail(key, value, "ожидается число")
+    return float(value)
+
+
+def _positive_float(key: str, value: Any) -> float:
+    number = _as_number(key, value)
+    if number <= 0:
+        raise _fail(key, value, "ожидается положительное число")
+    return number
+
+
+def _nonnegative_int(key: str, value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise _fail(key, value, "ожидается целое число >= 0")
+    return value
+
+
+def _positive_int(key: str, value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise _fail(key, value, "ожидается целое число > 0")
+    return value
+
+
+def _fraction(key: str, value: Any) -> float:
+    number = _as_number(key, value)
+    if not 0.0 <= number <= 1.0:
+        raise _fail(key, value, "ожидается число в [0, 1]")
+    return number
+
+
+def _nonempty_str(key: str, value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise _fail(key, value, "ожидается непустая строка")
+    return value
+
+
+def _bool(key: str, value: Any) -> bool:
+    if not isinstance(value, bool):
+        raise _fail(key, value, "ожидается true/false")
+    return value
+
+
+def _optional_point(key: str, value: Any) -> tuple[int, int] | None:
+    """Пара неотрицательных целых [x, y] (безопасная точка курсора);
+    None — точка не задана (курсор при kill не уводится)."""
+    if value is None:
+        return None
+    if (not isinstance(value, (list, tuple)) or len(value) != 2
+            or any(isinstance(v, bool) or not isinstance(v, int) or v < 0
+                   for v in value)):
+        raise _fail(key, value, "ожидается пара неотрицательных целых [x, y]")
+    return (int(value[0]), int(value[1]))
+
+
+# --- Загрузка и валидация ---
+
+Validator = Callable[[str, Any], Any]
+
+_SECTION_FIELDS = {
+    name: frozenset(cls.__dataclass_fields__)
+    for name, cls in (
+        ("timing", TimingConfig),
+        ("ocr", OcrConfig),
+        ("behavior", BehaviorConfig),
+        ("paths", PathsConfig),
+        ("kill_switch", KillSwitchConfig),
+        ("resolution", ResolutionConfig),
+        ("window", WindowConfig),
+    )
+}
+
+
+def _section(raw: Any, name: str) -> dict[str, Any]:
+    """Секция как dict; неизвестные ключи внутри секции отклоняются."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise _fail(name, raw, "ожидается mapping ключ: значение")
+    unknown = set(raw) - _SECTION_FIELDS[name]
+    if unknown:
+        raise ConfigError(f"{name}: неизвестные ключи {sorted(unknown)}")
+    return dict(raw)
+
+
+def _build_section(
+    name: str, cls: type, raw: dict[str, Any], validators: dict[str, Validator]
+) -> Any:
+    """Собрать секцию: дефолты из полей dataclass, заданные в YAML — валидируются."""
+    defaults = cls()
+    kwargs = {}
+    for f in fields(cls):
+        if f.name in raw:
+            kwargs[f.name] = validators[f.name](f"{name}.{f.name}", raw[f.name])
+        else:
+            kwargs[f.name] = getattr(defaults, f.name)
+    return cls(**kwargs)
+
+
+def _check_min_max(cfg: BehaviorConfig) -> None:
+    """Пары min/max человеческих таймингов и траектории: min не больше max."""
+    for lo, hi in (
+        ("press_delay", "нажатия"),
+        ("key_delay", "между клавишами"),
+        ("move_step_delay", "между шагами траектории"),
+    ):
+        low = getattr(cfg, f"{lo}_min_ms")
+        high = getattr(cfg, f"{lo}_max_ms")
+        if low > high:
+            raise _fail(
+                f"behavior.{lo}_max_ms",
+                high,
+                f"не меньше behavior.{lo}_min_ms ({low}, задержка {hi})",
+            )
+    if cfg.drag_midpoints_min > cfg.drag_midpoints_max:
+        raise _fail(
+            "behavior.drag_midpoints_max",
+            cfg.drag_midpoints_max,
+            "не меньше behavior.drag_midpoints_min "
+            f"({cfg.drag_midpoints_min}, число промежуточных точек)",
+        )
+
+
+def _build_paths(raw: dict[str, Any]) -> PathsConfig:
+    # Секция не задана — дефолты. Задана — перекрывается целиком: пропуск
+    # пути в ней ошибка, а не тихий дефолт; заданные значения валидируются
+    # раньше проверки обязательности (пустой model важнее незаданного порта).
+    if not raw:
+        return PathsConfig()
+    values = {
+        key: _nonempty_str(f"paths.{key}", value) for key, value in raw.items()
+    }
+    for key in ("model", "arduino_port"):
+        if key not in values:
+            raise ConfigError(f"paths.{key}: обязательный параметр не задан")
+    return PathsConfig(**values)
+
+
+def _build_log(raw: Optional[dict[str, Any]]) -> LogConfig:
+    """Секция log (8.3): вложенная policy — своя сборка, как у paths."""
+    if raw is None:
+        return LogConfig()
+    if not isinstance(raw, dict):
+        raise _fail("log", raw, "ожидается mapping ключ: значение")
+    if not raw:
+        return LogConfig()
+    unknown = set(raw) - {"enabled", "dir", "max_bytes", "keep_files",
+                          "policy"}
+    if unknown:
+        raise ConfigError(f"log: неизвестные ключи {sorted(unknown)}")
+    policy_raw = raw.get("policy")
+    if policy_raw is None:
+        policy = LogPolicy()
+    else:
+        if not isinstance(policy_raw, dict):
+            raise _fail("log.policy", policy_raw,
+                        "ожидается mapping ключ: значение")
+        unknown_policy = set(policy_raw) - {"all_failures", "irreversible"}
+        if unknown_policy:
+            raise ConfigError(
+                f"log.policy: неизвестные ключи {sorted(unknown_policy)}")
+        policy = LogPolicy(
+            all_failures=_bool("log.policy.all_failures",
+                               policy_raw.get("all_failures", True)),
+            irreversible=_bool("log.policy.irreversible",
+                               policy_raw.get("irreversible", True)))
+    return LogConfig(
+        enabled=_bool("log.enabled", raw.get("enabled", True)),
+        dir=_nonempty_str("log.dir", raw.get("dir", "logs/actions")),
+        max_bytes=_positive_int("log.max_bytes",
+                                raw.get("max_bytes", 20_000_000)),
+        keep_files=_positive_int("log.keep_files",
+                                 raw.get("keep_files", 5)),
+        policy=policy)
+
+
+def load_config(path: str | Path | None = None) -> CoreConfig:
+    """Загрузить конфиг.
+
+    path=None — дефолты без файла. Иначе читается YAML; неизвестные ключи,
+    неверные типы и значения вне диапазонов → ConfigError. Отсутствующий
+    файл → FileNotFoundError.
+    """
+    if path is None:
+        return CoreConfig()
+
+    with open(path, "r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+
+    if data is None:
+        return CoreConfig()
+    if not isinstance(data, dict):
+        raise _fail("config.yaml", data, "ожидается mapping секций")
+
+    unknown_top = set(data) - (set(_SECTION_FIELDS) | {"dry_run", "log"})
+    if unknown_top:
+        raise ConfigError(f"config.yaml: неизвестные секции {sorted(unknown_top)}")
+
+    timing = _build_section(
+        "timing",
+        TimingConfig,
+        _section(data.get("timing"), "timing"),
+        {
+            "wait_default_timeout": _positive_float,
+            "verify_interval": _positive_float,
+            "hover_pause": _positive_float,
+            "poll_interval": _positive_float,
+            "click_retry_count": _nonnegative_int,
+        },
+    )
+    ocr = _build_section(
+        "ocr",
+        OcrConfig,
+        _section(data.get("ocr"), "ocr"),
+        {"confidence_threshold": _fraction, "reread_count": _nonnegative_int},
+    )
+    behavior = _build_section(
+        "behavior",
+        BehaviorConfig,
+        _section(data.get("behavior"), "behavior"),
+        {
+            "numpad_fraction": _fraction,
+            "enter_fraction": _fraction,
+            "click_jitter_px": _nonnegative_int,
+            "move_jitter_px": _nonnegative_int,
+            "press_delay_min_ms": _nonnegative_int,
+            "press_delay_max_ms": _nonnegative_int,
+            "key_delay_min_ms": _nonnegative_int,
+            "key_delay_max_ms": _nonnegative_int,
+            "move_step_delay_min_ms": _nonnegative_int,
+            "move_step_delay_max_ms": _nonnegative_int,
+            "drag_midpoints_min": _nonnegative_int,
+            "drag_midpoints_max": _nonnegative_int,
+        },
+    )
+    _check_min_max(behavior)
+    kill_switch = _build_section(
+        "kill_switch",
+        KillSwitchConfig,
+        _section(data.get("kill_switch"), "kill_switch"),
+        {"hotkey": _nonempty_str, "inactivity_timeout": _positive_float,
+         "safe_point": _optional_point},
+    )
+    resolution = _build_section(
+        "resolution",
+        ResolutionConfig,
+        _section(data.get("resolution"), "resolution"),
+        {"width": _positive_int, "height": _positive_int},
+    )
+    window = _build_section(
+        "window",
+        WindowConfig,
+        _section(data.get("window"), "window"),
+        {
+            "title": _nonempty_str,
+            "class_name": lambda key, value: None
+            if value is None
+            else _nonempty_str(key, value),
+        },
+    )
+    dry_run = data.get("dry_run", False)
+    if not isinstance(dry_run, bool):
+        raise _fail("dry_run", dry_run, "ожидается true/false")
+
+    return CoreConfig(
+        timing=timing,
+        ocr=ocr,
+        behavior=behavior,
+        paths=_build_paths(_section(data.get("paths"), "paths")),
+        kill_switch=kill_switch,
+        resolution=resolution,
+        window=window,
+        log=_build_log(data.get("log")),
+        dry_run=dry_run,
+    )
