@@ -52,6 +52,15 @@ search_region (ocr_regions обзора не размечены — 6.1); setup_
 price_region и drag_verify (6.2); read_shop_state требует регион показателей
 (6.3). Всё это — ApiError (fail fast: клики/ввод без verify запрещены,
 инвариант 2), не молчаливый пропуск.
+
+JSONL-ЛОГ ДЕЙСТВИЙ (8.3, spec replay-logging): каждый действие-метод
+(навигация, табы/фильтры, поиск, скролл, setup_sell/start_sell/cancel_sell,
+recover — НЕ чтение: read_rows/read_shop_state/get_state/health) обёрнут
+_log_action: при wiring.action_logger запись с действием, verify-результатом
+и кадрами до/после (граница вызова API, не отдельной HID-команды — отчёт
+8.3). Кадры сохраняются только для ключевых записей: не-OK исходов и
+необратимых (start_sell) — политика log.policy; ротация и лимиты — в
+ActionLogger (l2core/api/actionlog.py).
 """
 from __future__ import annotations
 
@@ -350,6 +359,38 @@ class L2CoreAPI:
             free_area_point=w.free_area_point, cancelled=cancelled,
             rng=w.rng, clock=w.clock, sleep=w.sleep)
 
+    def _log_action(self, kind: str, call: Callable, *,
+                    target: Optional[str] = None,
+                    args: Optional[dict] = None,
+                    irreversible: bool = False):
+        """Обёртка записи действия в JSONL-лог (8.3, wiring.action_logger).
+
+        Кадры до/после — на границе ВЫЗОВА API: «до» = кадр на входе,
+        «после» = кадр на выходе (метод API = одно действие ядра с одним
+        verify-итогом; кадры вокруг отдельной HID-команды — граница, см.
+        отчёт 8.3). Logger None — вызов без изменений. Запись идёт после
+        исполнения: fail-fast ошибки контракта (ApiError до действия) в
+        журнал не пишутся — это не действия. Поля результата собираются
+        через getattr: результаты примитивов/сценариев 5.x/6.x разные,
+        общие — success/cancelled.
+        """
+        alog = self._w.action_logger
+        if alog is None:
+            return call()
+        before = np.asarray(self._w.screen.grab())
+        result = call()
+        after = np.asarray(self._w.screen.grab())
+        alog.record(
+            {"type": kind, "target": target, "args": args or {}},
+            success=result.success,
+            outcome=getattr(result, "outcome", None),
+            unconfirmed=getattr(result, "unconfirmed", False),
+            cancelled=result.cancelled,
+            failures=tuple(getattr(result, "failures", ()) or ()),
+            attempts=getattr(result, "attempts", None),
+            irreversible=irreversible, before=before, after=after)
+        return result
+
     # ------------------------------------------------------------------
     # Навигация
 
@@ -437,12 +478,18 @@ class L2CoreAPI:
         как открытие в 6.1). По таймауту — FAILED/UNKNOWN."""
         self._check_thread()
         c = self._cancelled(cancelled)
-        if c is not None and c():
-            return NavigationResult(success=False, outcome=None,
-                                    cancelled=True)
-        transition = _resolve_transition(self._w.market, "market_pic")
-        verify = VerifySpec.from_transition(transition)
-        return self._open_via_hud("market_pic", "market", verify, c)
+
+        def _call() -> NavigationResult:
+            if c is not None and c():
+                return NavigationResult(success=False, outcome=None,
+                                        cancelled=True)
+            transition = _resolve_transition(self._w.market, "market_pic")
+            verify = VerifySpec.from_transition(transition)
+            return self._open_via_hud("market_pic", "market", verify, c)
+
+        return self._log_action(
+            "open_market", _call,
+            target="market", args={"element": "market_pic"})
 
     def close_market(self, *, cancelled: Optional[Callable[[], bool]] = None
                      ) -> NavigationResult:
@@ -452,12 +499,14 @@ class L2CoreAPI:
         c = self._cancelled(cancelled)
         transition = _resolve_transition(self._w.market,
                                          "main_market_close_button")
-        clicked = click_element(
-            "main_market_close_button",
-            verify=VerifySpec.from_transition(transition),
-            on_fail=transition.on_fail,
-            **self._click_bundle(self._w.market, "market", c))
-        return _navigation(clicked)
+        return self._log_action(
+            "close_market",
+            lambda: _navigation(click_element(
+                "main_market_close_button",
+                verify=VerifySpec.from_transition(transition),
+                on_fail=transition.on_fail,
+                **self._click_bundle(self._w.market, "market", c))),
+            target="market", args={"element": "main_market_close_button"})
 
     def open_shop_buy(self, *, verify: Optional[VerifySpec] = None,
                       cancelled: Optional[Callable[[], bool]] = None
@@ -469,11 +518,18 @@ class L2CoreAPI:
         """
         self._check_thread()
         c = self._cancelled(cancelled)
-        if c is not None and c():
-            return NavigationResult(success=False, outcome=None,
-                                    cancelled=True)
-        return self._open_via_hud(
-            "open_buy_trade", "shop_buy", _require_verify(verify, "open_shop_buy"), c)
+
+        def _call() -> NavigationResult:
+            if c is not None and c():
+                return NavigationResult(success=False, outcome=None,
+                                        cancelled=True)
+            return self._open_via_hud(
+                "open_buy_trade", "shop_buy",
+                _require_verify(verify, "open_shop_buy"), c)
+
+        return self._log_action(
+            "open_shop_buy", _call,
+            target="shop_buy", args={"element": "open_buy_trade"})
 
     def open_shop_sell(self, *, verify: Optional[VerifySpec] = None,
                        cancelled: Optional[Callable[[], bool]] = None
@@ -482,12 +538,18 @@ class L2CoreAPI:
         (verify обязателен — см. open_shop_buy)."""
         self._check_thread()
         c = self._cancelled(cancelled)
-        if c is not None and c():
-            return NavigationResult(success=False, outcome=None,
-                                    cancelled=True)
-        return self._open_via_hud(
-            "open_sale_trade", "shop_sell",
-            _require_verify(verify, "open_shop_sell"), c)
+
+        def _call() -> NavigationResult:
+            if c is not None and c():
+                return NavigationResult(success=False, outcome=None,
+                                        cancelled=True)
+            return self._open_via_hud(
+                "open_sale_trade", "shop_sell",
+                _require_verify(verify, "open_shop_sell"), c)
+
+        return self._log_action(
+            "open_shop_sell", _call,
+            target="shop_sell", args={"element": "open_sale_trade"})
 
     # ------------------------------------------------------------------
     # Управление обзором
@@ -517,10 +579,12 @@ class L2CoreAPI:
             verify = VerifySpec.from_transition(transition)
         if transition is not None:
             on_fail = on_fail or transition.on_fail
-        clicked = click_element(
-            element_id, verify=verify, on_fail=on_fail, variant=variant,
-            **self._click_bundle(model, "market", c))
-        return _navigation(clicked)
+        return self._log_action(
+            "set_tab",
+            lambda: _navigation(click_element(
+                element_id, verify=verify, on_fail=on_fail, variant=variant,
+                **self._click_bundle(model, "market", c))),
+            target="market", args={"element": element_id, "variant": variant})
 
     def set_filter(self, element_id: str, *,
                    verify: Optional[VerifySpec] = None,
@@ -545,10 +609,13 @@ class L2CoreAPI:
             verify = VerifySpec.from_transition(transition)
         if transition is not None:
             on_fail = on_fail or transition.on_fail
-        clicked = click_element(
-            element_id, verify=verify, on_fail=on_fail, variant=variant,
-            **self._click_bundle(model, "market", c))
-        return _navigation(clicked)
+        return self._log_action(
+            "set_filter",
+            lambda: _navigation(click_element(
+                element_id, verify=verify, on_fail=on_fail, variant=variant,
+                **self._click_bundle(model, "market", c))),
+            target="market",
+            args={"element": element_id, "variant": variant})
 
     def search(self, text: str, *,
                submit: bool = True,
@@ -568,11 +635,14 @@ class L2CoreAPI:
         model = dataclasses.replace(
             w.market, ocr_regions={**w.market.ocr_regions,
                                    SEARCH_REGION_ID: w.search_region})
-        return enter_text(
-            text, model=model, region_id=SEARCH_REGION_ID, ocr=w.ocr,
-            field_element_id=field_element_id,
-            search_button_id=search_button_id, submit=submit,
-            **self._enter_bundle("market", c))
+        return self._log_action(
+            "search",
+            lambda: enter_text(
+                text, model=model, region_id=SEARCH_REGION_ID, ocr=w.ocr,
+                field_element_id=field_element_id,
+                search_button_id=search_button_id, submit=submit,
+                **self._enter_bundle("market", c)),
+            target="market", args={"text": text, "submit": submit})
 
     def scroll_list(self, direction: str = DIR_DOWN, n: int = 1, *,
                     on_fail: Tuple[str, ...] = (),
@@ -582,15 +652,18 @@ class L2CoreAPI:
         self._check_thread()
         c = self._cancelled(cancelled)
         w = self._w
-        return scroll_list(
-            direction, n, model=w.market, screen=w.screen, hid=w.hid,
-            cursor_pos=w.cursor_pos, activate=w.activate,
-            window_status=lambda frame: w.window_status(frame, "market"),
-            find_anchor=lambda frame: w.find_anchor(frame, "market"),
-            run_checks=w.run_checks, config=w.config,
-            segmentation=w.segmentation, on_fail=on_fail,
-            free_area_point=w.free_area_point, cancelled=c,
-            rng=w.rng, clock=w.clock, sleep=w.sleep)
+        return self._log_action(
+            "scroll_list",
+            lambda: scroll_list(
+                direction, n, model=w.market, screen=w.screen, hid=w.hid,
+                cursor_pos=w.cursor_pos, activate=w.activate,
+                window_status=lambda frame: w.window_status(frame, "market"),
+                find_anchor=lambda frame: w.find_anchor(frame, "market"),
+                run_checks=w.run_checks, config=w.config,
+                segmentation=w.segmentation, on_fail=on_fail,
+                free_area_point=w.free_area_point, cancelled=c,
+                rng=w.rng, clock=w.clock, sleep=w.sleep),
+            target="market", args={"direction": direction, "n": n})
 
     # ------------------------------------------------------------------
     # Чтение
@@ -769,20 +842,26 @@ class L2CoreAPI:
                 "setup_sell: OCR-регион поля цены не задан (параметр "
                 "price_region / wiring.price_region; в модели лавки не "
                 "размечен — KNOWN_GAPS): ввод цены без OCR-verify запрещён")
-        return setup_sell(
-            items, model=w.shop_sell, ocr=w.ocr, screen=w.screen, hid=w.hid,
-            cursor_pos=w.cursor_pos, activate=w.activate,
-            window_status=lambda frame: w.window_status(frame, "shop_sell"),
-            find_anchor=lambda frame: w.find_anchor(frame, "shop_sell"),
-            run_checks=w.run_checks, config=w.config, grid=grid,
-            hud_model=w.hud_model, hud_locator=w.hud_locator,
-            open_element=open_element, open_verify=open_verify,
-            source_locator=source_locator, price_region=region,
-            price_field_element=price_field_element,
-            price_submit=price_submit, drag_verify=drag_verify,
-            final_verify=final_verify, on_fail=on_fail,
-            free_area_point=w.free_area_point, cancelled=c,
-            rng=w.rng, clock=w.clock, sleep=w.sleep)
+        return self._log_action(
+            "setup_sell",
+            lambda: setup_sell(
+                items, model=w.shop_sell, ocr=w.ocr, screen=w.screen,
+                hid=w.hid,
+                cursor_pos=w.cursor_pos, activate=w.activate,
+                window_status=lambda frame: w.window_status(frame, "shop_sell"),
+                find_anchor=lambda frame: w.find_anchor(frame, "shop_sell"),
+                run_checks=w.run_checks, config=w.config, grid=grid,
+                hud_model=w.hud_model, hud_locator=w.hud_locator,
+                open_element=open_element, open_verify=open_verify,
+                source_locator=source_locator, price_region=region,
+                price_field_element=price_field_element,
+                price_submit=price_submit, drag_verify=drag_verify,
+                final_verify=final_verify, on_fail=on_fail,
+                free_area_point=w.free_area_point, cancelled=c,
+                rng=w.rng, clock=w.clock, sleep=w.sleep),
+            target="shop_sell",
+            args={"items": [{"slot": it.slot, "price": it.price}
+                            for it in items]})
 
     def start_sell(self, *,
                    confirm_checks: VerifySpec,
@@ -799,17 +878,21 @@ class L2CoreAPI:
         self._check_thread()
         c = self._cancelled(cancelled)
         w = self._w
-        return start_sell(
-            model=w.shop_sell, screen=w.screen, hid=w.hid,
-            cursor_pos=w.cursor_pos, activate=w.activate,
-            window_status=lambda frame: w.window_status(frame, "shop_sell"),
-            find_anchor=lambda frame: w.find_anchor(frame, "shop_sell"),
-            run_checks=w.run_checks, config=w.config,
-            confirm_checks=confirm_checks, verify=verify,
-            element_id=element_id, guard=w.guard, action_id=action_id,
-            hud_locator=w.hud_locator, on_fail=on_fail,
-            free_area_point=w.free_area_point, cancelled=c,
-            rng=w.rng, clock=w.clock, sleep=w.sleep)
+        return self._log_action(
+            "start_sell",
+            lambda: start_sell(
+                model=w.shop_sell, screen=w.screen, hid=w.hid,
+                cursor_pos=w.cursor_pos, activate=w.activate,
+                window_status=lambda frame: w.window_status(frame, "shop_sell"),
+                find_anchor=lambda frame: w.find_anchor(frame, "shop_sell"),
+                run_checks=w.run_checks, config=w.config,
+                confirm_checks=confirm_checks, verify=verify,
+                element_id=element_id, guard=w.guard, action_id=action_id,
+                hud_locator=w.hud_locator, on_fail=on_fail,
+                free_area_point=w.free_area_point, cancelled=c,
+                rng=w.rng, clock=w.clock, sleep=w.sleep),
+            target="shop_sell", irreversible=True,
+            args={"element": element_id})
 
     def cancel_sell(self, *,
                     verify: VerifySpec,
@@ -822,15 +905,19 @@ class L2CoreAPI:
         self._check_thread()
         c = self._cancelled(cancelled)
         w = self._w
-        return cancel_sell(
-            model=w.shop_sell, screen=w.screen, hid=w.hid,
-            cursor_pos=w.cursor_pos, activate=w.activate,
-            window_status=lambda frame: w.window_status(frame, "shop_sell"),
-            find_anchor=lambda frame: w.find_anchor(frame, "shop_sell"),
-            run_checks=w.run_checks, config=w.config, verify=verify,
-            element_id=element_id, on_fail=on_fail,
-            free_area_point=w.free_area_point, cancelled=c,
-            rng=w.rng, clock=w.clock, sleep=w.sleep)
+        return self._log_action(
+            "cancel_sell",
+            lambda: cancel_sell(
+                model=w.shop_sell, screen=w.screen, hid=w.hid,
+                cursor_pos=w.cursor_pos, activate=w.activate,
+                window_status=lambda frame: w.window_status(frame, "shop_sell"),
+                find_anchor=lambda frame: w.find_anchor(frame, "shop_sell"),
+                run_checks=w.run_checks, config=w.config, verify=verify,
+                element_id=element_id, on_fail=on_fail,
+                free_area_point=w.free_area_point, cancelled=c,
+                rng=w.rng, clock=w.clock, sleep=w.sleep),
+            target="shop_sell",
+            args={"element": element_id})
 
     # ------------------------------------------------------------------
     # Сервисные
@@ -853,35 +940,40 @@ class L2CoreAPI:
         self._check_thread()
         c = self._cancelled(cancelled)
         w = self._w
-        result = scenario_recover(
-            cause, target,
-            hud_model=w.hud_model, hud_element=hud_element,
-            screen=w.screen, hid=w.hid, cursor_pos=w.cursor_pos,
-            activate=w.activate,
-            window_status=lambda frame: w.window_status(frame, target),
-            find_anchor=lambda frame: w.find_anchor(frame, target),
-            goal_reached=w.goal_reached(target), config=w.config,
-            current_window=w.current_window, close_point=w.close_point,
-            hud_locator=w.hud_locator,
-            on_escalation=on_escalation or w.on_escalation,
-            resume=resume, pause_timeout=pause_timeout,
-            free_area_point=w.free_area_point, cancelled=c,
-            rng=w.rng, clock=w.clock, sleep=w.sleep)
-        # События по итогу цепочки (spec core-api-events, журнал 7.3):
-        # успех — recovered, эскалация — escalation (payload — справочник
-        # docs/API.md); отмена — событий нет. Канал — единый: events.push
-        # -> EventQueue -> журнал + dispatcher.
-        if self._events is not None:
-            steps = tuple(step.name for step in result.steps)
-            if result.success:
-                self._events.push(EVENT_RECOVERED,
-                                  {"target": target, "steps": steps})
-            elif result.escalated:
-                self._events.push(EVENT_ESCALATION,
-                                  {"target": target,
-                                   "detail": result.escalation_detail,
-                                   "steps": steps})
-        return result
+
+        def _run() -> RecoverResult:
+            result = scenario_recover(
+                cause, target,
+                hud_model=w.hud_model, hud_element=hud_element,
+                screen=w.screen, hid=w.hid, cursor_pos=w.cursor_pos,
+                activate=w.activate,
+                window_status=lambda frame: w.window_status(frame, target),
+                find_anchor=lambda frame: w.find_anchor(frame, target),
+                goal_reached=w.goal_reached(target), config=w.config,
+                current_window=w.current_window, close_point=w.close_point,
+                hud_locator=w.hud_locator,
+                on_escalation=on_escalation or w.on_escalation,
+                resume=resume, pause_timeout=pause_timeout,
+                free_area_point=w.free_area_point, cancelled=c,
+                rng=w.rng, clock=w.clock, sleep=w.sleep)
+            # События по итогу цепочки (spec core-api-events, журнал 7.3):
+            # успех — recovered, эскалация — escalation (payload — справочник
+            # docs/API.md); отмена — событий нет. Канал — единый: events.push
+            # -> EventQueue -> журнал + dispatcher.
+            if self._events is not None:
+                steps = tuple(step.name for step in result.steps)
+                if result.success:
+                    self._events.push(EVENT_RECOVERED,
+                                      {"target": target, "steps": steps})
+                elif result.escalated:
+                    self._events.push(EVENT_ESCALATION,
+                                      {"target": target,
+                                       "detail": result.escalation_detail,
+                                       "steps": steps})
+            return result
+
+        return self._log_action("recover", _run, target=target,
+                                args={"hud_element": hud_element})
 
     def health(self) -> HealthResult:
         """Агрегат живости: окно игры (находилка 3.2), открытое окно

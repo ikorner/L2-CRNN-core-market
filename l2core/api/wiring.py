@@ -68,6 +68,7 @@ from l2core.detector.states import StateDetector, StateReport
 from l2core.detector.status import WindowStatus, WindowStatusDetector
 from l2core.model import ElementSpec, OcrRegionSpec, UiModel, load_model
 from l2core.adapters.table_segmentation import TableSegmentation
+from l2core.api.actionlog import ActionLogger
 from l2core.primitives.activate import ActivateResult, activate_game
 from l2core.primitives.click import CheckReport, CheckRunner, JitterRng
 from l2core.primitives.outcome import IrreversibleGuard
@@ -125,6 +126,7 @@ class ApiWiring:
     on_escalation: Optional[Callable[[RecoverResult], None]] = None
     cancelled: Optional[Callable[[], bool]] = None
     note_activity: Optional[Callable[[], None]] = None  # kill switch 8.1
+    action_logger: Optional[ActionLogger] = None  # JSONL-лог действий (8.3)
     rng: Optional[JitterRng] = None
     guard: IrreversibleGuard = field(default_factory=IrreversibleGuard)
     clock: Callable[[], float] = time.monotonic
@@ -174,6 +176,7 @@ def build_wiring(*, config: CoreConfig,
                  on_escalation: Optional[Callable[[RecoverResult], None]] = None,
                  cancelled: Optional[Callable[[], bool]] = None,
                  note_activity: Optional[Callable[[], None]] = None,
+                 action_logger: Optional[ActionLogger] = None,
                  rng: Optional[JitterRng] = None,
                  clock: Callable[[], float] = time.monotonic,
                  sleep: Callable[[float], None] = time.sleep,
@@ -298,6 +301,7 @@ def build_wiring(*, config: CoreConfig,
         shop_regions=shop_regions, segmentation=segmentation,
         free_area_point=free_area_point, on_escalation=on_escalation,
         cancelled=cancelled, note_activity=note_activity,
+        action_logger=action_logger,
         rng=rng, clock=clock, sleep=sleep,
         dry_run=config.dry_run if dry_run is None else dry_run)
 
@@ -313,6 +317,7 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
                owner_thread=None,
                cancelled: Optional[Callable[[], bool]] = None,
                note_activity: Optional[Callable[[], None]] = None,
+               action_logger: Optional[ActionLogger] = None,
                rng: Optional[JitterRng] = None,
                clock: Callable[[], float] = time.monotonic,
                sleep: Callable[[float], None] = time.sleep,
@@ -333,6 +338,12 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
     адаптера для тестов. Экран читается по-настоящему: verify работает
     на реальных кадрах, результаты примитивов честно уходят в
     FAILED/UNKNOWN (эффекта нет) — семантика для первых запусков.
+
+    JSONL-лог действий (8.3): при config.log.enabled (дефолт) поднимается
+    ActionLogger из config.log (dir/лимиты/политика; ts — от тех же часов
+    сборки); явный action_logger побеждает конфиг. Каждый действие-метод
+    фасада пишет запись (кадры до/после — только ключевые: не-OK и
+    необратимые) — l2core/api/actionlog.py.
     """
     if isinstance(config, (str, Path)):
         config = load_config(config)
@@ -350,6 +361,11 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
             hid = HidDevice(config.paths.arduino_port)
             hid.connect()   # порт + проверка прошивки (жизненный цикл — у фасада)
     ocr = ocr or create_ocr_client("torch", model_path=config.paths.model)
+    if action_logger is None and config.log.enabled:
+        action_logger = ActionLogger(
+            config.log.dir, max_bytes=config.log.max_bytes,
+            keep_files=config.log.keep_files, policy=config.log.policy,
+            clock=clock)
     finder = GameWindowFinder(
         gateway, title=config.window.title,
         class_name=config.window.class_name)
@@ -363,5 +379,6 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
         search_region=search_region, price_region=price_region,
         shop_regions=shop_regions, segmentation=segmentation,
         cancelled=cancelled, note_activity=note_activity,
+        action_logger=action_logger,
         rng=rng, clock=clock, sleep=sleep, dry_run=effective_dry_run)
     return L2CoreAPI(wiring, owner_thread=owner_thread)

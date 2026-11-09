@@ -46,4 +46,13 @@ window:
   title: Lineage II  # точный заголовок окна игры (подтвердить у владельца, Q18 docs/OWNER_QUESTIONS.md)
   class_name: null  # опциональный класс окна для фильтрации кандидатов
 
+log:  # JSONL-лог действий (8.3): кадры до/после, действие, verify-результат
+  enabled: true  # логирование действий (create_api поднимает ActionLogger)
+  dir: logs/actions  # log_dir: actions-NNNN.jsonl + frames/*.png
+  max_bytes: 20000000  # ротация текущего jsonl при превышении размера
+  keep_files: 5  # хранить столько файлов (старшие удаляются, ключевые записи мигрируют)
+  policy:
+    all_failures: true  # кадры для всех не-OK исходов (FAILED/UNKNOWN)
+    irreversible: true  # кадры для необратимых действий (start_sell)
+
 dry_run: false  # true: экран читается и состояние определяется, действия только логируются (без HID)

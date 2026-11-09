@@ -13,6 +13,8 @@
   точка курсора;
 - resolution — референсное разрешение клиентской области;
 - window — критерии поиска окна игры (заголовок/класс, задача 3.2);
+- log — JSONL-лог действий (log_dir, лимиты ротации, политика ключевых
+  кадров, задача 8.3);
 - dry_run — режим без HID (действия только логируются).
 
 Частичный YAML накладывается поверх дефолтов (dataclass-поля);
@@ -21,7 +23,7 @@
 
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import yaml
 
@@ -75,6 +77,32 @@ class PathsConfig:
 
 
 @dataclass(frozen=True)
+class LogPolicy:
+    """Политика ключевых кадров JSONL-лога действий (задача 8.3): для каких
+    записей сохраняются PNG-снимки (спека replay-logging — «только ключевые
+    кадры»; обычные успешные записи идут без кадров)."""
+
+    all_failures: bool = True   # кадры для всех не-OK исходов (FAILED/UNKNOWN)
+    irreversible: bool = True   # кадры для необратимых действий (start_sell)
+
+
+@dataclass(frozen=True)
+class LogConfig:
+    """JSONL-лог действий (задача 8.3): log_dir, лимиты ротации, политика.
+
+    Файлы log_dir/actions-NNNN.jsonl + log_dir/frames/*.png (снимки по хэшу
+    содержимого). Ротация: текущий файл превысил max_bytes → следующий
+    записи идут в новый файл; файлов старше keep_files не хранится
+    (ключевые записи старших файлов мигрируют в новейший)."""
+
+    enabled: bool = True              # логирование действий (create_api)
+    dir: str = "logs/actions"         # log_dir
+    max_bytes: int = 20_000_000       # ротация текущего jsonl при превышении
+    keep_files: int = 5               # хранить столько файлов лога
+    policy: LogPolicy = field(default_factory=LogPolicy)
+
+
+@dataclass(frozen=True)
 class KillSwitchConfig:
     hotkey: str = "ctrl+shift+k"  # локальный хоткей мгновенной остановки
     inactivity_timeout: float = 300.0  # глобальный таймаут неактивности, сек
@@ -108,6 +136,7 @@ class CoreConfig:
     kill_switch: KillSwitchConfig = field(default_factory=KillSwitchConfig)
     resolution: ResolutionConfig = field(default_factory=ResolutionConfig)
     window: WindowConfig = field(default_factory=WindowConfig)
+    log: LogConfig = field(default_factory=LogConfig)
     dry_run: bool = False  # действия только логируются, без HID
 
 
@@ -154,6 +183,12 @@ def _fraction(key: str, value: Any) -> float:
 def _nonempty_str(key: str, value: Any) -> str:
     if not isinstance(value, str) or not value.strip():
         raise _fail(key, value, "ожидается непустая строка")
+    return value
+
+
+def _bool(key: str, value: Any) -> bool:
+    if not isinstance(value, bool):
+        raise _fail(key, value, "ожидается true/false")
     return value
 
 
@@ -252,6 +287,44 @@ def _build_paths(raw: dict[str, Any]) -> PathsConfig:
     return PathsConfig(**values)
 
 
+def _build_log(raw: Optional[dict[str, Any]]) -> LogConfig:
+    """Секция log (8.3): вложенная policy — своя сборка, как у paths."""
+    if raw is None:
+        return LogConfig()
+    if not isinstance(raw, dict):
+        raise _fail("log", raw, "ожидается mapping ключ: значение")
+    if not raw:
+        return LogConfig()
+    unknown = set(raw) - {"enabled", "dir", "max_bytes", "keep_files",
+                          "policy"}
+    if unknown:
+        raise ConfigError(f"log: неизвестные ключи {sorted(unknown)}")
+    policy_raw = raw.get("policy")
+    if policy_raw is None:
+        policy = LogPolicy()
+    else:
+        if not isinstance(policy_raw, dict):
+            raise _fail("log.policy", policy_raw,
+                        "ожидается mapping ключ: значение")
+        unknown_policy = set(policy_raw) - {"all_failures", "irreversible"}
+        if unknown_policy:
+            raise ConfigError(
+                f"log.policy: неизвестные ключи {sorted(unknown_policy)}")
+        policy = LogPolicy(
+            all_failures=_bool("log.policy.all_failures",
+                               policy_raw.get("all_failures", True)),
+            irreversible=_bool("log.policy.irreversible",
+                               policy_raw.get("irreversible", True)))
+    return LogConfig(
+        enabled=_bool("log.enabled", raw.get("enabled", True)),
+        dir=_nonempty_str("log.dir", raw.get("dir", "logs/actions")),
+        max_bytes=_positive_int("log.max_bytes",
+                                raw.get("max_bytes", 20_000_000)),
+        keep_files=_positive_int("log.keep_files",
+                                 raw.get("keep_files", 5)),
+        policy=policy)
+
+
 def load_config(path: str | Path | None = None) -> CoreConfig:
     """Загрузить конфиг.
 
@@ -270,7 +343,7 @@ def load_config(path: str | Path | None = None) -> CoreConfig:
     if not isinstance(data, dict):
         raise _fail("config.yaml", data, "ожидается mapping секций")
 
-    unknown_top = set(data) - (set(_SECTION_FIELDS) | {"dry_run"})
+    unknown_top = set(data) - (set(_SECTION_FIELDS) | {"dry_run", "log"})
     if unknown_top:
         raise ConfigError(f"config.yaml: неизвестные секции {sorted(unknown_top)}")
 
@@ -348,5 +421,6 @@ def load_config(path: str | Path | None = None) -> CoreConfig:
         kill_switch=kill_switch,
         resolution=resolution,
         window=window,
+        log=_build_log(data.get("log")),
         dry_run=dry_run,
     )
