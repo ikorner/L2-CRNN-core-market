@@ -362,6 +362,86 @@ class TestOwnerGuardedHid:
         assert guarded.TRAJ_MAX_POINTS == 60
         assert guarded.version == (2, 0)
 
+    def test_no_public_raw_hid_access(self):
+        """Публичного люка к сырому HidDevice без проверки владельца нет:
+        аксессора `inner` нет, команды вне явного списка недоступны
+        (__getattr__ fail closed). Сырой адаптер остаётся только под
+        приватным именем `_hid` — конвенция Python, вне поддерживаемой
+        границы guard'а (зафиксовано в докстринге hid_owner.py)."""
+        hid = RecordingHid()
+        guarded = OwnerGuardedHid(hid)
+        assert "inner" not in vars(type(guarded))
+        with pytest.raises(AttributeError):
+            guarded.inner
+
+    def test_unlisted_method_blocked_by_getattr(self):
+        """Метод, появившийся у оборачиваемого объекта вне явного списка
+        guard'а, НЕ доступен через __getattr__-проскок: обхода проверки
+        владельца нет (fail closed)."""
+
+        class ExtendedHid(RecordingHid):
+            def future_command(self):
+                self.calls.append(("future_command", (), {}))
+
+        hid = ExtendedHid()
+        guarded = OwnerGuardedHid(hid)
+        with pytest.raises(AttributeError, match="future_command"):
+            guarded.future_command()
+        assert hid.calls == []   # железо не тронуто
+
+    def test_private_names_blocked_by_getattr(self):
+        """Приватные атрибуты оборачиваемого объекта снаружи недоступны
+        (доступ к ним — вне поддерживаемой границы guard'а)."""
+
+        class WithPrivate(RecordingHid):
+            def __init__(self):
+                super().__init__()
+                self._serial = object()
+
+        hid = WithPrivate()
+        guarded = OwnerGuardedHid(hid)
+        with pytest.raises(AttributeError):
+            guarded._serial
+
+
+class TestHidOwnerContract:
+    """Guard-тест паритета guard'а и вендорного HidDevice: публичные методы
+    вендора ⊆ явный список обёрнутых команд. Новая команда в вендоре не
+    проскочит молча — расхождение падает с именем метода."""
+
+    # Явный список команд, обёрнутых OwnerGuardedHid (дублирует список
+    # методов guard'а намеренно: расхождение списков — тоже находка).
+    _WRAPPED = frozenset({
+        "connect", "close", "is_connected", "ping", "get_version",
+        "release_all", "move_rel", "click", "mouse_down", "mouse_up",
+        "traj", "scroll", "key_press", "key_down", "key_up", "key_combo",
+        "type_char",
+    })
+
+    def test_vendor_public_methods_match_guard_list(self):
+        from l2core.adapters.hid import HidDevice
+
+        vendor_public = frozenset(
+            name for name, value in vars(HidDevice).items()
+            if not name.startswith("_") and callable(value))
+        missing = vendor_public - self._WRAPPED
+        extra = self._WRAPPED - vendor_public
+        assert not missing, (
+            f"публичные методы вендорного HidDevice вне guard'а "
+            f"(обход проверки владельца): {sorted(missing)} — добавьте "
+            f"обёртку с _check() в OwnerGuardedHid")
+        assert not extra, (
+            f"guard оборачивает методы, которых нет в вендоре "
+            f"(вендор изменён?): {sorted(extra)}")
+
+    def test_each_vendor_method_wrapped_explicitly(self):
+        """Каждая команда вендора — собственный метод OwnerGuardedHid
+        (проверка владельца), а не __getattr__-проброс."""
+        for name in sorted(self._WRAPPED):
+            assert name in vars(OwnerGuardedHid), (
+                f"{name}: не обёрнут явно в OwnerGuardedHid — доступен "
+                f"только через __getattr__ без проверки владельца")
+
 
 # --- EventDispatcher ---
 
