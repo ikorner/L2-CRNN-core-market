@@ -49,7 +49,8 @@ torch (OCR in-process, CPU-режим обязан работать), pygetwindo
   клика и траектории, человеческие задержки нажатий.
 - `paths` — путь к чекпоинту CRNN и порт HID-адаптера arduino.
 - `kill_switch` — хоткей мгновенной остановки (`ctrl+shift+k`, слушается
-  локально, не через arduino) и глобальный таймаут неактивности (сек).
+  локально, не через arduino), глобальный таймаут неактивности (сек) и
+  безопасная точка курсора `safe_point: [x, y]` при kill.
 - `resolution` — референсное разрешение клиентской области (1920×1080).
 - `dry_run` — см. ниже.
 
@@ -98,8 +99,9 @@ api.close_market()
 передаются в `create_api` параметрами `search_region` / `price_region` /
 `shop_regions` (см. KNOWN_GAPS и докстринги `l2core/api/`).
 
-Полный цикл бота (CLI/сервис, kill switch 8.1, события 7.3, потоки 7.2) —
-вне текущего объёма; репозиторий пока — библиотека + тесты:
+Готовый цикл бота как CLI/сервис — вне текущего объёма; репозиторий пока —
+библиотека + тесты (API 7.1, потоки 7.2, события 7.3, kill switch 8.1 —
+реализованы, сборку выполняет вызывающий слой):
 
 ```bash
 python -m pytest
@@ -110,7 +112,26 @@ python -m pytest
 При срабатывании хоткея (`ctrl+shift+k`) или таймаута неактивности:
 мгновенный стоп цикла, прерывание блокирующих вызовов с возвратом
 UNKNOWN/CANCELLED, освобождение HID (`release_all`), увод курсора в
-безопасную точку, событие стратегии `killed`.
+безопасную точку (`kill_switch.safe_point`, по умолчанию угол экрана —
+вне клиентской области игры), событие стратегии `killed`
+(`{"reason": "hotkey" | "inactivity"}`, см. docs/API.md).
+
+Компонент — `l2core/api/killswitch.py` (`KillSwitch`); хоткей слушается
+низкоуровневым Win32-хуком WH_KEYBOARD_LL (не через arduino; источник
+клавиш — инъекция, тесты на фейках). Сборка:
+
+```python
+ks = KillSwitch(config.kill_switch,
+                hotkey_source=Win32HotkeySource(config.kill_switch.hotkey),
+                set_cursor_pos=lambda x, y: gateway.set_cursor_pos(x, y))
+api = create_api(config, cancelled=ks.is_killed)   # прерывание вызовов
+bot = L2CoreBot(wiring, kill_switch=ks)            # release_all + killed
+ks.start(); bot.start()
+# стратегия получила killed -> bot.stop() (join потоков — за стратегией)
+```
+
+Kill идемпотентен и необратим. Активность потока стратегии фиксируют
+вызовы API (`wiring.note_activity`) — они продлевают таймаут неактивности.
 
 ## Типичные проблемы
 

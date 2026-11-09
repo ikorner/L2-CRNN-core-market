@@ -63,8 +63,10 @@ ApiWiring(...)/build_wiring(...) — точка расширения тесто�
 (глубокая инкапсуляция wiring — YAGNI). Доступ к блокирующему API — только
 через bot.api.
 
-YAGNI (задача 7.2): kill switch (8.1) — здесь только точка push; журнал
-событий и API-справочник payload'ов — 7.3 (реализовано: EventAPI в
+YAGNI (задача 7.2): kill switch подключается параметром kill_switch
+(8.1, l2core/api/killswitch.py: release_all при kill — исключение guard'а
+владельца, событие killed — push в очередь этой сборки); журнал событий
+и API-справочник payload'ов — 7.3 (реализовано: EventAPI в
 bot.event_api, журнал ведётся на push очереди).
 """
 from __future__ import annotations
@@ -80,6 +82,7 @@ import numpy as np
 
 from l2core.api.core import L2CoreAPI
 from l2core.api.events import (
+    EVENT_KILLED,
     EVENT_MODAL,
     EVENT_SOLD,
     EVENT_WINDOW_CLOSED,
@@ -352,8 +355,10 @@ class L2CoreBot:
     stop-флаги + join; повторный start — EngineError (цикл жизни один).
 
     События: observer публикует в bot.events (EventQueue); внешние
-    источники (recover on_escalation 5.8, kill switch 8.1) — через
-    bot.push(type, payload). Доставка — bot.dispatcher.subscribe(type, cb).
+    источники (recover on_escalation 5.8) — через bot.push(type, payload);
+    kill switch (8.1) подключается параметром kill_switch: release_all при
+    kill — исключение guard'а владельца, событие killed — push этой
+    очереди. Доставка — bot.dispatcher.subscribe(type, cb).
     """
 
     def __init__(
@@ -365,18 +370,36 @@ class L2CoreBot:
         poll_interval: Optional[float] = None,
         dispatch_interval: float = _DISPATCH_POLL_INTERVAL,
         cancelled: Optional[Callable[[], bool]] = None,
+        kill_switch: Optional[Any] = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
     ):
         self._owner = threading.current_thread()
-        guarded = OwnerGuardedHid(wiring.hid, owner_thread=self._owner)
+        # Kill switch (8.1): release_all при kill — санкционированное
+        # исключение guard'а владельца (слушатель — чужой поток, см.
+        # hid_owner.py/killswitch.py); событие killed публикуется в
+        # очередь этой сборки.
+        guarded = OwnerGuardedHid(wiring.hid, owner_thread=self._owner,
+                                  kill_switch=(kill_switch.is_killed
+                                               if kill_switch is not None
+                                               else None))
         self._wiring = dataclasses.replace(wiring, hid=guarded)
         # Журнал ведётся на push (до потребления): pull-форма wait_event
         # не теряет события, забранные dispatcher'ом (7.3).
         self._queue = EventQueue(journal=EventJournal())
+        if kill_switch is not None:
+            kill_switch.attach(
+                hid=guarded,
+                on_kill=lambda reason: self._queue.push(
+                    EVENT_KILLED, {"reason": reason}))
         self._event_api = None   # создан после dispatcher'а (см. ниже)
         interval = (poll_interval if poll_interval is not None
                     else wiring.config.timing.poll_interval)
+        # Kill switch (8.1): без явного cancelled observer проверяет
+        # kill-флаг — после kill цикл наблюдения завершается сам.
+        observer_cancelled = (cancelled if cancelled is not None
+                              else (kill_switch.is_killed
+                                    if kill_switch is not None else None))
         # Id окон наблюдения — из сборки моделей (дедупликация: модели
         # в тестах могут совпадать).
         seen: list = []
@@ -392,7 +415,7 @@ class L2CoreBot:
             window_status=wiring.window_status,
             queue=self._queue, interval=interval, monitor=monitor,
             modal=modal, detect_state=wiring.detect_state,
-            cancelled=cancelled, clock=clock, sleep=sleep,
+            cancelled=observer_cancelled, clock=clock, sleep=sleep,
             window_ids=tuple(seen))
         self._dispatcher = EventDispatcher(self._queue,
                                            poll_interval=dispatch_interval)

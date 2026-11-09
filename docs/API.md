@@ -59,7 +59,7 @@ bot.push("killed", {"reason": ...})            # == bot.event_api.push(...)
 | `modal` | перехватчик модалок (observer, 3.6) | `ModalReport` |
 | `recovered` | `api.recover()` по успеху цепочки | `{"target": str, "steps": tuple[str, ...]}` |
 | `escalation` | `api.recover()` по эскалации цепочки | `{"target": str, "detail": str, "steps": tuple[str, ...]}` |
-| `killed` | kill switch (8.1) через `bot.push` | `dict` (определяется 8.1; инфраструктура готова) |
+| `killed` | kill switch (8.1, `L2CoreBot(kill_switch=...)`) | `{"reason": "hotkey" \| "inactivity"}` |
 
 ### `sold` — `SoldPayload` (l2core/scenarios/monitor.py, 6.3)
 
@@ -98,8 +98,23 @@ push-callback и событие — разные каналы, подключа�
 
 ### `killed` — dict
 
-Источник — kill switch (8.1, вне этой задачи); инфраструктура типа и канал
-публикации (`bot.push`) готовы. Формат payload определит 8.1.
+Источник — kill switch (8.1, l2core/api/killswitch.py): локальный хоткей
+(`config.kill_switch.hotkey`) или глобальный таймаут неактивности
+(`config.kill_switch.inactivity_timeout`). Публикуется движком
+(`L2CoreBot(kill_switch=...)`, канал — push в очередь бота; подключение
+ручной сборки — `ks.attach(on_kill=...)` / `bot.push("killed", ...)`).
+
+| Поле | Тип | Смысл |
+|---|---|---|
+| `reason` | str | `"hotkey"` — аварийная остановка хоткеем; `"inactivity"` — таймаут неактивности |
+
+Семантика: до публикации kill switch уже выставил cancelled-флаг (все
+блокирующие вызовы прерываются с cancelled=True — CANCELLED-домен, не
+UNKNOWN), выполнил `hid.release_all()` (best-effort) и увёл курсор в
+`config.kill_switch.safe_point`. Kill идемпотентен: событие — ровно одно
+за жизнь объекта KillSwitch. Остановку движка (join потоков) выполняет
+стратегия: получила `killed` → `bot.stop()` (dispatcher должен остаться
+живым до доставки самого события).
 
 ## Журнал событий
 

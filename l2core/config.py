@@ -9,7 +9,8 @@
 - behavior — поведенческий профиль (доли способов ввода, джиттеры,
   человеческие тайминги HID);
 - paths — пути (чекпоинт CRNN, порт arduino);
-- kill_switch — хоткей и глобальный таймаут неактивности;
+- kill_switch — хоткей, глобальный таймаут неактивности и безопасная
+  точка курсора;
 - resolution — референсное разрешение клиентской области;
 - window — критерии поиска окна игры (заголовок/класс, задача 3.2);
 - dry_run — режим без HID (действия только логируются).
@@ -77,6 +78,9 @@ class PathsConfig:
 class KillSwitchConfig:
     hotkey: str = "ctrl+shift+k"  # локальный хоткей мгновенной остановки
     inactivity_timeout: float = 300.0  # глобальный таймаут неактивности, сек
+    safe_point: tuple[int, int] | None = (8, 8)  # безопасная точка курсора
+    # (x, y) при kill (угол экрана — вне клиентской области игры);
+    # None — курсор не уводится
 
 
 @dataclass(frozen=True)
@@ -151,6 +155,18 @@ def _nonempty_str(key: str, value: Any) -> str:
     if not isinstance(value, str) or not value.strip():
         raise _fail(key, value, "ожидается непустая строка")
     return value
+
+
+def _optional_point(key: str, value: Any) -> tuple[int, int] | None:
+    """Пара неотрицательных целых [x, y] (безопасная точка курсора);
+    None — точка не задана (курсор при kill не уводится)."""
+    if value is None:
+        return None
+    if (not isinstance(value, (list, tuple)) or len(value) != 2
+            or any(isinstance(v, bool) or not isinstance(v, int) or v < 0
+                   for v in value)):
+        raise _fail(key, value, "ожидается пара неотрицательных целых [x, y]")
+    return (int(value[0]), int(value[1]))
 
 
 # --- Загрузка и валидация ---
@@ -300,7 +316,8 @@ def load_config(path: str | Path | None = None) -> CoreConfig:
         "kill_switch",
         KillSwitchConfig,
         _section(data.get("kill_switch"), "kill_switch"),
-        {"hotkey": _nonempty_str, "inactivity_timeout": _positive_float},
+        {"hotkey": _nonempty_str, "inactivity_timeout": _positive_float,
+         "safe_point": _optional_point},
     )
     resolution = _build_section(
         "resolution",

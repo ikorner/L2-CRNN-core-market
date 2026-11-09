@@ -302,13 +302,18 @@ class L2CoreAPI:
 
     def _check_thread(self) -> None:
         """Дисциплина вызова спеки: блокирующий API — только из потока
-        стратегии-владельца; чужой поток → RuntimeError."""
+        стратегии-владельца; чужой поток → RuntimeError. Успешная проверка
+        фиксирует активность executor'а (wiring.note_activity — линия
+        таймаута неактивности kill switch 8.1)."""
         if threading.current_thread() is not self._owner:
             raise RuntimeError(
                 f"L2CoreAPI: блокирующий API вызван из чужого потока "
                 f"({threading.current_thread().name!r}; владелец — "
                 f"{self._owner.name!r}): стратегия MUST вызывать API "
                 f"только из своего потока (spec core-api-events)")
+        note = self._w.note_activity
+        if note is not None:
+            note()
 
     def _cancelled(self, cancelled: Optional[Callable[[], bool]]
                    ) -> Optional[Callable[[], bool]]:

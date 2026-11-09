@@ -39,7 +39,7 @@ engine.py (сборка — единственная точка, где живо
 from __future__ import annotations
 
 import threading
-from typing import Optional
+from typing import Callable, Optional
 
 __all__ = ["HidOwnershipError", "OwnerGuardedHid"]
 
@@ -62,17 +62,32 @@ class OwnerGuardedHid:
     безопасно из любого потока.
     """
 
-    def __init__(self, hid, owner_thread: Optional[threading.Thread] = None):
+    def __init__(self, hid, owner_thread: Optional[threading.Thread] = None,
+                 kill_switch: Optional[Callable[[], bool]] = None):
         self._hid = hid
         self._owner = owner_thread or threading.current_thread()
+        # Санкционированный обход владельца для release_all при kill switch
+        # (8.1): kill-слушатель живёт в своём потоке, а освобождать HID
+        # при аварийной остановке обязан именно он. См. _check/release_all.
+        self._kill_switch = kill_switch
 
     @property
     def owner_thread(self) -> threading.Thread:
         """Поток-владелец HID (action executor)."""
         return self._owner
 
-    def _check(self) -> None:
-        """Проверка владения: чужой поток — HidOwnershipError до железа."""
+    def _check(self, *, allow_kill: bool = False) -> None:
+        """Проверка владения: чужой поток — HidOwnershipError до железа.
+
+        allow_kill (только release_all, 8.1): kill switch сработал —
+        владельца не проверяем. Обоснование (killswitch.py): аварийная
+        остановка важнее владения; release_all идемпотентен и только
+        отпускает кнопки — безопасен из любого потока; любая ДРУГАЯ
+        команда из чужого потока при активном kill по-прежнему
+        отклоняется (guard fail closed)."""
+        if allow_kill and self._kill_switch is not None \
+                and self._kill_switch():
+            return
         current = threading.current_thread()
         if current is not self._owner:
             raise HidOwnershipError(
@@ -129,7 +144,10 @@ class OwnerGuardedHid:
     # --- Команды устройства (только владелец) ---
 
     def release_all(self):
-        self._check()
+        # Единственная команда с санкционированным обходом владельца:
+        # при сработавшем kill switch (8.1) её выполняет слушатель из
+        # своего потока (обоснование — в _check и killswitch.py).
+        self._check(allow_kill=True)
         return self._hid.release_all()
 
     def move_rel(self, *args, **kwargs):

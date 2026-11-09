@@ -123,6 +123,7 @@ class ApiWiring:
     free_area_point: Optional[Tuple[int, int]] = None
     on_escalation: Optional[Callable[[RecoverResult], None]] = None
     cancelled: Optional[Callable[[], bool]] = None
+    note_activity: Optional[Callable[[], None]] = None  # kill switch 8.1
     rng: Optional[JitterRng] = None
     guard: IrreversibleGuard = field(default_factory=IrreversibleGuard)
     clock: Callable[[], float] = time.monotonic
@@ -170,6 +171,7 @@ def build_wiring(*, config: CoreConfig,
                  free_area_point: Optional[Tuple[int, int]] = None,
                  on_escalation: Optional[Callable[[RecoverResult], None]] = None,
                  cancelled: Optional[Callable[[], bool]] = None,
+                 note_activity: Optional[Callable[[], None]] = None,
                  rng: Optional[JitterRng] = None,
                  clock: Callable[[], float] = time.monotonic,
                  sleep: Callable[[float], None] = time.sleep) -> ApiWiring:
@@ -290,7 +292,8 @@ def build_wiring(*, config: CoreConfig,
         search_region=search_region, price_region=price_region,
         shop_regions=shop_regions, segmentation=segmentation,
         free_area_point=free_area_point, on_escalation=on_escalation,
-        cancelled=cancelled, rng=rng, clock=clock, sleep=sleep)
+        cancelled=cancelled, note_activity=note_activity,
+        rng=rng, clock=clock, sleep=sleep)
 
 
 def create_api(config, *, models_dir="ui_model", assets_dir="assets",
@@ -303,6 +306,7 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
                segmentation: Optional[TableSegmentation] = None,
                owner_thread=None,
                cancelled: Optional[Callable[[], bool]] = None,
+               note_activity: Optional[Callable[[], None]] = None,
                rng: Optional[JitterRng] = None,
                clock: Callable[[], float] = time.monotonic,
                sleep: Callable[[float], None] = time.sleep) -> L2CoreAPI:
@@ -339,5 +343,6 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
         activate=activate, game_finder=finder,
         search_region=search_region, price_region=price_region,
         shop_regions=shop_regions, segmentation=segmentation,
-        cancelled=cancelled, rng=rng, clock=clock, sleep=sleep)
+        cancelled=cancelled, note_activity=note_activity,
+        rng=rng, clock=clock, sleep=sleep)
     return L2CoreAPI(wiring, owner_thread=owner_thread)

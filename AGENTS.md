@@ -107,8 +107,9 @@ python tools/gen_ocr_golden.py
 # GPU; без crnn_best.pt — понятная ошибка, код выхода 2
 python tools/benchmark_ocr.py --model <путь>/crnn_best.pt
 
-# Запуск бота: публичный API есть (create_api, задача 7.1), готовый
-# цикл бота/CLI — нет (kill switch 8.1, события 7.3, потоки 7.2);
+# Запуск бота: публичный API есть (create_api, задача 7.1), kill switch есть
+# (KillSwitch 8.1, компонент для сборки вызывающим слоем), готовый
+# цикл бота/CLI — нет (события 7.3, потоки 7.2 есть);
 # выдумывать команду запуска нельзя.
 ```
 
@@ -863,9 +864,12 @@ StateObserver / EventDispatcher; очередь — `l2core/api/events.py`
   контекстный менеджер. Доступ к API — только через `bot.api`: прямое
   использование исходного wiring с сырым HidDevice обходит guard
   (граница зафиксирована в докстринге engine.py).
-- YAGNI: kill switch (8.1) — здесь только точка push; AST-guard'а на observer
-  нет — сценарий «Observer не отправляет действия» покрыт интеграционно
-  (tests/test_engine.py).
+- Kill switch (8.1) подключается параметром `kill_switch`: движок
+  передаёт guard-сборку HID (release_all при kill — санкционированное
+  исключение guard'а владельца, см. killswitch.py) и публикует событие
+  killed; без явного `cancelled` observer проверяет kill-флаг и завершает
+  цикл сам. AST-guard'а на observer нет — сценарий «Observer не отправляет
+  действия» покрыт интеграционно (tests/test_engine.py).
 - Тесты: tests/test_engine.py (очередь: порядок/seq/неизвестный тип/
   конкурентность; guard: делегирование/чужой поток/явный владелец;
   dispatcher: порядок/изоляция исключений/unsubscribe/join; observer:
@@ -901,9 +905,9 @@ dispatcher). Журнал подключается к очереди: `EventQueu
   (sold/window_closed/modal), `api.recover()` по итогу цепочки 5.8/6.4
   (успех -> recovered `{"target", "steps"}`, эскалация -> escalation
   `{"target", "detail", "steps"}`, отмена — без событий), `bot.push` /
-  `EventAPI.push` — внешним источникам (killed 8.1). Типы: sold,
-  window_closed, modal, recovered, escalation, killed (инфраструктура типа
-  killed готова, источник — 8.1).
+  `EventAPI.push` — внешним источникам. Типы: sold,
+  window_closed, modal, recovered, escalation, killed (источник — kill
+  switch 8.1 через движок).
 - **API-справочник — docs/API.md** (контракт payload'ов): sold ->
   SoldPayload 6.3, window_closed -> `{"window"}`, modal -> ModalReport 3.6,
   recovered/escalation -> dict по справочнику. Пины:
@@ -914,6 +918,53 @@ dispatcher). Журнал подключается к очереди: `EventQueu
 - L2CoreAPI: методы `on/wait_event/get_events` и свойство `events`
   делегируют EventAPI (параметр ctor `events`; сборка без него — ApiError,
   fail fast); движок подключает: `bot.event_api` (== `bot.api.events`).
+
+### Kill switch: локальный хоткей + таймаут неактивности (задача 8.1,
+spec safety, решение 16 design.md)
+
+`l2core/api/killswitch.py` — KillSwitch: слушатель в собственном потоке;
+срабатывание — хоткей ИЛИ таймаут тишины (линию продлевают вызовы API:
+каждый публичный метод фасада через `wiring.note_activity` фиксирует
+активность executor'а). `kill(reason)` идемпотентен и необратим, эффекты
+ровно одни: (1) флаг killed — `is_killed()` передаётся в сборку как
+`cancelled` (wiring.cancelled — дефолт всех блокирующих вызовов 7.1:
+wait_until/примитивы прерываются, результат — cancelled=True, outcome=None,
+CANCELLED-домен, не UNKNOWN); (2) `hid.release_all()` best-effort; (3) увод
+курсора в безопасную точку (`set_cursor_pos`, параметр побеждает
+`kill_switch.safe_point` из конфига; оба не заданы — курсор не трогается +
+диагностика; дефолт (8, 8) — угол экрана вне клиентской области игры);
+(4) событие `killed` (`{"reason": "hotkey" | "inactivity"}`) через on_kill.
+
+- **Канал хоткея** — инъекция `hotkey_source` (контракт start/stop/
+  pressed); прод-реализация — `Win32HotkeySource` (adapters/win32.py):
+  низкоуровневый хук WH_KEYBOARD_LL в собственном потоке (нажатие
+  фиксирует сам хук, не опрос — короткое нажатие не пропадает между
+  poll'ами); слушаем локальную клавиатуру, НЕ arduino. Парсинг строки
+  хоткея («ctrl+shift+k»: a-z/0-9/f1-f12 + модификаторы) fail fast без
+  Win32; хук — живой код (pragma no cover), ленивый импорт как в 3.2.
+- **Guard владельца и kill**: слушатель — чужой поток, а владелец HID —
+  поток стратегии, поэтому `OwnerGuardedHid(hid, kill_switch=ks.is_killed)`
+  даёт САНКЦИОНИРОВАННОЕ ИСКЛЮЧЕНИЕ: release_all при поднятом kill-флаге
+  выполняется из любого потока (идемпотентен, только отпускает кнопки);
+  любая другая HID-команда из чужого потока при активном kill по-прежнему
+  HidOwnershipError (fail closed). L2CoreBot(kill_switch=ks) собирает это
+  сам: guard-сборка + attach + push killed в свою очередь; без явного
+  cancelled observer по умолчанию проверяет kill-флаг и завершает цикл
+  сам. Движок kill НЕ останавливает: dispatcher должен дожить до доставки
+  события killed; join потоков — за стратегией (killed -> bot.stop()).
+- Ожидание в цикле слушателя — wait_until (инвариант 1), часы/сон —
+  инъекции; `poll_once()` — детерминированная итерация проверок для тестов
+  без потоков. Жизненный цикл один: повторный start — KillSwitchError,
+  stop идемпотентен (kill-флаг не снимается).
+- Win32Gateway дополнен `set_cursor_pos(x, y) -> bool` (PyWin32Gateway —
+  win32gui.SetCursorPos, ленивый импорт).
+- Конфиг: `kill_switch.safe_point` — пара неотрицательных int [x, y] |
+  null (валидатор по схеме 1.3; shipped config.yaml == дефолты схемы).
+- Тесты: tests/test_killswitch.py (35 тестов: хоткей/таймаут/эффекты/
+  идемпотентность/жизненный цикл, прерывание wait_until и полного
+  api.open_market из потока стратегии, активность через API, guard-
+  исключение, интеграция с L2CoreBot, конфиг safe_point, парсинг хоткея).
+  YAGNI: dry-run (8.2) и JSONL-лог (8.3) сюда не входят.
 
 ### wait_until и запрет sleep (задача 5.1, инвариант 1)
 
@@ -1008,7 +1059,8 @@ null). Replay-модель эффектов: действие → записан
   MssScreen/HidDevice/TorchOcr/PyWin32Gateway). Потоки — L2CoreBot (7.2,
   engine.py: state observer / event dispatcher / HID-owner guard,
   events.py — очередь); события для стратегий (on/wait_event, журнал) —
-  7.3, kill switch — 8.1.
+  7.3; kill switch (хоткей/таймаут неактивности, release_all, курсор,
+  событие killed) — 8.1, killswitch.py + Win32HotkeySource (adapters/win32.py).
 - `l2core/config.py` — схема и типизированный загрузчик `config.yaml`.
 - `tests/` — pytest; `ui_model/` — YAML UI-модель; `assets/` — шаблоны и
   golden-кропы (версионируются вместе с моделью); `base_screenshot/scr/` —
