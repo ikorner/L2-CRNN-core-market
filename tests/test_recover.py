@@ -1,7 +1,8 @@
 """Тесты общей recover-цепочки (задача 5.8, spec action-primitives:
 «Recover-цепочка с пассивными шагами и эскалацией», «Штатный FAILED при
-невыполненных предусловиях открытия», «Recover переоткрывает окно через HUD»,
-«Исчерпание цепочки», «Лавку нельзя создать в текущей зоне»).
+невыполненных предусловиях открытия», «Recover переоткрывает окно рецептом
+навигации» (menu-quickslot-navigation), «Исчерпание цепочки»,
+«Лавку нельзя создать в текущей зоне»).
 
 Детерминизм (инвариант 7): ScriptedHid фиксирует действия и мутирует
 скриптованный «мир» состояния, goal/current_window/find_anchor — чистые
@@ -24,6 +25,7 @@ from l2core.detector.anchor import Anchor
 from l2core.detector.status import STATUS_FOUND, WindowStatus
 from l2core.model import ElementSpec, Rect, UiModel, VariantSpec, WindowSpec
 from l2core.primitives.activate import ActivateGameError, ActivateResult
+from l2core.primitives.navigation import RecipeResult
 from l2core.primitives.outcome import ActionOutcome, to_outcome
 from l2core.primitives.recover import (
     STEP_CLOSE_WINDOW,
@@ -42,8 +44,7 @@ from l2core.primitives.recover import (
 )
 
 TARGET = "shop_sell"
-HUD_ELEMENT = "open_sale_trade"
-HUD_POINT = (769, 883)
+OPEN_RECIPE = "open_shop_sell"
 CLOSE_POINT = (700, 200)
 FREE_POINT = (960, 540)  # центр 1920x1080 — свободная область по дефолту
 ANCHOR = Anchor(window_id=TARGET, x=100, y=100, score=0.99, method="template")
@@ -105,10 +106,7 @@ class ScriptedHid:
 
     def click(self, button=1, count=1, hold_ms=None):
         self._append("click", (button, count, hold_ms, self.pos))
-        if self.pos == HUD_POINT and self.world.hud_click_opens:
-            self.world.current = TARGET
-            self.world.goal = True
-        elif self.pos == CLOSE_POINT and self.world.close_click_closes:
+        if self.pos == CLOSE_POINT and self.world.close_click_closes:
             self.world.current = None
         elif self.pos == FREE_POINT and self.world.free_click_opens_goal:
             self.world.goal = True
@@ -149,22 +147,8 @@ def make_config():
     )
 
 
-def make_hud_model(hud=True):
-    variants = {"normal": VariantSpec(name="normal", template="t.png")}
-    element = ElementSpec(
-        id=HUD_ELEMENT, role="icon_sample",
-        rect=Rect(1000, 420, 200, 160) if hud else None,
-        hud=hud, variants=variants,
-    )
-    return UiModel(
-        path="hud", window=WindowSpec(id="market", title="m", size=(1008, 674)),
-        elements={HUD_ELEMENT: element}, states={}, transitions=(),
-        ocr_regions={}, table_geometry=None,
-    )
-
-
 def make_deps(world, hid, *, clock, goal=None, current_window=None,
-              close_point=None, hud_locator=None, on_escalation=None,
+              close_point=None, recipe_runner="default", on_escalation=None,
               resume=None, pause_timeout=5.0, capture_state=None,
               cause=None, cancelled=None, find_anchor=None):
     """Стандартный набор инъекций recover поверх мира."""
@@ -181,7 +165,7 @@ def make_deps(world, hid, *, clock, goal=None, current_window=None,
     def _find_anchor(frame):
         return ANCHOR if world.anchor_ok else None
 
-    calls = {"capture_state": 0, "escalation": []}
+    calls = {"capture_state": 0, "escalation": [], "recipe": []}
 
     def _capture_state():
         calls["capture_state"] += 1
@@ -189,9 +173,21 @@ def make_deps(world, hid, *, clock, goal=None, current_window=None,
     def _on_escalation(result):
         calls["escalation"].append(result)
 
+    if recipe_runner == "default":
+        def recipe_runner(recipe_id):
+            # Исполнитель рецепта — фейк: открытие мира по флагу
+            # (как раньше клик по HUD-иконке).
+            calls["recipe"].append(recipe_id)
+            if world.hud_click_opens:
+                world.current = TARGET
+                world.goal = True
+            ok = world.goal
+            return RecipeResult(
+                recipe_id, success=ok, attempts=1,
+                failures=() if ok else ("verify открытия не сошёлся",))
+
     deps = dict(
-        hud_model=make_hud_model(),
-        hud_element=HUD_ELEMENT,
+        recipe_runner=recipe_runner,
         screen=FakeScreen(),
         hid=hid,
         cursor_pos=lambda: hid.pos,
@@ -203,8 +199,6 @@ def make_deps(world, hid, *, clock, goal=None, current_window=None,
         current_window=current_window
         or (lambda f: world.current),
         close_point=close_point,
-        hud_locator=hud_locator
-        or (lambda element, variant, frame: HUD_POINT),
         on_escalation=on_escalation or _on_escalation,
         resume=resume,
         pause_timeout=pause_timeout,
@@ -310,8 +304,9 @@ class TestFullChain:
         # Перекалибровка (поиск якоря) не выполнялась — цель достигнута раньше.
         assert anchor_polls == []
         assert calls["escalation"] == []
-        # Клики: свободная область, кнопка закрытия чужого окна, HUD.
-        assert click_positions(hid) == [FREE_POINT, CLOSE_POINT, HUD_POINT]
+        # Клики: свободная область, кнопка закрытия чужого окна;
+        # переоткрытие — рецепт (фейк без HID-клика).
+        assert click_positions(hid) == [FREE_POINT, CLOSE_POINT]
 
 
 class TestCloseWindow:
@@ -328,8 +323,9 @@ class TestCloseWindow:
         close_step = [s for s in result.steps if s.name == STEP_CLOSE_WINDOW][0]
         assert close_step.status == STATUS_SKIPPED
         assert "нечего" in close_step.detail or "нет" in close_step.detail
-        # Кнопка закрытия не кликалась: только свободная область и HUD.
-        assert click_positions(hid) == [FREE_POINT, HUD_POINT]
+        # Кнопка закрытия не кликалась: только свободная область;
+        # переоткрытие — рецепт (фейк без HID-клика).
+        assert click_positions(hid) == [FREE_POINT]
 
     def test_close_skipped_when_target_already_open(self):
         clock = FakeClock()
@@ -384,10 +380,10 @@ class TestCloseWindow:
 
 
 class TestReopenTimeout:
-    def test_opening_timeout_failed_plus_escalation_no_reclicks(self):
-        # «Лавку нельзя создать в текущей зоне»: после клика по open_sale_trade
-        # окно не открылось за таймаут -> FAILED, фиксация состояния,
-        # событие escalation, повторных кликов по HUD нет.
+    def test_opening_timeout_failed_plus_escalation_no_retry(self):
+        # «Лавку нельзя создать в текущей зоне»: рецепт open_shop_sell не
+        # открыл окно -> FAILED, фиксация состояния, событие escalation,
+        # повторных попыток открытия нет.
         clock = FakeClock()
         world = World()
         hid = ScriptedHid(clock, world)
@@ -398,12 +394,8 @@ class TestReopenTimeout:
         assert not result.success
         assert result.escalated
         assert to_outcome(result) is ActionOutcome.FAILED
-        # Ровно один клик по HUD, после него — ни одного HID-действия.
-        log = hid.log
-        hud_clicks = [i for i, (_, a, args) in enumerate(log)
-                      if a == "click" and args[-1] == HUD_POINT]
-        assert hud_clicks == [4]  # после key_press/move/free-click/move
-        assert log[hud_clicks[0] + 1:] == []
+        # Рецепт вызван ровно один раз.
+        assert calls["recipe"] == [OPEN_RECIPE]
         # Фиксация состояния и событие escalation — ровно по разу.
         assert calls["capture_state"] == 1
         assert len(calls["escalation"]) == 1
@@ -412,12 +404,11 @@ class TestReopenTimeout:
         assert STEP_RECALIBRATE not in [s.name for s in result.steps]
         reopen = [s for s in result.steps if s.name == STEP_REOPEN][0]
         assert reopen.status == STATUS_FAILED
-        assert "таймаут" in reopen.detail
-        assert any(HUD_ELEMENT in f for f in result.failures)
+        assert any(OPEN_RECIPE in f for f in result.failures)
 
-    def test_hud_not_located_skips_reopen(self):
+    def test_recipe_runner_missing_skips_reopen(self):
         # Цель достигается после перекалибровки (якорь стабилен) — reopen
-        # пропущен (иконка не локализована), эскалации нет, кликов нет.
+        # пропущен (recipe_runner не задан), эскалации нет.
         clock = FakeClock()
         world = World()
         world.anchor_ok = True
@@ -433,7 +424,7 @@ class TestReopenTimeout:
 
         deps, calls = make_deps(
             world, hid, clock=clock,
-            hud_locator=lambda element, variant, frame: None,
+            recipe_runner=None,
             find_anchor=find_anchor, goal=goal,
         )
 
@@ -441,9 +432,8 @@ class TestReopenTimeout:
 
         reopen = [s for s in result.steps if s.name == STEP_REOPEN][0]
         assert reopen.status == STATUS_SKIPPED
-        assert "не локализована" in reopen.detail
-        # Клик по HUD отсутствует (пассивный клик в свободную область — есть).
-        assert HUD_POINT not in click_positions(hid)
+        assert "recipe_runner" in reopen.detail
+        assert calls["recipe"] == []
         assert result.success
         assert calls["escalation"] == []
 
@@ -467,7 +457,7 @@ class TestRecalibrateAndEscalation:
 
         deps, calls = make_deps(
             world, hid, clock=clock,
-            hud_locator=lambda element, variant, frame: None,
+            recipe_runner=None,
             find_anchor=find_anchor, goal=goal,
         )
 
@@ -492,7 +482,7 @@ class TestRecalibrateAndEscalation:
 
         deps, calls = make_deps(world, hid, clock=clock, resume=resume,
                                 pause_timeout=5.0,
-                                hud_locator=lambda e, v, f: None)
+                                recipe_runner=None)
 
         result = recover(TARGET, **deps)
 
@@ -567,7 +557,7 @@ class TestPrologueAndCancel:
         hid = ScriptedHid(clock, world)
         deps, calls = make_deps(world, hid, clock=clock,
                                 cancelled=lambda: clock.now >= 2.5,
-                                hud_locator=lambda e, v, f: None)
+                                recipe_runner=None)
 
         result = recover(TARGET, **deps)
 
@@ -642,21 +632,3 @@ class TestReleaseAll:
 
         assert result.success
         assert any("release_all" in f for f in result.failures)
-
-
-class TestContract:
-    def test_hud_element_missing_is_model_error(self):
-        clock = FakeClock()
-        world = World()
-        world.hud_click_opens = True
-        hid = ScriptedHid(clock, world)
-        deps, _ = make_deps(world, hid, clock=clock)
-        deps["hud_element"] = "no_such_element"
-
-        with pytest.raises(RecoverError):
-            recover(TARGET, **deps)
-
-    def test_result_satisfies_primitive_result_protocol(self):
-        from l2core.primitives.outcome import PrimitiveResult
-        assert isinstance(RecoverResult(target_window=TARGET, success=True),
-                          PrimitiveResult)

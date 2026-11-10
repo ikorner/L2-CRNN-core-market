@@ -147,8 +147,12 @@ class ApiWiring:
 
 def _load_hud_templates(models: Mapping[str, UiModel], assets_dir: Path) -> dict:
     """Шаблоны HUD-элементов (element_id, variant) -> (серый шаблон,
-    элемент, вариант). HUD-элементы живут в модели market (icon_sample с
-    search_area); ошибки ссылок/файлов — падение при сборке (разметчик)."""
+    элемент, вариант). HUD-элементы живут в моделях окон (market держит
+    дубликаты навигационных элементов для сигнатур recover_closed) и в
+    навигационной модели (канон). Конфликтный дубликат (тот же
+    (element_id, variant), другой шаблон/точка) — падение при сборке:
+    молчаливый last-wins запрещён. Ошибки ссылок/файлов — падение при
+    сборке (разметчик)."""
     import cv2
 
     templates = {}
@@ -161,8 +165,26 @@ def _load_hud_templates(models: Mapping[str, UiModel], assets_dir: Path) -> dict
                 image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
                 if image is None:
                     raise FileNotFoundError(f"шаблон HUD-иконки не найден: {path}")
-                templates[(element_id, variant_name)] = (
-                    np.asarray(image, dtype=np.float64), element, spec)
+                key = (element_id, variant_name)
+                loaded = (np.asarray(image, dtype=np.float64), element, spec)
+                existing = templates.get(key)
+                if existing is not None:
+                    prev_image, prev_element, prev_spec = existing
+                    same = (
+                        prev_image.shape == loaded[0].shape
+                        and prev_spec.template == spec.template
+                        and prev_spec.click_point == spec.click_point
+                        and prev_element.search_area == element.search_area
+                    )
+                    if not same:
+                        raise ValueError(
+                            f"конфликтный дубликат HUD-элемента {key}: "
+                            f"модель {prev_element.id!r} ({prev_spec.template}) "
+                            f"и модель {element.id!r} ({spec.template}) задают "
+                            f"разные шаблоны/точки — приведите модели к "
+                            f"одному описанию (канон — navigation.yaml)")
+                    continue
+                templates[key] = loaded
     return templates
 
 

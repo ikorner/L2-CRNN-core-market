@@ -876,7 +876,6 @@ class L2CoreAPI:
     # Сервисные
 
     def recover(self, cause: RecoverCause, target: str, *,
-                hud_element: str,
                 on_escalation: Optional[Callable[[RecoverResult], None]] = None,
                 resume: Optional[Callable[[], bool]] = None,
                 pause_timeout: Optional[float] = None,
@@ -884,9 +883,9 @@ class L2CoreAPI:
                 ) -> RecoverResult:
         """Общий recover по сигналу needs_recover (сценарий 6.4 поверх
         цепочки 5.8). cause — результат примитива/сценария/навигации API с
-        needs_recover; без него — ScenarioRecoverError (fail fast). Пара
-        target/hud_element — решение вызывающего слоя (market+market_pic /
-        shop_buy+open_buy_trade / shop_sell+open_sale_trade). По итогу
+        needs_recover; без него — ScenarioRecoverError (fail fast).
+        Переоткрытие цели — рецепт навигации open_<target> (сборка без
+        навигационной модели: шаг пропускается с диагностикой). По итогу
         публикует события журнально-очередного канала (7.3): успех ->
         recovered, эскалация -> escalation (payload — справочник
         docs/API.md); отмена — без событий."""
@@ -895,16 +894,19 @@ class L2CoreAPI:
         w = self._w
 
         def _run() -> RecoverResult:
+            recipe_runner = None
+            if w.navigation is not None and w.nav_evaluate is not None:
+                recipe_runner = (
+                    lambda rid: self._run_open_recipe(rid, None, c))
             result = scenario_recover(
                 cause, target,
-                hud_model=w.hud_model, hud_element=hud_element,
+                recipe_runner=recipe_runner,
                 screen=w.screen, hid=w.hid, cursor_pos=w.cursor_pos,
                 activate=w.activate,
                 window_status=lambda frame: w.window_status(frame, target),
                 find_anchor=lambda frame: w.find_anchor(frame, target),
                 goal_reached=w.goal_reached(target), config=w.config,
                 current_window=w.current_window, close_point=w.close_point,
-                hud_locator=w.hud_locator,
                 on_escalation=on_escalation or w.on_escalation,
                 resume=resume, pause_timeout=pause_timeout,
                 free_area_point=w.free_area_point, cancelled=c,
@@ -926,7 +928,7 @@ class L2CoreAPI:
             return result
 
         return self._log_action("recover", _run, target=target,
-                                args={"hud_element": hud_element})
+                                args={"recipe": f"open_{target}"})
 
     def health(self) -> HealthResult:
         """Агрегат живости: окно игры (находилка 3.2), открытое окно

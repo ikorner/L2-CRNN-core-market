@@ -15,12 +15,12 @@ needs_recover от любого примитива 5.x или сценария 6
     release_all первым HID-действием (залипшая кнопка из 5.6).
 
     target — id окна, которое восстанавливаем (market / shop_buy /
-    shop_sell); вместе с hud_element (id HUD-иконки открытия цели из
-    модели market: market_pic / open_buy_trade / open_sale_trade) —
-    выбор пары — решение вызывающего слоя, сценарий маппинг не выдумывает.
+    shop_sell); переоткрытие — рецепт навигации open_<target>
+    (menu-quickslot-navigation) через инъекцию recipe_runner; runner не
+    задан — шаг переоткрытия пропускается с диагностикой.
 
     Провайдеры (screen/hid/cursor_pos/activate/window_status/find_anchor/
-    goal_reached/current_window/close_point/hud_locator/...) — ГОТОВЫЕ
+    goal_reached/current_window/close_point/recipe_runner/...) — ГОТОВЫЕ
     провайдеры от вызывающего слоя (тот же паттерн, что 6.1): сценарий
     адаптеры не создаёт и wiring на детекторы 3.4/3.5 не собирает — это
     ответственность стратегии/API (7.1). БЕЗ внутреннего состояния (spec):
@@ -88,8 +88,7 @@ def scenario_recover(
     cause: RecoverCause,
     target: str,
     *,
-    hud_model: UiModel,
-    hud_element: str,
+    recipe_runner: Optional[Callable[[str], RecipeResult]] = None,
     screen: Screen,
     hid,
     cursor_pos: Callable[[], Tuple[int, int]],
@@ -100,8 +99,6 @@ def scenario_recover(
     config: CoreConfig,
     current_window: Optional[Callable[[np.ndarray], Optional[str]]] = None,
     close_point: Optional[Callable[[str, np.ndarray],
-                                   Optional[Tuple[int, int]]]] = None,
-    hud_locator: Optional[Callable[[ElementSpec, Optional[str], np.ndarray],
                                    Optional[Tuple[int, int]]]] = None,
     on_escalation: Optional[Callable[[RecoverResult], None]] = None,
     resume: Optional[Callable[[], bool]] = None,
@@ -126,8 +123,7 @@ def scenario_recover(
             f"switch — 8.1), цепочка не запускается")
     return recover(
         target,
-        hud_model=hud_model,
-        hud_element=hud_element,
+        recipe_runner=recipe_runner,
         screen=screen,
         hid=hid,
         cursor_pos=cursor_pos,
@@ -138,7 +134,6 @@ def scenario_recover(
         config=config,
         current_window=current_window,
         close_point=close_point,
-        hud_locator=hud_locator,
         on_escalation=on_escalation,
         resume=resume,
         pause_timeout=pause_timeout,

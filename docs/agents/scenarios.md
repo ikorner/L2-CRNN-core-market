@@ -36,8 +36,8 @@ read_rows ТОЛЬКО читает кадр: ни HID, ни скролла (о�
 через инъекции, не в «голове» сценария). Обход параметризуется списком
 точек `ScanPoint(verify, tab=None, filters=(), search=None)` извне (params
 табов/фильтров частично не размечены — KNOWN_GAPS): открытие обзора
-(клик по market_pic, verify из перехода модели recover_closed ->
-list__tab_home; перехода нет — ScanError, открытие вслепую запрещено) ->
+(recipe_runner: рецепт навигации open_market — menu-quickslot-navigation;
+runner не задан — ScanError, открытие вслепую запрещено) ->
 для каждой точки: таб -> фильтры (click_element, verify точки) -> поиск
 (enter_text; OCR-регион поля в market.yaml не размечен — search_region/
 search_field_element/search_button_element передаются снаружи, подшиваются
@@ -70,10 +70,9 @@ market-scenarios «Сценарий выставления лавки прода
   отгруженной shop_sell секция не размечена (мета поле `slot` не
   описывает — KNOWN_GAPS п.9, Q26). Вне диапазона слота, повтор слота,
   цена < 1 — SetupSellError (fail fast).
-- **setup_sell**: открытие лавки через HUD (клик по open_element —
-  open_sale_trade из модели market, verify снаружи: межокнные переходы
-  формат не выражает — KNOWN_GAPS п.3; open_element=None — лавка открыта
-  вызывающим слоем) → для каждого item: свежий якорь (слепой drag
+- **setup_sell**: открытие лавки — рецепт навигации (recipe_runner,
+  open_recipe по умолчанию "open_shop_sell"; open_recipe=None — лавка
+  открыта вызывающим слоем) → для каждого item: свежий якорь (слепой drag
   запрещён) + target = якорь + slot_point → drag_item(verify=drag_verify)
   → enter_price (OCR-регион поля цены в shop_sell не размечен —
   price_region подшивается в копию модели, как search_region в 6.1; без
@@ -152,19 +151,19 @@ market-scenarios «Сценарий recover как композиция прим
 
 `l2core/scenarios/recover.py` — ТОНКАЯ ОБВЯЗКА поверх цепочки 5.8
 (primitives/recover.py, механика там не дублируется):
-`scenario_recover(cause, target, *, hud_model, hud_element, провайдеры...)`.
+`scenario_recover(cause, target, *, recipe_runner, провайдеры...)`.
 
 - **Контракт вызова**: `cause` — результат примитива 5.x/сценария 6.1–6.3
   со структурным типом `RecoverCause` (PrimitiveResult + needs_recover);
   БЕЗ needs_recover (успех/отмена) — `ScenarioRecoverError` (fail fast,
   цепочка не запускается; отмену стратегия ветвит до вызова). `target` —
-  id восстанавливаемого окна, `hud_element` — id HUD-иконки его открытия
-  (market.yaml): выбор пары — решение вызывающего слоя, маппинг сценарий
-  не выдумывает. cause протягивается в цепочку (needs_recover →
-  release_all первым HID-действием).
+  id восстанавливаемого окна; переоткрытие — рецепт навигации
+  open_<target> через recipe_runner (сборка без навигационной модели —
+  шаг пропускается с диагностикой). cause протягивается в цепочку
+  (needs_recover → release_all первым HID-действием).
 - **Провайдеры — готовые, от вызывающего слоя** (паттерн 6.1): screen/hid/
   cursor_pos/activate/window_status/find_anchor/goal_reached/
-  current_window/close_point/hud_locator/... сценарий адаптеры не создаёт,
+  current_window/close_point/recipe_runner/... сценарий адаптеры не создаёт,
   wiring на детекторы 3.4/3.5 не собирает (это 7.1). Без внутреннего
   состояния: каждый вызов — независимая композиция.
 - **Результат — RecoverResult как есть**: success / escalated (событие

@@ -417,12 +417,9 @@ def make_run_checks(world, calls):
 
 
 def make_hud_locator(world, calls):
-    points = {"market_pic": HUD_POINT, "open_buy_trade": OPEN_BUY_POINT,
-              "open_sale_trade": OPEN_SELL_POINT}
-
     def hud_locator(element, variant, frame):
         calls.append(element.id)
-        return points.get(element.id)
+        return None
 
     return hud_locator
 
@@ -437,7 +434,8 @@ QS_SELL_POINT = (360, 950)
 
 
 class NavWorld:
-    """Мир навигации: X toggles меню; клики по точкам открывают окна."""
+    """Мир навигации: X toggles меню; клики по точкам открывают окна.
+    Поля goal/current/close_click_closes — для recover-цепочки (5.8)."""
 
     def __init__(self):
         self.menu_open = False
@@ -445,17 +443,27 @@ class NavWorld:
         self.shop_buy_opened = False
         self.shop_sell_opened = False
         self.open_click_works = True
+        self.goal = False          # целевое состояние (recover)
+        self.current = None        # открытое окно торговли
+        self.close_click_closes = False
+
+    def _open(self, window):
+        setattr(self, f"{window}_opened", True)
+        self.current = window
+        self.goal = True
 
     def react_click(self, pos):
         if pos == HAMBURGER_POINT:
             self.menu_open = True
         elif (pos == MENU_ICON_POINT and self.menu_open
                 and self.open_click_works):
-            self.market_opened = True
+            self._open("market")
         elif pos == QS_BUY_POINT and self.open_click_works:
-            self.shop_buy_opened = True
+            self._open("shop_buy")
         elif pos == QS_SELL_POINT and self.open_click_works:
-            self.shop_sell_opened = True
+            self._open("shop_sell")
+        elif pos == RECOVER_CLOSE_POINT and self.close_click_closes:
+            self.current = None
 
 
 class NavHid(ScriptedHid):
@@ -1263,46 +1271,43 @@ class TestGetState:
 
 class TestRecover:
     def test_recover_success_at_entry_goal(self):
-        world, clock = World(), FakeClock()
-        world.goal = True
-        hid = ScriptedHid(clock, world)
-        api = make_api(world, hid, clock=clock)
+        nav_world, clock = NavWorld(), FakeClock()
+        nav_world.goal = True
+        api, _ = make_nav_api(nav_world, clock=clock)
 
-        result = api.recover(Cause(), "shop_sell", hud_element="open_sale_trade")
+        result = api.recover(Cause(), "shop_sell")
 
         assert result.success
         assert result.target_window == "shop_sell"
         assert not result.escalated
 
-    def test_recover_runs_chain_with_providers(self):
+    def test_recover_runs_chain_with_recipe_reopen(self):
         # Цель не достигнута на входе: цепочка 5.8 идёт по шагам —
-        # ESC, свободный клик, закрытие чужого окна, переоткрытие через HUD.
-        world, clock = World(), FakeClock()
-        world.current = "market"
-        world.hud_click_opens = True
-        world.close_click_closes = True
-        hid = ScriptedHid(clock, world)
-        api = make_api(world, hid, clock=clock)
+        # ESC, свободный клик, закрытие чужого окна, переоткрытие
+        # рецептом open_shop_sell (menu-quickslot-navigation).
+        nav_world, clock = NavWorld(), FakeClock()
+        nav_world.current = "market"
+        nav_world.close_click_closes = True
+        api, hid = make_nav_api(nav_world, clock=clock)
 
-        result = api.recover(Cause(), "shop_sell", hud_element="open_sale_trade")
+        result = api.recover(Cause(), "shop_sell")
 
         assert result.success
         assert actions(hid)[0] == "release_all"   # cause протянут
         assert click_positions(hid) == [FREE_POINT, RECOVER_CLOSE_POINT,
-                                        OPEN_SELL_POINT]
+                                        QS_SELL_POINT]
 
     def test_recover_fail_fast_on_successful_cause(self):
         api = make_api()
         with pytest.raises(ScenarioRecoverError):
-            api.recover(Cause(success=True), "shop_sell",
-                        hud_element="open_sale_trade")
+            api.recover(Cause(success=True), "shop_sell")
 
     def test_recover_cancelled(self):
-        world, clock = World(), FakeClock()
-        hid = ScriptedHid(clock, world)
-        api = make_api(world, hid, clock=clock, cancelled=lambda: True)
+        nav_world, clock = NavWorld(), FakeClock()
+        api, hid = make_nav_api(nav_world, clock=clock,
+                                cancelled=lambda: True)
 
-        result = api.recover(Cause(), "shop_sell", hud_element="open_sale_trade")
+        result = api.recover(Cause(), "shop_sell")
 
         assert result.cancelled
         assert not result.escalated

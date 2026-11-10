@@ -120,7 +120,7 @@ __all__ = [
     "load_gaps",
     "load_model",
     "load_navigation",
-    "load_navigation",    "parse_value",
+    "parse_value",
     "read_confident",
     "read_region",
     "read_stable",

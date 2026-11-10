@@ -26,14 +26,13 @@ from l2core.config import (
 from l2core.detector.anchor import Anchor
 from l2core.detector.status import STATUS_FOUND, WindowStatus
 from l2core.model import ElementSpec, Rect, UiModel, VariantSpec, WindowSpec
+from l2core.primitives.navigation import RecipeResult
 from l2core.primitives.activate import ActivateResult
 from l2core.primitives.outcome import ActionOutcome, to_outcome
 from l2core.primitives.recover import STEP_REOPEN, RecoverError
 from l2core.scenarios.recover import ScenarioRecoverError, scenario_recover
 
 TARGET = "shop_sell"
-HUD_ELEMENT = "open_sale_trade"
-HUD_POINT = (769, 883)
 CLOSE_POINT = (700, 200)
 FREE_POINT = (960, 540)  # центр 1920x1080 — свободная область по дефолту
 ANCHOR = Anchor(window_id=TARGET, x=100, y=100, score=0.99, method="template")
@@ -91,10 +90,7 @@ class ScriptedHid:
 
     def click(self, button=1, count=1, hold_ms=None):
         self._append("click", (button, count, hold_ms, self.pos))
-        if self.pos == HUD_POINT and self.world.hud_click_opens:
-            self.world.current = TARGET
-            self.world.goal = True
-        elif self.pos == CLOSE_POINT and self.world.close_click_closes:
+        if self.pos == CLOSE_POINT and self.world.close_click_closes:
             self.world.current = None
 
     def key_press(self, code):
@@ -126,24 +122,11 @@ def make_config():
     )
 
 
-def make_hud_model():
-    variants = {"normal": VariantSpec(name="normal", template="t.png")}
-    element = ElementSpec(
-        id=HUD_ELEMENT, role="icon_sample",
-        rect=Rect(1000, 420, 200, 160), hud=True, variants=variants,
-    )
-    return UiModel(
-        path="hud", window=WindowSpec(id="market", title="m", size=(1008, 674)),
-        elements={HUD_ELEMENT: element}, states={}, transitions=(),
-        ocr_regions={}, table_geometry=None,
-    )
-
-
 def make_deps(world, hid, *, clock, goal=None, cancelled=None,
               on_escalation=None, resume=None, pause_timeout=5.0,
-              hud_locator=None):
+              recipe_runner="default"):
     """Стандартный набор провайдеров сценария поверх мира."""
-    calls = {"escalation": [], "close_point": [], "hud_locator": []}
+    calls = {"escalation": [], "close_point": [], "recipe": []}
 
     def _on_escalation(result):
         calls["escalation"].append(result)
@@ -152,17 +135,23 @@ def make_deps(world, hid, *, clock, goal=None, cancelled=None,
         calls["close_point"].append(window_id)
         return CLOSE_POINT
 
-    def _hud_locator(element, variant, frame):
-        calls["hud_locator"].append(element.id)
-        return HUD_POINT
-
     def window_status(frame):
         return WindowStatus(status=STATUS_FOUND, reason=None, anchor=ANCHOR,
                             content_loaded=True, content_detail="ok")
 
+    if recipe_runner == "default":
+        def recipe_runner(recipe_id):
+            calls["recipe"].append(recipe_id)
+            if world.hud_click_opens:
+                world.current = TARGET
+                world.goal = True
+            ok = world.goal
+            return RecipeResult(
+                recipe_id, success=ok, attempts=1,
+                failures=() if ok else ("verify открытия не сошёлся",))
+
     deps = dict(
-        hud_model=make_hud_model(),
-        hud_element=HUD_ELEMENT,
+        recipe_runner=recipe_runner,
         screen=FakeScreen(),
         hid=hid,
         cursor_pos=lambda: hid.pos,
@@ -174,7 +163,6 @@ def make_deps(world, hid, *, clock, goal=None, cancelled=None,
         config=make_config(),
         current_window=lambda f: world.current,
         close_point=_close_point,
-        hud_locator=hud_locator or _hud_locator,
         on_escalation=on_escalation or _on_escalation,
         resume=resume,
         pause_timeout=pause_timeout,
@@ -227,9 +215,10 @@ class TestCallContract:
         result = scenario_recover(Cause(), TARGET, **deps)
 
         assert result.success
-        assert click_positions(hid) == [FREE_POINT, CLOSE_POINT, HUD_POINT]
+        # Переоткрытие — рецепт (фейк без HID-клика).
+        assert click_positions(hid) == [FREE_POINT, CLOSE_POINT]
         assert calls["close_point"] == ["market"]
-        assert calls["hud_locator"] == [HUD_ELEMENT]
+        assert calls["recipe"] == ["open_shop_sell"]
 
     def test_cause_forwarded_release_all_first(self):
         # cause протянут в цепочку 5.8: при needs_recover release_all —
@@ -308,15 +297,20 @@ class TestFailFast:
         assert calls["escalation"] == []
 
     def test_model_errors_propagate(self):
-        # Ошибки модели (нет HUD-элемента) — контракт 5.8, пробрасываются
-        # как есть (RecoverError), не оборачиваются сценарием.
+        # Ошибки модели (исполнителя рецептов — RecipeError) — контракт
+        # 5.8: пробрасываются как есть, не оборачиваются сценарием.
         clock = FakeClock()
         world = World()
         hid = ScriptedHid(clock, world)
         deps, _ = make_deps(world, hid, clock=clock)
-        deps["hud_element"] = "no_such_element"
+        from l2core.primitives.navigation import RecipeError
 
-        with pytest.raises(RecoverError):
+        def bad_runner(recipe_id):
+            raise RecipeError(f"рецепт {recipe_id!r} отсутствует")
+
+        deps["recipe_runner"] = bad_runner
+
+        with pytest.raises(RecipeError):
             scenario_recover(Cause(), TARGET, **deps)
 
 

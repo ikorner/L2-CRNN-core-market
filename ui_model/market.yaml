@@ -211,7 +211,7 @@ elements:
     hud: true
     search_area: [430, 700, 500, 100]
     variants:
-      normal: {template: navigation/quickslot_sell.png}
+      normal: {template: navigation/quickslot_sell.png, click_point: [16, 24]}
   other_active:
     rect: [715, 154, 139, 43]
     role: click_target

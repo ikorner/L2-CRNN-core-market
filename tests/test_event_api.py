@@ -396,7 +396,7 @@ class TestApiEvents:
         world.goal = True
         api = make_api(world, clock=clock, events=make_event_api(queue))
 
-        result = api.recover(Cause(), "shop_sell", hud_element="open_sale_trade")
+        result = api.recover(Cause(), "shop_sell")
 
         assert result.success
         recovered = [entry.event for entry in queue.journal.get_events()
@@ -413,8 +413,7 @@ class TestApiEvents:
                                    # цепочка исчерпывается -> эскалация
         api = make_api(world, clock=clock, events=make_event_api(queue))
 
-        result = api.recover(Cause(), "shop_sell", hud_element="open_sale_trade",
-                             pause_timeout=0.01)
+        result = api.recover(Cause(), "shop_sell", pause_timeout=0.01)
 
         assert result.escalated
         escalations = [entry.event for entry in queue.journal.get_events()
@@ -433,7 +432,7 @@ class TestApiEvents:
         api = make_api(world, clock=clock, cancelled=lambda: True,
                        events=make_event_api(queue))
 
-        result = api.recover(Cause(), "shop_sell", hud_element="open_sale_trade")
+        result = api.recover(Cause(), "shop_sell")
 
         assert result.cancelled
         assert queue.journal.get_events() == ()

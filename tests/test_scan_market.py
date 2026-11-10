@@ -515,10 +515,10 @@ class TestScanFailures:
         assert f"элемент {TAB_ELEMENT!r} не подтверждён" in result.failures[0]
         assert "scroll" not in [a for _, a, _ in hid.log]
 
-    def test_anchor_lost_on_read_frame_aborts_point(self):
-        # Открытие — через recipe_runner (find_anchor не трогает). Якорь
-        # есть на первом кадре чтения строк, теряется на следующем —
-        # чтение обрывается честной фиксацией, слепого чтения нет.
+    def test_anchor_lost_on_first_read_frame_aborts_point(self):
+        # Открытие — через recipe_runner (find_anchor не трогает). Якоря
+        # нет с самого первого кадра чтения (бюджет 0 вызовов) — чтение
+        # обрывается честной фиксацией, слепого чтения нет.
         seen = {"n": 0}
 
         def find_anchor(frame):

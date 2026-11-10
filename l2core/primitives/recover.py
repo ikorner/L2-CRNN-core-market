@@ -7,7 +7,7 @@ recover — оркестратор ПОВЕРХ существующих при�
 пассивные шаги исполняются общей механикой on_fail click.py). Цепочка:
 
     ESC → клик в свободную область → закрыть окно (если открыто не то) →
-    переоткрыть через иконку HUD (клик + wait verify открытия) →
+    переоткрыть рецептом навигации (recipe_runner) →
     перекалибровка якоря → эскалация (пауза + событие стратегии)
 
 УСТРОЙСТВО: recover — не ритуал, а путь к цели. Цель — инъекция
@@ -50,16 +50,19 @@ close_sell_button); точки нет (кнопки в модели нет, ка
 окно закрылось устойчиво — wait_until по свежим кадрам: current_window !=
 закрываемое подряд stability_frames кадров.
 
-ШАГ «ПЕРЕОТКРЫТЬ ЧЕРЕЗ HUD»: точку иконки даёт инъекция hud_locator
-(та же конвенция, что в 5.3: HUD панели перетаскиваются, фиксированных
-координат нет — design.md решение 4). РОВНО ОДИН клик по иконке, затем
-wait verify открытия (goal_reached по свежим кадрам, таймаут из конфига).
-Спека «Лавку нельзя создать в текущей зоне»: неоткрытие за таймаут →
-штатный FAILED (успех=False, unconfirmed=False → ActionOutcome.FAILED):
-фиксация состояния (инъекция capture_state — снимок/перехватчик модалок
-3.6; статус окна — в failures) + событие escalation; ПОВТОРНЫХ кликов по
-HUD нет (MUST) — предусловия (зона торговли, живой персонаж) за это время
-не меняются, повтор был бы ритуалом.
+ШАГ «ПЕРЕОТКРЫТЬ РЕЦЕПТОМ НАВИГАЦИИ» (menu-quickslot-navigation): окно
+открывает инъекция recipe_runner(recipe_id) — исполнитель рецептов
+(l2core/primitives/navigation.py; id рецепта — соглашение open_<window>).
+Рецепт сам верифицирует открытие (verify финального шага — якорь окна),
+после успеха — повторная проверка цели (goal_reached по свежим кадрам,
+таймаут из конфига). Спека «Лавку нельзя создать в текущей зоне»:
+неоткрытие за таймаут → штатный FAILED (успех=False, unconfirmed=False
+→ ActionOutcome.FAILED): фиксация состояния (инъекция capture_state —
+снимок/перехватчик модалок 3.6; статус окна — в failures) + событие
+escalation; ПОВТОРНЫХ попыток открытия нет (MUST) — предусловия (зона
+торговли, живой персонаж) за это время не меняются, повтор был бы
+ритуалом. recipe_runner не задан — шаг пропускается с диагностикой
+(честная деградация, как раньше с hud_locator=None).
 
 ШАГ «ПЕРЕКАЛИБРОВКА ЯКОРЯ»: кэша позиции в архитектуре нет — якорь ищется
 на каждом кадре свежий (инвариант 3), поэтому «перекалибровка» — это
@@ -92,7 +95,7 @@ cancelled=True, событие escalation НЕ отправляется (эск�
 
 ДЕТЕРМИНИЗМ (инвариант 7): вся недетерминированность — за инъекциями
 (hid, экран, активация, статус, якорь, goal/current_window/close_point/
-hud_locator, resume, часы); rng — для hold_ms кликов (профиль 5.3).
+recipe_runner, resume, часы); rng — для hold_ms кликов (профиль 5.3).
 Прямых вызовов sleep нет (инвариант 1): паузы и ожидания — только
 wait_until по инъецированным часам.
 
@@ -117,7 +120,7 @@ from l2core.config import CoreConfig
 from l2core.detector.anchor import Anchor
 from l2core.detector.status import WindowStatus
 from l2core.detector.transaction import FrameTransaction
-from l2core.model import ElementSpec, UiModel
+from l2core.primitives.navigation import RecipeResult
 from l2core.primitives.activate import ActivateGameError, ActivateResult
 from l2core.primitives.click import (
     JitterRng,
@@ -209,8 +212,7 @@ class RecoverError(Exception):
 def recover(
     target_window: str,
     *,
-    hud_model: UiModel,
-    hud_element: str,
+    recipe_runner: Optional[Callable[[str], "RecipeResult"]] = None,
     screen: Screen,
     hid,
     cursor_pos: Callable[[], Tuple[int, int]],
@@ -221,8 +223,6 @@ def recover(
     config: CoreConfig,
     current_window: Optional[Callable[[np.ndarray], Optional[str]]] = None,
     close_point: Optional[Callable[[str, np.ndarray],
-                                   Optional[Tuple[int, int]]]] = None,
-    hud_locator: Optional[Callable[[ElementSpec, Optional[str], np.ndarray],
                                    Optional[Tuple[int, int]]]] = None,
     on_escalation: Optional[Callable[[RecoverResult], None]] = None,
     resume: Optional[Callable[[], bool]] = None,
@@ -236,11 +236,13 @@ def recover(
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
 ) -> RecoverResult:
-    """Общий recover: цепочка пассивных шагов → переоткрытие через HUD →
-    перекалибровка якоря → эскалация. Контракт — в докстринге модуля.
+    """Общий recover: цепочка пассивных шагов → переоткрытие рецептом
+    навигации → перекалибровка якоря → эскалация. Контракт — в
+    докстринге модуля.
 
-    hud_model/hud_element — модель с HUD-иконками (market.yaml) и id иконки
-    открытия цели (market_pic / open_buy_trade / open_sale_trade).
+    recipe_runner — исполнитель рецептов открытия (id по соглашению
+    open_<target_window>); None — шаг переоткрытия пропускается с
+    диагностикой (сборка без навигационной модели).
     goal_reached — «состояние восстановлено» (wiring на детекторах 3.4/3.5).
     current_window/close_point — какое окно открыто и где его кнопка закрытия.
     on_escalation — push-callback события escalation (7.3 не здесь).
@@ -250,11 +252,6 @@ def recover(
     if stability_frames < 1:
         raise RecoverError(
             f"stability_frames должно быть >= 1, получено {stability_frames}")
-    element = hud_model.elements.get(hud_element)
-    if element is None:
-        raise RecoverError(
-            f"HUD-элемент {hud_element!r} отсутствует в модели "
-            f"{hud_model.window.id!r}")
     rng = rng or random.Random()
     steps: list[RecoverStep] = []
     failures: list = []
@@ -467,57 +464,60 @@ def recover(
                             STEP_CLOSE_WINDOW, STATUS_FAILED,
                             f"окно {opened!r} не закрылось за таймаут"))
 
-        # --- ШАГ 4: переоткрыть через иконку HUD (ровно один клик + verify).
-        if hud_locator is None:
+        # --- ШАГ 4: переоткрыть рецептом навигации (menu-quickslot-
+        # navigation; рецепт сам верифицирует открытие, дальше — проверка
+        # цели по свежим кадрам).
+        if recipe_runner is None:
             steps.append(RecoverStep(STEP_REOPEN, STATUS_SKIPPED,
-                                     "hud_locator не задан — клик по HUD "
-                                     "невозможен"))
+                                     "recipe_runner не задан — переоткрытие "
+                                     "невозможно (сборка без навигационной "
+                                     "модели)"))
         else:
             gate = _activate_guard()
             if gate == "cancelled":
                 return _cancelled_result()
             if gate == "escalate":
                 return _escalate("активация окна игры невозможна "
-                                 "(шаг переоткрытия через HUD)")
-            point = hud_locator(element, None, tx.refresh())
-            if point is None:
+                                 "(шаг переоткрытия)")
+            recipe_id = f"open_{target_window}"
+            opened_result = recipe_runner(recipe_id)
+            if opened_result.cancelled:
+                return _cancelled_result()
+            if not opened_result.success:
+                # «Лавку нельзя создать в текущей зоне»: неоткрытие →
+                # штатный FAILED + фиксация + escalation; повторных
+                # попыток открытия нет (MUST, spec).
+                reason = "; ".join(opened_result.failures) or (
+                    "verify открытия не сошёлся")
+                failures.append(
+                    f"{STEP_REOPEN}: рецепт {recipe_id!r} не открыл окно "
+                    f"{target_window!r}: {reason} — предусловия открытия "
+                    f"не выполнены (зона торговли, живой персонаж?)")
                 steps.append(RecoverStep(
-                    STEP_REOPEN, STATUS_SKIPPED,
-                    f"иконка HUD {hud_element!r} не локализована в "
-                    f"search_area — клик невозможен"))
-            else:
-                try:
-                    _move_to(hid, cursor_pos, point)
-                    hid.click(BTN_LEFT, 1, _hold_ms(config, rng))
-                except HidError as e:
-                    failures.append(f"{STEP_REOPEN}: HID-сбой ({e})")
-                    steps.append(RecoverStep(STEP_REOPEN, STATUS_FAILED,
-                                             f"HID-сбой: {e}"))
-                else:
-                    opened = _goal_wait()
-                    if opened.cancelled:
-                        return _cancelled_result()
-                    if opened.success:
-                        steps.append(RecoverStep(STEP_REOPEN,
-                                                 STATUS_GOAL_REACHED,
-                                                 "окно открыто (verify)"))
-                        return _success_result()
-                    # «Лавку нельзя создать в текущей зоне»: неоткрытие за
-                    # таймаут → штатный FAILED + фиксация + escalation;
-                    # повторных кликов по HUD нет (MUST, spec).
-                    failures.append(
-                        f"{STEP_REOPEN}: окно {target_window!r} не открылось "
-                        f"за таймаут {config.timing.wait_default_timeout} с "
-                        f"после клика по HUD-иконке {hud_element!r} — "
-                        f"предусловия открытия не выполнены (зона торговли, "
-                        f"живой персонаж?)")
-                    steps.append(RecoverStep(
-                        STEP_REOPEN, STATUS_FAILED,
-                        f"окно не открылось за таймаут "
-                        f"{config.timing.wait_default_timeout} с"))
-                    return _escalate(
-                        f"неоткрытие окна {target_window!r} после клика по "
-                        f"HUD-иконке {hud_element!r}")
+                    STEP_REOPEN, STATUS_FAILED,
+                    f"окно не открыто рецептом {recipe_id!r}"))
+                return _escalate(
+                    f"неоткрытие окна {target_window!r} рецептом "
+                    f"{recipe_id!r}")
+            opened = _goal_wait()
+            if opened.cancelled:
+                return _cancelled_result()
+            if opened.success:
+                steps.append(RecoverStep(STEP_REOPEN,
+                                         STATUS_GOAL_REACHED,
+                                         "окно открыто (verify)"))
+                return _success_result()
+            failures.append(
+                f"{STEP_REOPEN}: окно {target_window!r} открыто рецептом "
+                f"{recipe_id!r}, но цель не достигнута за таймаут "
+                f"{config.timing.wait_default_timeout} с")
+            steps.append(RecoverStep(
+                STEP_REOPEN, STATUS_FAILED,
+                f"цель не достигнута за таймаут "
+                f"{config.timing.wait_default_timeout} с"))
+            return _escalate(
+                f"цель не достигнута после открытия окна "
+                f"{target_window!r} рецептом {recipe_id!r}")
 
         # --- ШАГ 5: перекалибровка якоря (стабильность found подряд K кадров).
         stable = _wait_stable(lambda f: find_anchor(f) is not None)

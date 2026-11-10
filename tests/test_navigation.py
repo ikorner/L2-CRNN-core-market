@@ -443,3 +443,50 @@ class TestShippedNavigation:
         models = _shipped_models()
         assert "open" in models["shop_buy"].elements["jak"].variants
         assert "open" in models["shop_sell"].elements["jakor_sell"].variants
+
+
+class TestFormatBoundaries:
+    """Границы формата: navigation.yaml не модель окна; дубликаты
+    HUD-шаблонов с конфликтом отклоняются (wiring)."""
+
+    def test_load_model_rejects_navigation_file(self, tmp_path):
+        import pytest
+        from l2core.model import load_model
+        from l2core.model.loader import ModelFormatError
+        path = _write_nav(tmp_path)
+        with pytest.raises(ModelFormatError):
+            load_model(path)
+
+    def test_hud_template_conflict_rejected(self, tmp_path):
+        import cv2
+        import numpy as np
+        import pytest
+        from l2core.api.wiring import _load_hud_templates
+        from l2core.model import (
+            ElementSpec, Rect, UiModel, VariantSpec, WindowSpec)
+
+        assets = tmp_path / "assets"
+        assets.mkdir()
+        cv2.imwrite(str(assets / "a.png"), np.zeros((8, 8), np.uint8))
+        cv2.imwrite(str(assets / "b.png"), np.ones((8, 8), np.uint8))
+
+        def model_with(template):
+            element = ElementSpec(
+                id="dup", role="icon_sample", hud=True,
+                search_area=Rect(0, 0, 100, 100),
+                variants={"normal": VariantSpec("normal", template)})
+            return UiModel(
+                path="m", window=WindowSpec(id="market", title="m",
+                                            size=(100, 100)),
+                elements={"dup": element}, states={}, transitions=(),
+                ocr_regions={}, table_geometry=None)
+
+        models = {"market": model_with("a.png"),
+                  "navigation": model_with("b.png")}
+        with pytest.raises(ValueError, match="конфликтный дубликат"):
+            _load_hud_templates(models, assets)
+
+        # Совпадающие дубликаты — штатны (market держит копии навигации).
+        models["navigation"] = model_with("a.png")
+        templates = _load_hud_templates(models, assets)
+        assert ("dup", "normal") in templates
