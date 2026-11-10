@@ -57,7 +57,10 @@ META = json.loads((SCR_DIR / "meta.json").read_text(encoding="utf-8"))
 # scr_all_close — всё закрыто). Якорь обязан НЕ находиться
 # (tests/test_anchor.py::TestAnchorDetectorMarket проверяет то же по
 # позициям — здесь только факт покрытия).
-ANCHOR_ABSENT = ("scr_153511", "scr_153527", "scr_all_close")
+ANCHOR_ABSENT = ("scr_153511", "scr_153527", "scr_all_close",
+               # досъёмка живого прогона 9.4 (Q28): базовый экран и
+               # открытое «Меню» — окон торговли на кадре нет
+               "scr_menu_closed", "scr_menu_open")
 
 # Мета задала state (open), но якорь честно не находится: заголовок
 # «open»-состояния лавки («<Продажа>»/«<Покупка>») в модель не
@@ -86,6 +89,19 @@ SHOP_FACT_OPENING = ("scr_154222",)
 # scr_154355/154244 — сигнатуры opening на динамическом контенте
 # противоречат остальным признакам, строгое «все сигнатуры» даёт
 # unknown). Любое подтверждённое состояние здесь — падение.
+# Досъёмка живого прогона 9.4 (2026-11-10, Q30): обзор открыт владельцем
+# на живой игре (вкладка/фильтр как в мете не размечены — R4); факт
+# детектора на обоих кадрах (до/после прокрутки) — подтверждённое
+# состояние, якорь template@72,111. Материал для живых кропов ячеек.
+FACT_FILTER_STATES["scr_live_rows_home"] = (
+    "list__filter_prochee__global_filter_sell__tab_prochee",
+    {"filter": "prochee", "global_filter": "sell", "tab": "prochee"},
+)
+FACT_FILTER_STATES["scr_live_rows_home_scrolled"] = (
+    "list__filter_prochee__global_filter_sell__tab_prochee",
+    {"filter": "prochee", "global_filter": "sell", "tab": "prochee"},
+)
+
 HONEST_UNKNOWN = (
     "scr_153712", "scr_153722", "scr_153731", "scr_153740", "scr_153750",
     "scr_153802", "scr_153810", "scr_153819", "scr_153830", "scr_153840",
