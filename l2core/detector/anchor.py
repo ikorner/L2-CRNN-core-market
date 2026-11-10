@@ -40,11 +40,13 @@ _FRAME_LINE_OFFSET = (2, 2)
 # Элементы-опоры якоря по умолчанию: окно -> кортеж опор (element_id,
 # variant); find_anchor перебирает опоры template matching'ом по порогу окна,
 # первая сошедшаяся даёт Anchor. market подтверждается целым окном
-# (market_main_menu), лавки — заголовком (jak / jakor_sell).
+# (market_main_menu), лавки — заголовком; у лавок две опоры: «opening»
+# (jak / jakor_sell) и «open» (заголовок открытого окна — досъёмка
+# menu-quickslot-navigation, развязка KNOWN_GAPS п. 6).
 DEFAULT_ANCHOR_TEMPLATES = {
     "market": (("market_main_menu", "normal"),),
-    "shop_buy": (("jak", "normal"),),
-    "shop_sell": (("jakor_sell", "normal"),),
+    "shop_buy": (("jak", "normal"), ("jak", "open")),
+    "shop_sell": (("jakor_sell", "normal"), ("jakor_sell", "open")),
 }
 
 # Допустимые форматы anchor_templates: (element, variant) — одна опора

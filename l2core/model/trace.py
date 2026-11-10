@@ -50,7 +50,7 @@
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from .types import UiModel
 from .validator import (  # noqa: F401  (KNOWN_ON_FAIL_STEPS — реэкспорт)
@@ -160,7 +160,8 @@ def trace_navigation(models: Dict[str, UiModel], nav) -> List[Violation]:
     окно из `recover_closed` своей модели (поле opens). Проверяется:
     - nav_window_unreachable — на каждое окно обязан существовать рецепт
       open_<window> с opens == <window>;
-    - nav_recover_state_missing — в модели окна нет recover_closed;
+    - nav_recover_state_missing — глобального состояния recover_closed
+      («все окна закрыты») нет НИ В ОДНОЙ модели набора (живёт в market);
     - nav_recipe_no_exit — неуспех рецепта не имеет выхода в recover
       (ни on_fail, ни alternate);
     - nav_on_fail_steps — шаги on_fail рецептов только именованные
@@ -168,6 +169,18 @@ def trace_navigation(models: Dict[str, UiModel], nav) -> List[Violation]:
     """
     file = nav.path
     violations: List[Violation] = []
+
+    if not any("recover_closed" in model.states for model in models.values()):
+        violations.append(Violation(
+            rule="nav_recover_state_missing",
+            file=file,
+            subject="recover_closed",
+            detail=(
+                "ни в одной модели окна нет глобального состояния "
+                "recover_closed — точки входа рецептов open_<window> "
+                "не существует"
+            ),
+        ))
 
     def check_on_fail(steps: Tuple[str, ...], subject: str) -> None:
         for step in steps:
@@ -207,16 +220,6 @@ def trace_navigation(models: Dict[str, UiModel], nav) -> List[Violation]:
                     f"вместо {window_id!r}"
                 ),
             ))
-        if "recover_closed" not in model.states:
-            violations.append(Violation(
-                rule="nav_recover_state_missing",
-                file=file,
-                subject=window_id,
-                detail=(
-                    "в модели окна нет состояния recover_closed — точки "
-                    "входа рецепта open_<window> не существует"
-                ),
-            ))
         if not recipe.on_fail and recipe.alternate is None:
             violations.append(Violation(
                 rule="nav_recipe_no_exit",
@@ -233,12 +236,19 @@ def trace_navigation(models: Dict[str, UiModel], nav) -> List[Violation]:
     return violations
 
 
-def trace_model(model: UiModel) -> List[Violation]:
+def trace_model(model: UiModel, *, nav: Optional[object] = None) -> List[Violation]:
     """Трассировка модели; вернуть нарушения (пусто — граф трассируется).
 
     Пустая секция transitions — вакуум (ruling R3), как у валидатора 2.3.
+
+    nav — навигационная модель (опционально): рецепт open_<window>
+    (opens == id окна) даёт recover_-состояниям выход в работу через
+    навигацию (межоконные переходы форматом окон не выражены — открытие
+    исполняют рецепты, menu-quickslot-navigation). Без nav правила
+    unknown_no_exit/recover_no_return проверяются только по переходам
+    модели (синтетические тесты графа).
     """
-    if not model.transitions:
+    if not model.transitions and nav is None:
         return []
 
     file = model.path
@@ -250,6 +260,13 @@ def trace_model(model: UiModel) -> List[Violation]:
     }
     working_states = set(model.states) - recover_states
     violations: List[Violation] = []
+
+    recipe_exit = False
+    if nav is not None:
+        recipe = nav.recipes.get(f"open_{model.window.id}")
+        recipe_exit = recipe is not None and recipe.opens == model.window.id
+    if not model.transitions and recipe_exit:
+        return []
 
     for transition in model.transitions:
         label = _transition_label(transition)
@@ -274,6 +291,10 @@ def trace_model(model: UiModel) -> List[Violation]:
         for recover_id in recover_states
         if reachable(graph, recover_id, transition_only=True) & working_states
     }
+    if recipe_exit:
+        # Открытие окна из recover_-состояния исполняет рецепт
+        # навигации — выход в работу есть.
+        recover_returns = set(recover_states)
     if not recover_returns:
         violations.append(
             Violation(

@@ -1,0 +1,116 @@
+# Навигационная модель «Меню/quick-slot» (menu-quickslot-navigation).
+# Формат: ui_model/FORMAT.md (секция «Навигационная модель»). Не модель окна:
+# открытие окон торговли через игровое «Меню» (клавиша X / гамбургер) и
+# панель быстрого доступа (quick-slot). Сырьё: base_screenshot/scr/
+# scr_nav_qs_panel (2026-11-10), scr_nav_menu_open, scr_nav_shop_*_open.
+elements:
+  hamburger_button:
+    role: icon_sample
+    hud: true
+    search_area: [1000, 740, 136, 100]   # правый нижний угол клиента
+    variants:
+      normal: {template: navigation/hamburger.png, click_point: [20, 19]}
+  menu_anchor:
+    role: icon_sample
+    hud: true
+    search_area: [200, 200, 900, 600]    # меню открывается по центру клиента
+    variants:
+      normal: {template: navigation/menu_anchor.png}   # иконка «Магазин»
+  menu_market_icon:
+    role: click_target
+    rect: [159, 2, 34, 34]               # 1:1 от menu_anchor («Обзор лавок»)
+    variants:
+      normal: {template: navigation/menu_market_icon.png, click_point: [17, 17]}
+  quickslot_buy_icon:
+    role: icon_sample
+    hud: true
+    search_area: [430, 700, 500, 100]    # ряд 1 панели (F1..F12)
+    variants:
+      normal: {template: navigation/quickslot_buy.png, click_point: [16, 24]}
+  quickslot_sell_icon:
+    role: icon_sample
+    hud: true
+    search_area: [430, 700, 500, 100]
+    variants:
+      normal: {template: navigation/quickslot_sell.png, click_point: [16, 24]}
+  market_open_anchor:
+    role: state_signature
+    hud: true
+    search_area: [0, 0, 1136, 833]
+    variants:
+      normal: {template: market/scr_owner_q2_window_title.png}
+  shop_buy_open_anchor:
+    role: state_signature
+    hud: true
+    search_area: [0, 0, 1136, 833]
+    variants:
+      normal: {template: shop_buy/scr_nav_shop_buy_open_title.png}
+  shop_sell_open_anchor:
+    role: state_signature
+    hud: true
+    search_area: [0, 0, 1136, 833]
+    variants:
+      normal: {template: shop_sell/scr_nav_shop_sell_open_title.png}
+signatures:
+  menu_open:
+    - {kind: template, element: menu_anchor, variant: normal}
+    - {kind: template, element: menu_market_icon, variant: normal}
+recipes:
+  open_market:
+    opens: market
+    steps:
+      - action: key
+        key: X
+        skip_if: [menu_open]             # X — toggle: не закрыть открытое меню
+        verify: [menu_open]
+        on_fail: [press_esc]
+      - action: click
+        element: menu_market_icon
+        verify:
+          - {kind: template, element: market_open_anchor, variant: normal}
+        on_fail: [press_esc, click_free_area]
+    on_fail: [press_esc, click_free_area]
+    alternate: open_market_via_hamburger
+  open_market_via_hamburger:
+    opens: market
+    steps:
+      - action: click
+        element: hamburger_button
+        verify: [menu_open]
+        on_fail: [press_esc, click_free_area]
+      - action: click
+        element: menu_market_icon
+        verify:
+          - {kind: template, element: market_open_anchor, variant: normal}
+        on_fail: [press_esc, click_free_area]
+    on_fail: [press_esc, click_free_area]
+  open_shop_buy:
+    opens: shop_buy
+    steps:
+      - action: key
+        key: X
+        when: [menu_open]                # открытое меню мешает клику по слоту
+        verify:
+          - {kind: template, element: menu_anchor, expect: absent}
+        on_fail: [press_esc]
+      - action: click
+        element: quickslot_buy_icon
+        verify:
+          - {kind: template, element: shop_buy_open_anchor, variant: normal}
+        on_fail: [press_esc, click_free_area]
+    on_fail: [press_esc, click_free_area]
+  open_shop_sell:
+    opens: shop_sell
+    steps:
+      - action: key
+        key: X
+        when: [menu_open]
+        verify:
+          - {kind: template, element: menu_anchor, expect: absent}
+        on_fail: [press_esc]
+      - action: click
+        element: quickslot_sell_icon
+        verify:
+          - {kind: template, element: shop_sell_open_anchor, variant: normal}
+        on_fail: [press_esc, click_free_area]
+    on_fail: [press_esc, click_free_area]

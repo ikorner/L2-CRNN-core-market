@@ -69,18 +69,18 @@ def test_load_shipped_market_model_round_trip():
     )
 
     # HUD-элемент: не вписался в окно геометрически (окно на скриншоте
-    # закрыто) -> search_area.
-    opener = model.elements["open_buy_trade"]
+    # закрыто) -> search_area. Каноническое описание навигации живёт в
+    # navigation.yaml; здесь — дубликаты для сигнатур recover_closed
+    # (menu-quickslot-navigation).
+    opener = model.elements["hamburger_button"]
     assert opener.hud
-    assert opener.search_area == (751, 920, 34, 24)
+    assert opener.search_area == (1000, 740, 136, 100)
     assert opener.rect is None
 
-    # market_pic: ручная правка поверх импорта (HUD по спеке ui-model),
-    # конвертер её не перезаписывает.
-    pic = model.elements["market_pic"]
-    assert pic.hud
-    assert pic.search_area == (1000, 420, 200, 160)
-    assert pic.variants["normal"].click_point == (86, 64)
+    # quickslot_sell_icon: HUD-элемент панели быстрого доступа (слот F2).
+    qs = model.elements["quickslot_sell_icon"]
+    assert qs.hud
+    assert qs.search_area == (430, 700, 500, 100)
 
     # состояние из меты: params + template-сигнатуры фактов наблюдания.
     # Вторая сигнатура добавлена в 2.5 (пробел KNOWN_GAPS закрыт правкой

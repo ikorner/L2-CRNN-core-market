@@ -354,7 +354,9 @@ class TestTraceNavigation:
                     if v.rule == "nav_recipe_no_exit"}
         assert subjects == {"recipes.open_shop_buy"}
 
-    def test_recover_closed_missing_fails(self, tmp_path):
+    def test_recover_closed_missing_everywhere_fails(self, tmp_path):
+        # recover_closed — глобальное состояние (живёт в market):
+        # нарушение только если его нет НИ В ОДНОЙ модели набора.
         nav, _ = _nav_with_assets(tmp_path)
         nav = _dc.replace(nav, recipes={
             **nav.recipes,
@@ -362,14 +364,82 @@ class TestTraceNavigation:
                 nav.recipes["open_shop_buy"],
                 id="open_shop_sell", opens="shop_sell"),
         })
-        model = _window_model(tmp_path, "shop_sell")
-        model = _dc.replace(model, states={
-            "some_state": model.states["recover_closed"],
-        })
         models = {
             "market": _window_model(tmp_path, "market"),
             "shop_buy": _window_model(tmp_path, "shop_buy"),
-            "shop_sell": model,
+            "shop_sell": _window_model(tmp_path, "shop_sell"),
+        }
+        models = {
+            wid: _dc.replace(model, states={
+                "some_state": model.states["recover_closed"],
+            })
+            for wid, model in models.items()
         }
         rules = {v.rule for v in trace_navigation(models, nav)}
         assert "nav_recover_state_missing" in rules
+
+
+# ---------------------------------------------------------------------------
+# Отгруженная навигационная модель (Task 11): валидация, трассировка,
+# recover_closed на живом кадре панели, отсутствие удалённых HUD-элементов.
+# ---------------------------------------------------------------------------
+
+from pathlib import Path
+
+from l2core.adapters.template import default_matcher
+from l2core.detector.anchor import Anchor
+from l2core.detector.states import StateDetector
+from l2core.model import load_model
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+UI_MODEL_DIR = REPO_ROOT / "ui_model"
+ASSETS_DIR = REPO_ROOT / "assets"
+
+
+def _shipped_models():
+    return {
+        window_id: load_model(UI_MODEL_DIR / f"{window_id}.yaml")
+        for window_id in ("market", "shop_buy", "shop_sell")
+    }
+
+
+class TestShippedNavigation:
+    def test_shipped_navigation_validates_and_traces(self):
+        nav = load_navigation(UI_MODEL_DIR / "navigation.yaml")
+        violations = validate_navigation(nav, ASSETS_DIR)
+        assert violations == []
+        assert trace_navigation(_shipped_models(), nav) == []
+
+    def test_recover_closed_signatures_match_qs_panel(self):
+        # Голый экран с панелью quick-slot (досъёмка M2, 2026-11-10):
+        # сигнатуры recover_closed (гамбургер + иконка лавки продажи)
+        # подтверждаются на живом кадре.
+        import cv2
+        nav = load_navigation(UI_MODEL_DIR / "navigation.yaml")
+        models = _shipped_models()
+        detector = StateDetector(models, default_matcher(), ASSETS_DIR,
+                                 ocr_client=None)
+        frame = cv2.imread(str(REPO_ROOT / "base_screenshot" / "scr"
+                               / "scr_nav_qs_panel.png"))
+        anchor = Anchor(window_id="market", x=0, y=0, score=0.0,
+                        method="test")
+        checks = models["market"].states["recover_closed"].signatures
+        results = detector.evaluate(tuple(checks), frame, anchor)
+        assert all(r.matched is True for r in results), [
+            (r.name, r.detail) for r in results]
+
+    def test_removed_hud_opening_elements_absent(self):
+        market = _shipped_models()["market"]
+        for element_id in ("market_pic", "open_buy_trade", "open_sale_trade"):
+            assert element_id not in market.elements
+        assert all(
+            not (t.source == "recover_closed" and t.action.type == "click"
+                 and t.action.element == "market_pic")
+            for t in market.transitions)
+        assert "hamburger_button" in market.elements
+        assert "quickslot_sell_icon" in market.elements
+
+    def test_shop_open_anchor_variants_shipped(self):
+        models = _shipped_models()
+        assert "open" in models["shop_buy"].elements["jak"].variants
+        assert "open" in models["shop_sell"].elements["jakor_sell"].variants

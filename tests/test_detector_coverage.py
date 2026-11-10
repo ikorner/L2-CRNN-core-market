@@ -37,9 +37,11 @@ import cv2
 import pytest
 
 from l2core.adapters.template import OpenCvTemplateMatcher
+from l2core.adapters.template import default_matcher
 from l2core.detector.anchor import AnchorDetector
+from l2core.detector.navchecks import build_nav_evaluator
 from l2core.detector.states import StateDetector
-from l2core.model import load_model
+from l2core.model import Check, load_model, load_navigation
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCR_DIR = REPO_ROOT / "base_screenshot" / "scr"
@@ -67,6 +69,21 @@ ANCHOR_ABSENT = ("scr_153511", "scr_153527", "scr_all_close",
 # импортирован (KNOWN_GAPS.yaml п. 6, отчёт 3.3). До закрытия пробела
 # владельцем ожидаем честную не-находку, а не подгонку.
 ANCHOR_ABSENT_OPEN = ("scr_154318", "scr_154424")
+
+# Кадры навигационной модели (досъёмка menu-quickslot-navigation,
+# 2026-11-10): окна торговли на кадре нет, детектор окон не применяется —
+# покрытие через оценщик навигационных проверок (build_nav_evaluator).
+NAV_FRAMES = ("scr_nav_qs_panel", "scr_nav_menu_open")
+
+# Досъёмка open-окон лавок (menu-quickslot-navigation, 2026-11-10):
+# якорь находится по open-опоре (многоопорный якорь, KNOWN_GAPS п. 6
+# закрыт), но состояние «open» свежим кадром не подтверждается — его
+# сигнатуры импортированы со старого сырья и нестабильны (KNOWN_GAPS
+# п. 5). Факт детектора зафиксирован честно: «opening».
+FACT_OPEN_STATE = {
+    "scr_nav_shop_sell_open": ("opening", {}),
+    "scr_nav_shop_buy_open": ("opening", {}),
+}
 
 # Факт детектора после закрытия Q4 (глобальные фильтры «Продажа/Покупка»,
 # ответ владельца + досъёмка): сигнатуры кружков global_filter
@@ -241,6 +258,7 @@ HONEST_UNKNOWN = (
 )
 
 _ANCHOR_ABSENT = object()  # маркер ожидания «якорь не найден»
+_NAV_FRAME = object()      # маркер ожидания «кадр навигации»
 
 
 @lru_cache(maxsize=None)
@@ -290,6 +308,11 @@ def _expected(name: str, entry, model):
     if entry["state"] is not None:
         if name in ANCHOR_ABSENT_OPEN:
             return _ANCHOR_ABSENT
+        if name in FACT_OPEN_STATE:
+            # разметка меты (state='open') расходится с фактом детектора
+            # (сигнатуры open нестабильны — KNOWN_GAPS п. 5): честная
+            # фиксация факта вместо подгонки.
+            return FACT_OPEN_STATE[name]
         return _resolve_meta_state(entry, model)
     if name in ANCHOR_ABSENT:
         return _ANCHOR_ABSENT
@@ -302,6 +325,10 @@ def _expected(name: str, entry, model):
         )
     if name in SHOP_FACT_OPENING:
         return ("opening", {})
+    if name in FACT_OPEN_STATE:
+        return FACT_OPEN_STATE[name]
+    if name in NAV_FRAMES:
+        return _NAV_FRAME
     if name in HONEST_UNKNOWN:
         return (None, {})
     pytest.fail(
@@ -319,9 +346,26 @@ def test_detector_covers_meta_screenshots(real_detector, shipped_models, name):
     anchor_detector, state_detector = real_detector
     frame = frame_bgr(name)
 
-    expected = _expected(name, entry, shipped_models[window_id])
+    expected = _expected(
+        name, entry,
+        shipped_models[window_id] if window_id in shipped_models else None)
     if expected is _ANCHOR_ABSENT:
         assert anchor_detector.find_anchor(frame, window_id) is None
+        return
+    if expected is _NAV_FRAME:
+        nav = load_navigation(UI_MODEL_DIR / "navigation.yaml")
+        evaluate = build_nav_evaluator(nav, default_matcher(), ASSETS_DIR)
+        if name == "scr_nav_menu_open":
+            checks = nav.signatures["menu_open"]
+        else:
+            checks = (
+                Check(kind="template", element="hamburger_button",
+                      variant="normal"),
+                Check(kind="template", element="quickslot_sell_icon",
+                      variant="normal"),
+            )
+        report = evaluate(checks, frame)
+        assert report.passed, f"{name}: {report.failures}"
         return
 
     anchor = anchor_detector.find_anchor(frame, window_id)
@@ -356,13 +400,14 @@ def test_meta_coverage_matches_policy():
         set(meta_states) | set(ANCHOR_ABSENT) | set(ANCHOR_ABSENT_OPEN)
         | set(FACT_FILTER_STATES) | set(FALSE_CONFIRM_EQUIPMENT)
         | set(SHOP_FACT_OPENING) | set(HONEST_UNKNOWN)
+        | set(NAV_FRAMES) | set(FACT_OPEN_STATE)
     )
     assert covered == set(META["screenshots"])
     # Категории не пересекаются: один скрин — одна ожидаемая категория.
     categories = [
         set(ANCHOR_ABSENT), set(ANCHOR_ABSENT_OPEN), set(FACT_FILTER_STATES),
         set(FALSE_CONFIRM_EQUIPMENT), set(SHOP_FACT_OPENING),
-        set(HONEST_UNKNOWN),
+        set(HONEST_UNKNOWN), set(NAV_FRAMES), set(FACT_OPEN_STATE),
     ]
     total = sum(len(c) for c in categories)
     assert total == len(set().union(*categories)), "категории пересекаются"

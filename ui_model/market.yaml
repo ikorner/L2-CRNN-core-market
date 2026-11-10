@@ -184,16 +184,15 @@ elements:
     role: click_target
     variants:
       normal: {template: market/scr_153551_market_other_button_passive.png}
-  market_pic:
-    # Ручная правка поверх импорта: геометрически кроп вписывается в окно,
-    # но это HUD-иконка открытия «Обзора лавок» (spec ui-model). Область
-    # поиска и точка клика выведены из меты: rect кропа [1072, 473, 29, 22]
-    # -> центр (1086, 484), от угла области (1000, 420) = (86, 64).
+  hamburger_button:
+    # Кнопка-гамбургер открытия «Меню» (правый нижний угол клиента;
+    # menu-quickslot-navigation). Живёт здесь, т.к. подтверждает глобальное
+    # состояние recover_closed; каноническое описание — navigation.yaml.
     role: icon_sample
     hud: true
-    search_area: [1000, 420, 200, 160]
+    search_area: [1000, 740, 136, 100]
     variants:
-      normal: {template: market/scr_153511_market_pic.png, click_point: [86, 64]}
+      normal: {template: navigation/hamburger.png, click_point: [20, 19]}
   market_snar_passive:
     rect: [151, 155, 139, 44]
     role: click_target
@@ -204,18 +203,15 @@ elements:
     role: click_target
     variants:
       normal: {template: market/scr_153600_market_update_button.png}
-  open_buy_trade:
+  quickslot_sell_icon:
+    # Иконка «Торговая лавка (Продажа)» на панели быстрого доступа
+    # (ряд 1, F2; menu-quickslot-navigation). Каноническое описание —
+    # navigation.yaml.
     role: icon_sample
     hud: true
-    search_area: [751, 920, 34, 24]
+    search_area: [430, 700, 500, 100]
     variants:
-      normal: {template: market/scr_153511_open_buy_trade.png}
-  open_sale_trade:
-    role: icon_sample
-    hud: true
-    search_area: [751, 871, 34, 24]
-    variants:
-      normal: {template: market/scr_153511_open_sale_trade.png}
+      normal: {template: navigation/quickslot_sell.png}
   other_active:
     rect: [715, 154, 139, 43]
     role: click_target
@@ -1346,15 +1342,17 @@ states:
     # окно целиком, scr_153551 (мета второй признак не знала).
     - {kind: template, element: market_main_menu, variant: normal}
   recover_closed:
-    # «Все окна торговли закрыты» (scr_153511, scr_all_close). Сигнатуры —
-    # видимость HUD-иконок открытия (они импортированы в эту модель).
-    # Состояние глобальное (не окна market), живёт здесь, т.к. HUD-иконки
-    # импортом лежат в market.yaml; моделирование — вопрос владельцу (Q3,
-    # docs/OWNER_QUESTIONS.md).
+    # «Все окна торговли закрыты» (scr_nav_qs_panel, досъёмка
+    # menu-quickslot-navigation 2026-11-10). Сигнатуры — видимость
+    # HUD-элементов навигации (гамбургер + иконка лавки продажи на панели
+    # quick-slot). Состояние глобальное (не окна market), живёт здесь;
+    # возврат в работу — рецепт open_market навигационной модели
+    # (navigation.yaml), не переход окна (межоконные переходы форматом
+    # окон не выражены — KNOWN_GAPS п. 3, развязка рецептами).
     params: {}
     signatures:
-    - {kind: template, element: market_pic, variant: normal}
-    - {kind: template, element: open_buy_trade, variant: normal}
+    - {kind: template, element: hamburger_button, variant: normal}
+    - {kind: template, element: quickslot_sell_icon, variant: normal}
 # Семантика переходов (задача 2.5). Заполнены ТОЛЬКО переходы, подтверждённые
 # метой/скриншотами (R4: в мете click_leads_to: null всюду). Обоснование по
 # каждому переходу — в отчёте 2.5 и docs/OWNER_QUESTIONS.md. verify — наблюдаемые
@@ -1362,21 +1360,12 @@ states:
 # решение 6: ESC -> клик в свободную область); точная цепочка recover — рантайм
 # 5.8. timeout не задан — берётся из конфига при исполнении.
 transitions:
-  # scr_153511 (окон нет, иконка на HUD) -> scr_153551 (tab=home активен).
-  # ОТВЕТ ВЛАДЕЛЬЦА (Q2, приёмка): игра ЗАПОМИНАЕТ последний таб и страницу
-  # скролла — повторное открытие показывает запомненное место, «Главная» —
-  # только дефолт первого открытия. Поэтому verify перехода — универсальный
-  # признак «окно открыто» (заголовок window_title, общий для всех табов),
-  # а не признаки Главной: expected=list__tab_home — номинальная цель графа,
-  # фактическое состояние определяет детектор (вызывающий слой НЕ
-  # предполагает list__tab_home — см. OWNER_QUESTIONS Q2, следствия).
-  - from: recover_closed
-    action: click
-    element: market_pic
-    expected: list__tab_home
-    verify:
-      - {kind: template, element: window_title, variant: normal}
-    on_fail: [press_esc, click_free_area]
+  # Открытие обзора из recover_closed — НЕ переходом модели: межоконные
+  # переходы форматом окон не выражены (KNOWN_GAPS п. 3, развязка
+  # menu-quickslot-navigation) — открытие исполняет рецепт open_market
+  # навигационной модели (X -> иконка обзора в «Меню», alternate —
+  # гамбургер). Возврат recover_closed в работу — тоже рецепт (трассировка
+  # 6.5 учитывает navigation.yaml).
   # scr_153551 (tab=home) -> scr_153600 (tab=equipment, фильтр «Все» активен).
   - from: list__tab_home
     action: click
@@ -1947,32 +1936,32 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_zashita__global_filter_all__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_podderzhka__global_filter_all__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_balans__global_filter_all__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_sell__tab_artifacts
     action: click
@@ -2051,32 +2040,32 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_zashita__global_filter_sell__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_podderzhka__global_filter_sell__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_balans__global_filter_sell__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_buy__tab_artifacts
     action: click
@@ -2155,32 +2144,32 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_zashita__global_filter_buy__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_podderzhka__global_filter_buy__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_balans__global_filter_buy__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_all__tab_svotki
     action: click
@@ -2259,32 +2248,32 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_blag__global_filter_all__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_giganty__global_filter_all__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_drugie__global_filter_all__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_sell__tab_svotki
     action: click
@@ -2363,32 +2352,32 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_blag__global_filter_sell__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_giganty__global_filter_sell__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_drugie__global_filter_sell__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_buy__tab_svotki
     action: click
@@ -2467,32 +2456,32 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_blag__global_filter_buy__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_giganty__global_filter_buy__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_drugie__global_filter_buy__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_all__tab_pripasi
     action: click
@@ -2553,24 +2542,24 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_zaryady_dushi__global_filter_all__tab_pripasi
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_usileniya__global_filter_all__tab_pripasi
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_sell__tab_pripasi
     action: click
@@ -2631,24 +2620,24 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_zaryady_dushi__global_filter_sell__tab_pripasi
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_usileniya__global_filter_sell__tab_pripasi
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_buy__tab_pripasi
     action: click
@@ -2709,24 +2698,24 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_zaryady_dushi__global_filter_buy__tab_pripasi
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_usileniya__global_filter_buy__tab_pripasi
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_all__tab_prochee
     action: click
@@ -2805,32 +2794,32 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_kraski__global_filter_all__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_usil_predmety__global_filter_all__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_prochee__global_filter_all__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_sell__tab_prochee
     action: click
@@ -2909,32 +2898,32 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_kraski__global_filter_sell__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_usil_predmety__global_filter_sell__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_prochee__global_filter_sell__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_buy__tab_prochee
     action: click
@@ -3013,32 +3002,32 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_kraski__global_filter_buy__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_usil_predmety__global_filter_buy__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_prochee__global_filter_buy__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   # Закрытие окна крестом из состояний global_filter (требование
   # валидатора: путь в recover из каждого состояния). Семантика = закрытию
@@ -3049,16 +3038,16 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_buy__tab_equipment
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   # Закрытие крестом из прочих list-состояний (Q10, ответ владельца при
   # приёмке: крестик = ESC, закрывает окно из любого состояния — проверено
@@ -3070,200 +3059,200 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_weapon__global_filter_all__tab_equipment
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_armor__global_filter_all__tab_equipment
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_acces__global_filter_all__tab_equipment
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_weapon__global_filter_sell__tab_equipment
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_armor__global_filter_sell__tab_equipment
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_acces__global_filter_sell__tab_equipment
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_weapon__global_filter_buy__tab_equipment
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_armor__global_filter_buy__tab_equipment
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_acces__global_filter_buy__tab_equipment
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_all__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_sell__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_buy__tab_artifacts
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_all__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_sell__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_buy__tab_svotki
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_all__tab_pripasi
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_sell__tab_pripasi
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_buy__tab_pripasi
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_all__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_sell__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_buy__tab_prochee
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_all__tab_kollekcia
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_sell__tab_kollekcia
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   - from: list__filter_all__global_filter_buy__tab_kollekcia
     action: click
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
   # Обратный таб: scr_153600 -> scr_153551. Элемент — таб «Главная» в
   # невыбранном виде (scr_153712, в мете вариант помечен active по ошибке
@@ -3282,8 +3271,8 @@ transitions:
     element: main_market_close_button
     expected: recover_closed
     verify:
-      - {kind: template, element: market_pic, variant: normal}
-      - {kind: template, element: open_buy_trade, variant: normal}
+      - {kind: template, element: hamburger_button, variant: normal}
+      - {kind: template, element: quickslot_sell_icon, variant: normal}
     on_fail: [press_esc, click_free_area]
 ocr_regions: {}
 # Геометрия нарезки таблицы списка лавок. Калибровка под 1920x1080 из меты

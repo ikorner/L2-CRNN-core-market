@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from l2core.model import load_model
+from l2core.model import load_model, load_navigation
 from l2core.model.trace import (
     KNOWN_ON_FAIL_STEPS,
     UNKNOWN_NODE,
@@ -282,7 +282,8 @@ def test_on_fail_steps_parity_with_executor():
 @pytest.mark.parametrize("window", ["market", "shop_buy", "shop_sell"])
 def test_shipped_models_pass_trace(window):
     model = load_model(UI_MODEL / f"{window}.yaml")
-    violations = trace_model(model)
+    nav = load_navigation(UI_MODEL / "navigation.yaml")
+    violations = trace_model(model, nav=nav)
     assert violations == [], format_report(violations)
 
 

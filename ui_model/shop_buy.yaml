@@ -179,6 +179,10 @@ elements:
     role: click_target
     variants:
       normal: {template: shop_buy/scr_154330_jak.png}
+      # Опора open-состояния (досъёмка menu-quickslot-navigation,
+      # scr_nav_shop_buy_open): «Торговая лавка(Купить)» — заголовок
+      # открытого окна; многоопорный якорь (KNOWN_GAPS п. 6).
+      open: {template: shop_buy/scr_nav_shop_buy_open_title.png}
   kol-vo:
     rect: [476, 40, 32, 24]
     role: click_target

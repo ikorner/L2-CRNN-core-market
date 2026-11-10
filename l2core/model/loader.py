@@ -70,6 +70,9 @@ _DEFAULT_VARIANTS = (
     "placeholder",
     "focused",
     "filled",
+    # Открытое состояние окна: опора многоопорного якоря лавок
+    # (menu-quickslot-navigation; KNOWN_GAPS п. 6).
+    "open",
 )
 
 _DEFAULT_ROLES = (

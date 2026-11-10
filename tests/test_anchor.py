@@ -47,6 +47,13 @@ MARKET_BATCH_2 = [
 MARKET_ANCHORS = {name: (207, 77) for name in MARKET_BATCH_1}
 MARKET_ANCHORS.update({name: (202, 103) for name in MARKET_BATCH_2})
 
+# open-окна лавок по досъёмке menu-quickslot-navigation (2026-11-10):
+# многоопорный якорь находит заголовок «Торговая лавка(...)».
+SHOP_OPEN_ANCHORS = {
+    "scr_nav_shop_sell_open": ("shop_sell", (54, 234)),
+    "scr_nav_shop_buy_open": ("shop_buy", (55, 235)),
+}
+
 # Скриншоты без окна «Обзор лавок» (market якорь обязан не находиться).
 MARKET_NEGATIVES = ["scr_153511", "scr_153527", "scr_all_close"]
 # Скриншоты окон лавок (рамки обзора там нет).
@@ -151,6 +158,15 @@ class TestAnchorDetectorShops:
         """На скриншоте обзора лавок заголовок лавки не должен находиться."""
         assert detector.find_anchor(frame_bgr("scr_153551"), "shop_buy") is None
         assert detector.find_anchor(frame_bgr("scr_153551"), "shop_sell") is None
+
+
+class TestShopOpenAnchors:
+    @pytest.mark.parametrize("name,expected", sorted(SHOP_OPEN_ANCHORS.items()))
+    def test_open_window_anchor_found(self, detector, name, expected):
+        window_id, (x, y) = expected
+        anchor = detector.find_anchor(frame_bgr(name), window_id)
+        assert anchor is not None
+        assert (anchor.x, anchor.y) == (x, y)
 
 
 class TestNoCacheBetweenFrames:

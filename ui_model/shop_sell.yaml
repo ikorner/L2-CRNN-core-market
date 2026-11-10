@@ -133,6 +133,10 @@ elements:
     role: click_target
     variants:
       normal: {template: shop_sell/scr_154213_jakor_sell.png}
+      # Опора open-состояния (досъёмка menu-quickslot-navigation,
+      # scr_nav_shop_sell_open): «Торговая лавка(Продажа)» — заголовок
+      # открытого окна; многоопорный якорь (KNOWN_GAPS п. 6).
+      open: {template: shop_sell/scr_nav_shop_sell_open_title.png}
   jakor_strelka_sell:
     rect: [246, 174, 23, 40]
     role: click_target

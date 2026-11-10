@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from l2core.model import load_model
+from l2core.model import load_model, load_navigation
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 UI_MODEL = REPO_ROOT / "ui_model"
@@ -60,34 +60,37 @@ def _assert_confirmed_shape(transition):
     assert transition.timeout is None
 
 
-# --- market: HUD-иконка -> окно открыто ---
+# --- market: открытие обзора — рецепт навигации, не переход модели ---
 
 
-def test_hud_click_market_pic_opens_window_with_universal_verify():
-    # Q2 (приёмка): игра ЗАПОМИНАЕТ последний таб и страницу скролла —
-    # повторное открытие не гарантирует «Главную». Поэтому verify перехода —
-    # универсальный признак «окно открыто» (заголовок, общий для всех
-    # табов), а не признаки Главной; expected=list__tab_home — номинальная
-    # цель графа (дефолт первого открытия).
+def test_opening_is_recipe_not_a_model_transition():
+    # menu-quickslot-navigation: открытие обзора (X -> иконка в «Меню»,
+    # alternate — гамбургер) исполняет рецепт open_market навигационной
+    # модели; межоконные переходы форматом окон не выражены (KNOWN_GAPS
+    # п. 3, развязка рецептами). В модели market перехода открытия нет.
     market = _shipped("market")
-    transition = _find_click(market, "recover_closed", "market_pic")
-    assert transition is not None, "переход recover_closed --market_pic--> home нет"
-    assert transition.expected == MARKET_HOME
-    _assert_confirmed_shape(transition)
-    checks = {(c.element, c.variant) for c in transition.verify if c.kind == "template"}
-    assert checks == {("window_title", "normal")}
+    assert _find_click(market, "recover_closed", "market_pic") is None
+    nav = load_navigation(UI_MODEL / "navigation.yaml")
+    recipe = nav.recipes["open_market"]
+    assert recipe.opens == "market"
+    assert recipe.alternate == "open_market_via_hamburger"
+    checks = {(c.element, c.variant)
+              for c in recipe.steps[-1].verify if c.kind == "template"}
+    assert checks == {("market_open_anchor", "normal")}
 
 
 def test_recover_closed_state_present_with_observed_signatures():
-    """Состояние «все окна торговли закрыты»: сигнатуры — видимость HUD-иконок
-    (scr_153511). Префикс recover — соглашение валидатора 2.3 (ратификация
-    владельцем — вопрос Q1, docs/OWNER_QUESTIONS.md)."""
+    """Состояние «все окна торговли закрыты»: сигнатуры — видимость
+    HUD-элементов навигации (гамбургер + иконка лавки продажи на панели
+    quick-slot, scr_nav_qs_panel, досъёмка menu-quickslot-navigation).
+    Префикс recover — соглашение валидатора 2.3 (ратификация владельцем —
+    вопрос Q1, docs/OWNER_QUESTIONS.md)."""
     market = _shipped("market")
     state = market.states["recover_closed"]
     assert state.id.startswith("recover")
     checks = {(c.element, c.variant) for c in state.signatures if c.kind == "template"}
-    assert ("market_pic", "normal") in checks
-    assert ("open_buy_trade", "normal") in checks
+    assert ("hamburger_button", "normal") in checks
+    assert ("quickslot_sell_icon", "normal") in checks
 
 
 # --- market: табы «Главная» <-> «Снаряжение» ---

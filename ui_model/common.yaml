@@ -2,7 +2,7 @@
 # Формат: см. FORMAT.md. Это не модель окна — обязательные секции окон
 # (window/elements/states/transitions/ocr_regions) здесь не нужны.
 
-variants: [normal, hover, pressed, disabled, active, placeholder, focused, filled]
+variants: [normal, hover, pressed, disabled, active, placeholder, focused, filled, open]
 roles: [click_target, ocr_region, state_signature, icon_sample]
 grammars:
   digits: {kind: digits}

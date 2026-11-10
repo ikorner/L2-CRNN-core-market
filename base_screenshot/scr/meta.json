@@ -766,6 +766,75 @@
       ],
       "description": "Тот же список после прокрутки вниз на ~5 строк: составные цены («N аден»), разные форматы — живой материал для кропов ячеек (Q30, 2026-11-10). Состояние факт-фиксируется в test_detector_coverage.",
       "crops": []
+    },
+    "scr_nav_qs_panel": {
+      "file": "scr_nav_qs_panel.png",
+      "window": "navigation",
+      "state": null,
+      "state_params": {},
+      "resolution": [
+        1920,
+        1080
+      ],
+      "description": "панель быстрого доступа (quick-slot) на голом экране; досъёмка M2 menu-quickslot-navigation (2026-11-10); клиент в левом верхнем углу",
+      "crops": [
+        "scr_nav_qs_panel_hamburger",
+        "scr_nav_qs_panel_qs_buy",
+        "scr_nav_qs_panel_qs_sell"
+      ],
+      "anchor": null
+    },
+    "scr_nav_menu_open": {
+      "file": "scr_nav_menu_open.png",
+      "window": "navigation",
+      "state": null,
+      "state_params": {},
+      "resolution": [
+        1920,
+        1080
+      ],
+      "description": "Меню открыто по X; досъёмка menu-quickslot-navigation (2026-11-10); иконка обзора — второй значок верхнего ряда",
+      "crops": [
+        "scr_nav_menu_open_anchor",
+        "scr_nav_menu_open_market_icon"
+      ],
+      "anchor": null
+    },
+    "scr_nav_shop_sell_open": {
+      "file": "scr_nav_shop_sell_open.png",
+      "window": "shop_sell",
+      "state": "open",
+      "state_params": {},
+      "resolution": [
+        1920,
+        1080
+      ],
+      "description": "Торговая лавка (Продажа) открыта по F2; чистое open-окно без перекрытий; досъёмка M1 menu-quickslot-navigation (2026-11-10)",
+      "crops": [
+        "scr_nav_shop_sell_open_title"
+      ],
+      "anchor": [
+        54,
+        234
+      ]
+    },
+    "scr_nav_shop_buy_open": {
+      "file": "scr_nav_shop_buy_open.png",
+      "window": "shop_buy",
+      "state": "open",
+      "state_params": {},
+      "resolution": [
+        1920,
+        1080
+      ],
+      "description": "Торговая лавка (Купить) открыта по F1; чистое open-окно без перекрытий; досъёмка M1 menu-quickslot-navigation (2026-11-10)",
+      "crops": [
+        "scr_nav_shop_buy_open_title"
+      ],
+      "anchor": [
+        55,
+        235
+      ]
     }
   },
   "crops": {
@@ -4894,6 +4963,181 @@
         "click_leads_to": null
       },
       "notes": ""
+    },
+    "scr_nav_qs_panel_hamburger": {
+      "file": "navigation/hamburger.png",
+      "screenshot": "scr_nav_qs_panel",
+      "element": "navigation.hamburger_button",
+      "window": "navigation",
+      "slot": null,
+      "variant": "normal",
+      "roles": [
+        "icon_sample"
+      ],
+      "rect": [
+        1094,
+        785,
+        40,
+        38
+      ],
+      "description": "Кнопка-гамбургер открытия «Меню» (правый нижний угол клиента)",
+      "click_point": null,
+      "text_gt": null,
+      "links": {
+        "part_of": null,
+        "click_leads_to": null
+      },
+      "notes": "досъёмка menu-quickslot-navigation (2026-11-10)"
+    },
+    "scr_nav_qs_panel_qs_buy": {
+      "file": "navigation/quickslot_buy.png",
+      "screenshot": "scr_nav_qs_panel",
+      "element": "navigation.quickslot_buy_icon",
+      "window": "navigation",
+      "slot": null,
+      "variant": "normal",
+      "roles": [
+        "icon_sample"
+      ],
+      "rect": [
+        462,
+        727,
+        32,
+        45
+      ],
+      "description": "Слот F1: «Торговая лавка (Купить)» (ряд 1 панели быстрого доступа)",
+      "click_point": null,
+      "text_gt": null,
+      "links": {
+        "part_of": null,
+        "click_leads_to": null
+      },
+      "notes": "досъёмка menu-quickslot-navigation (2026-11-10)"
+    },
+    "scr_nav_qs_panel_qs_sell": {
+      "file": "navigation/quickslot_sell.png",
+      "screenshot": "scr_nav_qs_panel",
+      "element": "navigation.quickslot_sell_icon",
+      "window": "navigation",
+      "slot": null,
+      "variant": "normal",
+      "roles": [
+        "icon_sample"
+      ],
+      "rect": [
+        497,
+        727,
+        32,
+        45
+      ],
+      "description": "Слот F2: «Торговая лавка (Продажа)» (ряд 1 панели быстрого доступа)",
+      "click_point": null,
+      "text_gt": null,
+      "links": {
+        "part_of": null,
+        "click_leads_to": null
+      },
+      "notes": "досъёмка menu-quickslot-navigation (2026-11-10)"
+    },
+    "scr_nav_menu_open_anchor": {
+      "file": "navigation/menu_anchor.png",
+      "screenshot": "scr_nav_menu_open",
+      "element": "navigation.menu_anchor",
+      "window": "navigation",
+      "slot": null,
+      "variant": "normal",
+      "roles": [
+        "state_signature"
+      ],
+      "rect": [
+        288,
+        290,
+        38,
+        38
+      ],
+      "description": "Якорь меню: иконка «Магазин» (верхний ряд меню, 1-я)",
+      "click_point": null,
+      "text_gt": null,
+      "links": {
+        "part_of": null,
+        "click_leads_to": null
+      },
+      "notes": "досъёмка menu-quickslot-navigation (2026-11-10)"
+    },
+    "scr_nav_menu_open_market_icon": {
+      "file": "navigation/menu_market_icon.png",
+      "screenshot": "scr_nav_menu_open",
+      "element": "navigation.menu_market_icon",
+      "window": "navigation",
+      "slot": null,
+      "variant": "normal",
+      "roles": [
+        "icon_sample"
+      ],
+      "rect": [
+        447,
+        292,
+        34,
+        34
+      ],
+      "description": "Иконка «Обзор лавок» в меню (верхний ряд, 3-я; 1:1 от menu_anchor)",
+      "click_point": null,
+      "text_gt": null,
+      "links": {
+        "part_of": null,
+        "click_leads_to": null
+      },
+      "notes": "досъёмка menu-quickslot-navigation (2026-11-10)"
+    },
+    "scr_nav_shop_sell_open_title": {
+      "file": "shop_sell/scr_nav_shop_sell_open_title.png",
+      "screenshot": "scr_nav_shop_sell_open",
+      "element": "shop_sell.jakor_sell",
+      "window": "shop_sell",
+      "slot": null,
+      "variant": "normal",
+      "roles": [
+        "icon_sample"
+      ],
+      "rect": [
+        211,
+        245,
+        204,
+        22
+      ],
+      "description": "Заголовок open-окна «Торговая лавка(Продажа)» — опора многоопорного якоря (вариант open)",
+      "click_point": null,
+      "text_gt": null,
+      "links": {
+        "part_of": null,
+        "click_leads_to": null
+      },
+      "notes": "досъёмка menu-quickslot-navigation (2026-11-10)"
+    },
+    "scr_nav_shop_buy_open_title": {
+      "file": "shop_buy/scr_nav_shop_buy_open_title.png",
+      "screenshot": "scr_nav_shop_buy_open",
+      "element": "shop_buy.jak",
+      "window": "shop_buy",
+      "slot": null,
+      "variant": "normal",
+      "roles": [
+        "icon_sample"
+      ],
+      "rect": [
+        215,
+        244,
+        200,
+        24
+      ],
+      "description": "Заголовок open-окна «Торговая лавка(Купить)» — опора многоопорного якоря (вариант open)",
+      "click_point": null,
+      "text_gt": null,
+      "links": {
+        "part_of": null,
+        "click_leads_to": null
+      },
+      "notes": "досъёмка menu-quickslot-navigation (2026-11-10)"
     }
   },
   "conventions": "Как читать meta.json.\nТри слоя id: window -> state -> element. Кроп — «наблюдение элемента в состоянии».\nid кропа = <screenshot_id>_<rest> без .png; file — относительный путь от scr/.\nsame-element = группировка кропов по element+slot.\nПереходы состояний — из links.click_leads_to (part_of — вложенность).\nКоординаты rect/click_point — пиксели базового скриншота, от левого верхнего угла, 1:1.\nГруппа папки кропа == window: obzor_lavok=market, buy=shop_buy, sell=shop_sell.\n"
