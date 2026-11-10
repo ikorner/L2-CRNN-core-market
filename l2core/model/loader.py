@@ -87,7 +87,14 @@ def _default_grammars() -> dict:
             name="price",
             kind="price",
             separators=frozenset({",", "."}),
-            suffixes=(("к", 1000), ("кк", 1000000)),
+            suffixes=(
+                ("к", 1000),
+                ("кк", 1000000),
+                ("тыс", 1000),
+                ("млн", 1000000),
+                ("млрд", 1000000000),
+            ),
+            units=("аден",),
         ),
         "text": GrammarSpec(name="text", kind="text"),
     }

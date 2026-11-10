@@ -11,7 +11,11 @@ spec ocr-reading).
 - digits — строго неотрицательное целое;
 - price — разделители разрядов (`,` `.`) и суффиксы (`к`=1000, `кк`=1000000),
   опциональные единицы измерения (units, отсекаются перед разбором),
-  валидация по диапазону;
+  валидация по диапазону; составная игровая запись цены
+  «x млрд y млн z тыс d аден» (Q22): последовательность пар
+  «число масштаб» из suffixes (слово длиной ≥ 3), сумма компонентов,
+  масштабы строго по убыванию; хвостовое голое число — неявные адены
+  (слово «аден» при этом — units и отсекается до разбора);
 - text — свободный непустой текст.
 
 Дефолтные диапазоны (границы не заданы в модели): price — 1..2^63-1
@@ -123,7 +127,11 @@ def _strip_unit(grammar: GrammarSpec, text: str) -> str:
 
 
 def _parse_price(grammar: GrammarSpec, text: str) -> int:
-    core = _strip_spaces(_strip_unit(grammar, text))
+    stripped = _strip_unit(grammar, text)
+    composite = _parse_composite(grammar, text, stripped)
+    if composite is not None:
+        return composite
+    core = _strip_spaces(stripped)
     if not core:
         raise GrammarMismatch(grammar, text, "пусто после отсечения единиц")
 
@@ -149,6 +157,63 @@ def _parse_price(grammar: GrammarSpec, text: str) -> int:
     result = value.numerator
     _check_range(grammar, result, DEFAULT_PRICE_MIN, DEFAULT_PRICE_MAX)
     return result
+
+
+def _parse_composite(
+    grammar: GrammarSpec, raw_text: str, stripped: str
+) -> Optional[int]:
+    """Составная игровая запись цены: «5 млрд 450 млн 300 тыс 100 аден».
+
+    Слова-масштабы — ключи suffixes грамматики длиной ≥ 3 (короткие к/кк
+    остаются суффиксами классического разбора). Каждое слово обязано идти
+    после числа, масштабы — строго по убыванию, значения компонентов
+    суммируются; хвостовое голое число — неявные адены. Голое число в
+    середине последовательности — несовпадение (вероятно, OCR потерял
+    слово: разбор заниженной цены молча недопустим). Регистр слов не
+    учитывается. None — текст не похож на составной формат, разбор
+    продолжается классическим путём.
+    """
+    words = tuple(
+        sorted((w for w, _ in grammar.suffixes if len(w) >= 3), key=len, reverse=True)
+    )
+    if not words:
+        return None
+    pattern = "|".join(re.escape(w) for w in words)
+    if not re.search(r"\d\s*(?:" + pattern + r")", stripped, flags=re.IGNORECASE):
+        return None
+    mults = {w.lower(): m for w, m in grammar.suffixes}
+    components = []
+    pos, end = 0, len(stripped)
+    while pos < end:
+        if stripped[pos].isspace():
+            pos += 1
+            continue
+        token = re.match(
+            r"(\d+)(?:\s*(" + pattern + r"))?", stripped[pos:], flags=re.IGNORECASE
+        )
+        if token is None:
+            raise GrammarMismatch(
+                grammar, raw_text, "ожидаются «число» или «число масштаб»"
+            )
+        digits = int(token.group(1))
+        word = token.group(2)
+        if word is None:
+            if stripped[pos + token.end() :].strip():
+                raise GrammarMismatch(
+                    grammar, raw_text, "голое число допустимо только в конце"
+                )
+            components.append((digits, 1))
+            break
+        mult = mults[word.lower()]
+        if components and mult >= components[-1][1]:
+            raise GrammarMismatch(
+                grammar, raw_text, "масштабы должны идти строго по убыванию"
+            )
+        components.append((digits, mult))
+        pos += token.end()
+    value = sum(d * m for d, m in components)
+    _check_range(grammar, value, DEFAULT_PRICE_MIN, DEFAULT_PRICE_MAX)
+    return value
 
 
 def _split_groups(grammar: GrammarSpec, number: str) -> Tuple[str, ...]:

@@ -139,10 +139,95 @@ class TestPriceUnits:
         with pytest.raises(GrammarMismatch):
             parse_value(self._grammar(), "240аден")
 
-    def test_unknown_unit_word_is_mismatch(self):
-        # «млрд» в спеку не входит — не разбирается (вопрос владельцу Q22)
+    def test_scale_word_outside_suffixes_is_mismatch(self):
+        # «млрд» не входит в suffixes грамматики — композитный разбор
+        # не активируется, слово не разбирается (доступность масштабов —
+        # данные модели, common.yaml)
         with pytest.raises(GrammarMismatch):
             parse_value(self._grammar(), "240 млрд аден")
+
+
+def _price_game(**kw):
+    # грамматика price с игровыми масштабами (ответ владельца по Q22:
+    # цены всегда «x млрд y млн z тыс d аден», старшие части отбрасываются)
+    base = dict(
+        name="price",
+        kind="price",
+        separators=frozenset({",", "."}),
+        suffixes=(
+            ("к", 1000),
+            ("кк", 1000000),
+            ("тыс", 1000),
+            ("млн", 1000000),
+            ("млрд", 1000000000),
+        ),
+        units=("аден",),
+    )
+    base.update(kw)
+    return GrammarSpec(**base)
+
+
+class TestPriceComposite:
+    def test_full_format(self):
+        assert parse_value(_price_game(), "5 млрд 450 млн 300 тыс 100 аден") == 5_450_300_100
+
+    def test_small_price_leading_parts_dropped(self):
+        assert parse_value(_price_game(), "5 тыс 100 аден") == 5100
+
+    def test_plain_aden(self):
+        assert parse_value(_price_game(), "100 аден") == 100
+
+    def test_single_large_scale(self):
+        assert parse_value(_price_game(), "240 млрд аден") == 240_000_000_000
+
+    def test_middle_parts_omitted(self):
+        assert parse_value(_price_game(), "1 млрд 500 тыс аден") == 1_000_500_000
+
+    def test_case_insensitive_scale_words(self):
+        # слова-маcштабы матчатся без учёта регистра (OCR может отдать капс)
+        assert parse_value(_price_game(), "5 МЛН АДЕН") == 5_000_000
+
+    def test_trailing_bare_number_is_implicit_aden(self):
+        # «аден» уже отсечён units; хвостовое голое число — неявные адены
+        assert parse_value(_price_game(), "5 тыс 100") == 5100
+
+    def test_ascending_scales_are_mismatch(self):
+        with pytest.raises(GrammarMismatch):
+            parse_value(_price_game(), "5 тыс 2 млн аден")
+
+    def test_repeated_scale_is_mismatch(self):
+        with pytest.raises(GrammarMismatch):
+            parse_value(_price_game(), "5 млн 2 млн аден")
+
+    def test_bare_number_inside_sequence_is_mismatch(self):
+        # «5 100 тыс» — вероятно, OCR потерял слово: строго, иначе цена
+        # прочиталась бы заниженной молча
+        with pytest.raises(GrammarMismatch):
+            parse_value(_price_game(), "5 100 тыс аден")
+
+    def test_scale_word_without_number_is_mismatch(self):
+        with pytest.raises(GrammarMismatch):
+            parse_value(_price_game(units=()), "5 млрд млн")
+
+    def test_unknown_word_is_mismatch(self):
+        with pytest.raises(GrammarMismatch):
+            parse_value(_price_game(), "5 лямов аден")
+
+    def test_zero_is_out_of_range(self):
+        with pytest.raises(ValueOutOfRange):
+            parse_value(_price_game(), "0 аден")
+
+    def test_custom_range_applies_to_sum(self):
+        g = _price_game(min_value=10, max_value=99)
+        assert parse_value(g, "50 аден") == 50
+        with pytest.raises(ValueOutOfRange):
+            parse_value(g, "5 тыс 100 аден")
+
+    def test_legacy_suffix_still_works(self):
+        # композитный разбор не ломает старый путь (к/кк, разделители)
+        g = _price_game()
+        assert parse_value(g, "1.5кк") == 1500000
+        assert parse_value(g, "1,500,000") == 1500000
 
 
 class TestDigits:
@@ -325,9 +410,11 @@ class TestLoaderGrammarRange:
             load_common(path)
 
     def test_builtin_common_has_no_explicit_range(self):
-        # дефолтный диапазон применяется на разборе, модель не меняется
+        # дефолтный диапазон применяется на разборе, модель не меняется;
+        # «аден» — units поставляемой грамматики price (Q22), builtin
+        # словарь ему соответствует
         import l2core.model.loader as loader
 
         common = loader._builtin_common()
         assert common.grammars["price"].min_value is None
-        assert common.grammars["price"].units == ()
+        assert common.grammars["price"].units == ("аден",)

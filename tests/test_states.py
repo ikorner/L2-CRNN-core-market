@@ -528,11 +528,16 @@ class TestRealScreenshots:
         report = detect_on(real_detector, "scr_154213", "shop_sell")
         assert report.state == "opening"
 
-    def test_market_untabbed_state_is_unknown(self, real_detector):
-        """scr_153802: мета params tab=scroll, состояния таба scroll в
-        модели нет -> честный unknown (а не уверенное чужое состояние)."""
+    def test_market_scrolled_tab_state_is_confirmed(self, real_detector):
+        """scr_153802: прокрученный список на табе «Свитки» (мета params
+        tab=scroll фиксировала факт скролла, не таб). После Q6 состояния
+        табов размечены: детектор честно подтверждает svotki (подтаб
+        «Все» + global_filter=buy), скролл списка params состояния
+        не меняет (см. KNOWN_GAPS п. 8, п. 3)."""
         report = detect_on(real_detector, "scr_153802", "market")
-        assert report.state is None
+        assert report.state == "list__filter_all__global_filter_buy__tab_svotki"
+        assert report.params == {"filter": "all", "global_filter": "buy",
+                                 "tab": "svotki"}
 
 
 class TestEvaluateChecks:

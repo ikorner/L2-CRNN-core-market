@@ -129,16 +129,36 @@ elements:
     role: icon_sample
     variants:
       normal: {template: market/scr_153600_gorod.png}
-  krujok_empty:
+  krujok_all_active:
+    rect: [359, 107, 20, 23]
+    role: icon_sample
+    variants:
+      active: {template: market/scr_153600_krujok_ne_pusty.png}
+  krujok_all_passive:
+    rect: [359, 107, 20, 23]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153611_krujok_all_passive.png}
+  krujok_sell_active:
+    rect: [481, 107, 20, 23]
+    role: icon_sample
+    variants:
+      active: {template: market/scr_153611_krujok_sell_active.png}
+  krujok_sell_passive:
+    rect: [481, 107, 20, 23]
+    role: icon_sample
+    variants:
+      normal: {template: market/scr_153600_krujok_sell_passive.png}
+  krujok_buy_active:
+    rect: [606, 108, 21, 22]
+    role: icon_sample
+    variants:
+      active: {template: market/scr_153619_krujok_buy_active.png}
+  krujok_buy_passive:
     rect: [606, 108, 21, 22]
     role: icon_sample
     variants:
       normal: {template: market/scr_153600_krujok_empty.png}
-  krujok_ne_pusty:
-    rect: [359, 107, 20, 23]
-    role: click_target
-    variants:
-      normal: {template: market/scr_153600_krujok_ne_pusty.png}
   main_market_close_button:
     rect: [974, 8, 26, 27]
     role: icon_sample
@@ -421,6 +441,11 @@ elements:
     role: click_target
     variants:
       active: {template: market/scr_153600_snaryag_all_active.png}
+  snaryag_all_passive:
+    rect: [18, 207, 111, 28]
+    role: click_target
+    variants:
+      normal: {template: market/scr_153631_snaryag_all_passive.png}
   snaryag_armor_passive:
     rect: [248, 207, 110, 29]
     role: click_target
@@ -436,6 +461,140 @@ elements:
     role: click_target
     variants:
       active: {template: market/scr_153600_snaryg_active.png}
+  tab_snar_passive:
+    rect: [151, 154, 141, 45]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_tab_snar_passive.png}
+  # Подтабы «Артефакты» (досъёмка владельца, приёмка): клик по пассивному
+  # подтабу активирует его (яркая рамка, пиксель-проба верхней кромки:
+  # активная (113,101,86) vs пассивная (76,72,64), как в Q5); повторный клик
+  # — no-op; путь между подтабами — через «Все» (минимальная модель).
+  ataka_passive:
+    rect: [132, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_ataca_passive.png}
+  zashita_passive:
+    rect: [246, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_zashita_passive.png}
+  podderzhka_passive:
+    rect: [361, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_podderzhka_passive.png}
+  balans_passive:
+    rect: [476, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_balans_passive.png}
+  vse_artifacts_passive:
+    rect: [18, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_subtabs_vse_artifacts_passive.png}
+  tab_artifacts_passive:
+    rect: [292, 154, 140, 45]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_tab_artifacts_passive.png}
+  # Подтабы «Свитки» (досъёмка владельца, приёмка): механика = «Артефакты»
+  # (проба яркой рамки активного подтаба; путь между подтабами — через
+  # «Все»).
+  obychnye_passive:
+    rect: [132, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_obychnye_passive.png}
+  blag_passive:
+    rect: [246, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_blag_passive.png}
+  giganty_passive:
+    rect: [361, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_giganty_passive.png}
+  drugie_passive:
+    rect: [476, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_drugie_passive.png}
+  vse_svotki_passive:
+    rect: [18, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_subtabs_vse_svotki_passive.png}
+  tab_svotki_passive:
+    rect: [433, 154, 140, 45]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_tab_svotki_passive.png}
+  # Подтабы «Припасы» (досъёмка владельца, приёмка): механика = «Артефакты».
+  zaryady_dukha_passive:
+    rect: [132, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_zaryady_dukha_passive.png}
+  zaryady_dushi_passive:
+    rect: [246, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_zaryady_dushi_passive.png}
+  usileniya_passive:
+    rect: [361, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_usileniya_passive.png}
+  vse_pripasi_passive:
+    rect: [18, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_subtabs_vse_pripasi_passive.png}
+  tab_pripasi_passive:
+    rect: [574, 154, 140, 45]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_tab_pripasi_passive.png}
+  # Подтабы «Прочее» (досъёмка владельца, приёмка): механика = «Артефакты».
+  kamni_dukha_passive:
+    rect: [132, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_kamni_dukha_passive.png}
+  kraski_passive:
+    rect: [246, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_kraski_passive.png}
+  usil_predmety_passive:
+    rect: [361, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_usil_predmety_passive.png}
+  prochee_passive:
+    rect: [476, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_sub_prochee_passive.png}
+  vse_prochee_passive:
+    rect: [18, 207, 110, 29]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_subtabs_vse_prochee_passive.png}
+  tab_prochee_passive:
+    rect: [715, 154, 140, 45]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_tab_prochee_passive.png}
+  tab_kollekcia_passive:
+    rect: [857, 154, 140, 45]
+    role: click_target
+    variants:
+      normal: {template: market/scr_owner_q6_tab_kollekcia_passive.png}
   type:
     rect: [54, 246, 30, 17]
     role: click_target
@@ -446,6 +605,17 @@ elements:
     role: click_target
     variants:
       active: {template: market/scr_153631_weapon_active.png}
+  window_title:
+    # Заголовок окна «Обзор лавок» (Q2): единственный визуальный признак,
+    # общий для ВСЕХ табов/состояний окна (проверено NCC 0.998 между
+    # «Главная» scr_153551 и живым кадром «Коллекции»). Используется в verify
+    # перехода открытия recover_closed -> list__tab_home: игра запоминает
+    # последний таб и страницу скролла (Q2), поэтому verify подтверждает
+    # только «окно открылось»; фактическое состояние классифицирует детектор.
+    rect: [440, 12, 136, 24]
+    role: state_signature
+    variants:
+      normal: {template: market/scr_owner_q2_window_title.png}
 states:
   list__filter_all__global_filter_all__tab_equipment:
     params: {filter: all, global_filter: all, tab: equipment}
@@ -453,6 +623,721 @@ states:
     - {kind: template, element: filter_button_all_active, variant: active}
     - {kind: template, element: snaryag_all_active, variant: active}
     - {kind: template, element: snaryg_active, variant: active}
+    # Дискриминация global_filter (Q4, ответ владельца + досъёмка): кружок
+    # «Все» заполнен, на «Продажа»/«Покупка» — пустые. Без этого признака
+    # состояние ложно подтверждалось на чужом фильтре (0.930, KNOWN_GAPS
+    # п. 4 до закрытия).
+    - {kind: template, element: krujok_all_active, variant: active}
+    # Подтаб «Все» активен: яркая рамка кнопки (Q5 — подтабы
+    # template'ами не дискриминируются, кросс 0.95+; проба рамки
+    # дельта 48 при допуске 16). Без пробы состояние ложно
+    # подтверждалось на подтабах «Оружие»/«Броня»/«Аксессуары».
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+  list__filter_all__global_filter_sell__tab_equipment:
+    params: {filter: all, global_filter: sell, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    # Привязка к табу «Снаряжение» + подтабу «Все»: без неё кружки
+    # global_filter подтверждают состояние на любых табах с включённым
+    # фильтром (false confirm на скринах других табов, замер Q4).
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: snaryag_all_active, variant: active}
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_buy__tab_equipment:
+    params: {filter: all, global_filter: buy, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: snaryag_all_active, variant: active}
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_weapon__global_filter_all__tab_equipment:
+    params: {filter: weapon, global_filter: all, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [134, 209], color: [118, 103, 87]}]
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_armor__global_filter_all__tab_equipment:
+    params: {filter: armor, global_filter: all, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [303, 208], color: [118, 103, 87]}]
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_acces__global_filter_all__tab_equipment:
+    params: {filter: acces, global_filter: all, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [364, 209], color: [118, 103, 87]}]
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_weapon__global_filter_sell__tab_equipment:
+    params: {filter: weapon, global_filter: sell, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [134, 209], color: [118, 103, 87]}]
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_armor__global_filter_sell__tab_equipment:
+    params: {filter: armor, global_filter: sell, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [303, 208], color: [118, 103, 87]}]
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_acces__global_filter_sell__tab_equipment:
+    params: {filter: acces, global_filter: sell, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [364, 209], color: [118, 103, 87]}]
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_weapon__global_filter_buy__tab_equipment:
+    params: {filter: weapon, global_filter: buy, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [134, 209], color: [118, 103, 87]}]
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_armor__global_filter_buy__tab_equipment:
+    params: {filter: armor, global_filter: buy, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [303, 208], color: [118, 103, 87]}]
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_acces__global_filter_buy__tab_equipment:
+    params: {filter: acces, global_filter: buy, tab: equipment}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [364, 209], color: [118, 103, 87]}]
+    - {kind: template, element: snaryg_active, variant: active}
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_all__tab_artifacts:
+    params: {filter: all, global_filter: all, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_all__global_filter_sell__tab_artifacts:
+    params: {filter: all, global_filter: sell, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_buy__tab_artifacts:
+    params: {filter: all, global_filter: buy, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_ataka__global_filter_all__tab_artifacts:
+    params: {filter: ataka, global_filter: all, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_ataka__global_filter_sell__tab_artifacts:
+    params: {filter: ataka, global_filter: sell, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_ataka__global_filter_buy__tab_artifacts:
+    params: {filter: ataka, global_filter: buy, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_zashita__global_filter_all__tab_artifacts:
+    params: {filter: zashita, global_filter: all, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [301, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_zashita__global_filter_sell__tab_artifacts:
+    params: {filter: zashita, global_filter: sell, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [301, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_zashita__global_filter_buy__tab_artifacts:
+    params: {filter: zashita, global_filter: buy, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [301, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_podderzhka__global_filter_all__tab_artifacts:
+    params: {filter: podderzhka, global_filter: all, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [416, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_podderzhka__global_filter_sell__tab_artifacts:
+    params: {filter: podderzhka, global_filter: sell, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [416, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_podderzhka__global_filter_buy__tab_artifacts:
+    params: {filter: podderzhka, global_filter: buy, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [416, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_balans__global_filter_all__tab_artifacts:
+    params: {filter: balans, global_filter: all, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [531, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_balans__global_filter_sell__tab_artifacts:
+    params: {filter: balans, global_filter: sell, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [531, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_balans__global_filter_buy__tab_artifacts:
+    params: {filter: balans, global_filter: buy, tab: artifacts}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [362, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [531, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_all__tab_svotki:
+    params: {filter: all, global_filter: all, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_all__global_filter_sell__tab_svotki:
+    params: {filter: all, global_filter: sell, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_buy__tab_svotki:
+    params: {filter: all, global_filter: buy, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_obychnye__global_filter_all__tab_svotki:
+    params: {filter: obychnye, global_filter: all, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_obychnye__global_filter_sell__tab_svotki:
+    params: {filter: obychnye, global_filter: sell, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_obychnye__global_filter_buy__tab_svotki:
+    params: {filter: obychnye, global_filter: buy, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_blag__global_filter_all__tab_svotki:
+    params: {filter: blag, global_filter: all, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [302, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_blag__global_filter_sell__tab_svotki:
+    params: {filter: blag, global_filter: sell, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [302, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_blag__global_filter_buy__tab_svotki:
+    params: {filter: blag, global_filter: buy, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [302, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_giganty__global_filter_all__tab_svotki:
+    params: {filter: giganty, global_filter: all, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [417, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_giganty__global_filter_sell__tab_svotki:
+    params: {filter: giganty, global_filter: sell, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [417, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_giganty__global_filter_buy__tab_svotki:
+    params: {filter: giganty, global_filter: buy, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [417, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_drugie__global_filter_all__tab_svotki:
+    params: {filter: drugie, global_filter: all, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [532, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_drugie__global_filter_sell__tab_svotki:
+    params: {filter: drugie, global_filter: sell, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [532, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_drugie__global_filter_buy__tab_svotki:
+    params: {filter: drugie, global_filter: buy, tab: svotki}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [504, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [532, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_all__tab_pripasi:
+    params: {filter: all, global_filter: all, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 88]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_all__global_filter_sell__tab_pripasi:
+    params: {filter: all, global_filter: sell, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 88]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_buy__tab_pripasi:
+    params: {filter: all, global_filter: buy, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 88]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_zaryady_dukha__global_filter_all__tab_pripasi:
+    params: {filter: zaryady_dukha, global_filter: all, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_zaryady_dukha__global_filter_sell__tab_pripasi:
+    params: {filter: zaryady_dukha, global_filter: sell, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_zaryady_dukha__global_filter_buy__tab_pripasi:
+    params: {filter: zaryady_dukha, global_filter: buy, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_zaryady_dushi__global_filter_all__tab_pripasi:
+    params: {filter: zaryady_dushi, global_filter: all, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [302, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_zaryady_dushi__global_filter_sell__tab_pripasi:
+    params: {filter: zaryady_dushi, global_filter: sell, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [302, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_zaryady_dushi__global_filter_buy__tab_pripasi:
+    params: {filter: zaryady_dushi, global_filter: buy, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [302, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_usileniya__global_filter_all__tab_pripasi:
+    params: {filter: usileniya, global_filter: all, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [417, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_usileniya__global_filter_sell__tab_pripasi:
+    params: {filter: usileniya, global_filter: sell, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [417, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_usileniya__global_filter_buy__tab_pripasi:
+    params: {filter: usileniya, global_filter: buy, tab: pripasi}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [645, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [417, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_all__tab_prochee:
+    params: {filter: all, global_filter: all, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [119, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_all__global_filter_sell__tab_prochee:
+    params: {filter: all, global_filter: sell, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [119, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_buy__tab_prochee:
+    params: {filter: all, global_filter: buy, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [119, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_kamni_dukha__global_filter_all__tab_prochee:
+    params: {filter: kamni_dukha, global_filter: all, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_kamni_dukha__global_filter_sell__tab_prochee:
+    params: {filter: kamni_dukha, global_filter: sell, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_kamni_dukha__global_filter_buy__tab_prochee:
+    params: {filter: kamni_dukha, global_filter: buy, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [187, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_kraski__global_filter_all__tab_prochee:
+    params: {filter: kraski, global_filter: all, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [302, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_kraski__global_filter_sell__tab_prochee:
+    params: {filter: kraski, global_filter: sell, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [302, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_kraski__global_filter_buy__tab_prochee:
+    params: {filter: kraski, global_filter: buy, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [302, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_usil_predmety__global_filter_all__tab_prochee:
+    params: {filter: usil_predmety, global_filter: all, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [417, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_usil_predmety__global_filter_sell__tab_prochee:
+    params: {filter: usil_predmety, global_filter: sell, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [417, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_usil_predmety__global_filter_buy__tab_prochee:
+    params: {filter: usil_predmety, global_filter: buy, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [417, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_prochee__global_filter_all__tab_prochee:
+    params: {filter: prochee, global_filter: all, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [532, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_prochee__global_filter_sell__tab_prochee:
+    params: {filter: prochee, global_filter: sell, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [532, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_prochee__global_filter_buy__tab_prochee:
+    params: {filter: prochee, global_filter: buy, tab: prochee}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [786, 190], color: [118, 104, 87]}]
+    - kind: pixel_probe
+      points: [{at: [532, 208], color: [113, 101, 86]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_all__tab_kollekcia:
+    params: {filter: all, global_filter: all, tab: kollekcia}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [927, 190], color: [119, 127, 136]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_all_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+  list__filter_all__global_filter_sell__tab_kollekcia:
+    params: {filter: all, global_filter: sell, tab: kollekcia}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [927, 190], color: [119, 127, 136]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_sell_active, variant: active}
+    - {kind: template, element: krujok_buy_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
+  list__filter_all__global_filter_buy__tab_kollekcia:
+    params: {filter: all, global_filter: buy, tab: kollekcia}
+    signatures:
+    - kind: pixel_probe
+      points: [{at: [927, 190], color: [119, 127, 136]}]
+    - kind: pixel_probe
+      points: [{at: [19, 209], color: [118, 103, 87]}]
+    - {kind: template, element: krujok_buy_active, variant: active}
+    - {kind: template, element: krujok_sell_passive, variant: normal}
+    - {kind: template, element: krujok_all_passive, variant: normal}
   list__tab_home:
     params: {tab: home}
     signatures:
@@ -478,15 +1363,19 @@ states:
 # 5.8. timeout не задан — берётся из конфига при исполнении.
 transitions:
   # scr_153511 (окон нет, иконка на HUD) -> scr_153551 (tab=home активен).
-  # Оговорка меты: при повторном открытии открывается последний tab —
-  # вопрос владельцу (Q2).
+  # ОТВЕТ ВЛАДЕЛЬЦА (Q2, приёмка): игра ЗАПОМИНАЕТ последний таб и страницу
+  # скролла — повторное открытие показывает запомненное место, «Главная» —
+  # только дефолт первого открытия. Поэтому verify перехода — универсальный
+  # признак «окно открыто» (заголовок window_title, общий для всех табов),
+  # а не признаки Главной: expected=list__tab_home — номинальная цель графа,
+  # фактическое состояние определяет детектор (вызывающий слой НЕ
+  # предполагает list__tab_home — см. OWNER_QUESTIONS Q2, следствия).
   - from: recover_closed
     action: click
     element: market_pic
     expected: list__tab_home
     verify:
-      - {kind: template, element: market_main_button_active, variant: active}
-      - {kind: template, element: market_main_menu, variant: normal}
+      - {kind: template, element: window_title, variant: normal}
     on_fail: [press_esc, click_free_area]
   # scr_153551 (tab=home) -> scr_153600 (tab=equipment, фильтр «Все» активен).
   - from: list__tab_home
@@ -496,6 +1385,1885 @@ transitions:
     verify:
       - {kind: template, element: snaryg_active, variant: active}
       - {kind: template, element: filter_button_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  # scr_153600 (tab=equipment, фильтр «Все» активен) -> живой кадр
+  # владельца (Q4, досъёмка 09.11.2025): клик по пассивной кнопке
+  # «Продажа» переключает радио-группу глобальных фильтров — список
+  # переключается на лавки «на продажу», кружок «Продажа» заполняется.
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: filter_button_sell_passive
+    expected: list__filter_all__global_filter_sell__tab_equipment
+    verify:
+      - {kind: template, element: krujok_sell_active, variant: active}
+      - {kind: template, element: krujok_buy_passive, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  # Аналогично «Покупка» (тот же живой кадр, Q4).
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: filter_button_buy_passive
+    expected: list__filter_all__global_filter_buy__tab_equipment
+    verify:
+      - {kind: template, element: krujok_buy_active, variant: active}
+      - {kind: template, element: krujok_sell_passive, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  # Радио-группа: переключение sell <-> buy напрямую (симметрия
+  # подтверждённого механизма, семантика = «пассивная кнопка включается»).
+  - from: list__filter_all__global_filter_sell__tab_equipment
+    action: click
+    element: filter_button_buy_passive
+    expected: list__filter_all__global_filter_buy__tab_equipment
+    verify:
+      - {kind: template, element: krujok_buy_active, variant: active}
+      - {kind: template, element: krujok_sell_passive, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_equipment
+    action: click
+    element: filter_button_sell_passive
+    expected: list__filter_all__global_filter_sell__tab_equipment
+    verify:
+      - {kind: template, element: krujok_sell_active, variant: active}
+      - {kind: template, element: krujok_buy_passive, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  # Подтабы «Снаряжение» (Q5, ответ владельца + досъёмка scr_153631):
+  # клик по пассивному подтабу активирует его (подсветка рамки,
+  # пиксель-проба), повторный клик без эффекта; клик по пассивному
+  # «Все» возвращает к полному списку. Прямые переходы между подтабами
+  # не размечены — путь через «Все» (минимальная модель).
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: snaryag_weapon_passive
+    expected: list__filter_weapon__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [134, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_weapon__global_filter_all__tab_equipment
+    action: click
+    element: snaryag_all_passive
+    expected: list__filter_all__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: snaryag_armor_passive
+    expected: list__filter_armor__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [303, 208], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_armor__global_filter_all__tab_equipment
+    action: click
+    element: snaryag_all_passive
+    expected: list__filter_all__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: snaryag_acces_passive
+    expected: list__filter_acces__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [364, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_acces__global_filter_all__tab_equipment
+    action: click
+    element: snaryag_all_passive
+    expected: list__filter_all__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_equipment
+    action: click
+    element: snaryag_weapon_passive
+    expected: list__filter_weapon__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [134, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_weapon__global_filter_sell__tab_equipment
+    action: click
+    element: snaryag_all_passive
+    expected: list__filter_all__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_equipment
+    action: click
+    element: snaryag_armor_passive
+    expected: list__filter_armor__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [303, 208], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_armor__global_filter_sell__tab_equipment
+    action: click
+    element: snaryag_all_passive
+    expected: list__filter_all__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_equipment
+    action: click
+    element: snaryag_acces_passive
+    expected: list__filter_acces__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [364, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_acces__global_filter_sell__tab_equipment
+    action: click
+    element: snaryag_all_passive
+    expected: list__filter_all__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_equipment
+    action: click
+    element: snaryag_weapon_passive
+    expected: list__filter_weapon__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [134, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_weapon__global_filter_buy__tab_equipment
+    action: click
+    element: snaryag_all_passive
+    expected: list__filter_all__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_equipment
+    action: click
+    element: snaryag_armor_passive
+    expected: list__filter_armor__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [303, 208], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_armor__global_filter_buy__tab_equipment
+    action: click
+    element: snaryag_all_passive
+    expected: list__filter_all__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_equipment
+    action: click
+    element: snaryag_acces_passive
+    expected: list__filter_acces__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [364, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_acces__global_filter_buy__tab_equipment
+    action: click
+    element: snaryag_all_passive
+    expected: list__filter_all__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  # Вкладки «Артефакты»/«Свитки»/«Припасы»/«Прочее»/«Коллекция» (Q6,
+  # ответ владельца + досъёмка 09.11.2025): таб подсвечивается нижней
+  # кромкой (пиксель-проба; у «Коллекции» синяя тема — свой цвет),
+  # подтабы механически идентичны «Снаряжению». Навигация — звезда
+  # через «Снаряжение» (минимальная модель); global_filter при
+  # переключении табов сохраняется (подтверждено досъёмкой: кружки
+  # не меняются). Подтабы не-«Все» этих вкладок не размечены —
+  # KNOWN_GAPS.yaml п. 3.
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: tab_artifacts_passive
+    expected: list__filter_all__global_filter_all__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [362, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_artifacts
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: tab_svotki_passive
+    expected: list__filter_all__global_filter_all__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [504, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_svotki
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: tab_pripasi_passive
+    expected: list__filter_all__global_filter_all__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [645, 190], color: [118, 104, 88]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_pripasi
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: tab_prochee_passive
+    expected: list__filter_all__global_filter_all__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [786, 190], color: [119, 104, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_prochee
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: tab_kollekcia_passive
+    expected: list__filter_all__global_filter_all__tab_kollekcia
+    verify:
+      - kind: pixel_probe
+        points: [{at: [927, 190], color: [119, 127, 136]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_kollekcia
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_all__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_equipment
+    action: click
+    element: tab_artifacts_passive
+    expected: list__filter_all__global_filter_sell__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [362, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_artifacts
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_equipment
+    action: click
+    element: tab_svotki_passive
+    expected: list__filter_all__global_filter_sell__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [504, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_svotki
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_equipment
+    action: click
+    element: tab_pripasi_passive
+    expected: list__filter_all__global_filter_sell__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [645, 190], color: [118, 104, 88]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_pripasi
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_equipment
+    action: click
+    element: tab_prochee_passive
+    expected: list__filter_all__global_filter_sell__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [786, 190], color: [119, 104, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_prochee
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_equipment
+    action: click
+    element: tab_kollekcia_passive
+    expected: list__filter_all__global_filter_sell__tab_kollekcia
+    verify:
+      - kind: pixel_probe
+        points: [{at: [927, 190], color: [119, 127, 136]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_kollekcia
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_sell__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_equipment
+    action: click
+    element: tab_artifacts_passive
+    expected: list__filter_all__global_filter_buy__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [362, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_artifacts
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_equipment
+    action: click
+    element: tab_svotki_passive
+    expected: list__filter_all__global_filter_buy__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [504, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_svotki
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_equipment
+    action: click
+    element: tab_pripasi_passive
+    expected: list__filter_all__global_filter_buy__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [645, 190], color: [118, 104, 88]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_pripasi
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_equipment
+    action: click
+    element: tab_prochee_passive
+    expected: list__filter_all__global_filter_buy__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [786, 190], color: [119, 104, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_prochee
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_equipment
+    action: click
+    element: tab_kollekcia_passive
+    expected: list__filter_all__global_filter_buy__tab_kollekcia
+    verify:
+      - kind: pixel_probe
+        points: [{at: [927, 190], color: [119, 127, 136]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_kollekcia
+    action: click
+    element: tab_snar_passive
+    expected: list__filter_all__global_filter_buy__tab_equipment
+    verify:
+      - kind: pixel_probe
+        points: [{at: [220, 190], color: [118, 104, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_artifacts
+    action: click
+    element: ataka_passive
+    expected: list__filter_ataka__global_filter_all__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_ataka__global_filter_all__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_all__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_artifacts
+    action: click
+    element: zashita_passive
+    expected: list__filter_zashita__global_filter_all__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [301, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zashita__global_filter_all__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_all__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_artifacts
+    action: click
+    element: podderzhka_passive
+    expected: list__filter_podderzhka__global_filter_all__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [416, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_podderzhka__global_filter_all__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_all__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_artifacts
+    action: click
+    element: balans_passive
+    expected: list__filter_balans__global_filter_all__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [531, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_balans__global_filter_all__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_all__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_ataka__global_filter_all__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zashita__global_filter_all__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_podderzhka__global_filter_all__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_balans__global_filter_all__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_artifacts
+    action: click
+    element: ataka_passive
+    expected: list__filter_ataka__global_filter_sell__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_ataka__global_filter_sell__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_sell__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_artifacts
+    action: click
+    element: zashita_passive
+    expected: list__filter_zashita__global_filter_sell__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [301, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zashita__global_filter_sell__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_sell__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_artifacts
+    action: click
+    element: podderzhka_passive
+    expected: list__filter_podderzhka__global_filter_sell__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [416, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_podderzhka__global_filter_sell__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_sell__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_artifacts
+    action: click
+    element: balans_passive
+    expected: list__filter_balans__global_filter_sell__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [531, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_balans__global_filter_sell__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_sell__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_ataka__global_filter_sell__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zashita__global_filter_sell__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_podderzhka__global_filter_sell__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_balans__global_filter_sell__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_artifacts
+    action: click
+    element: ataka_passive
+    expected: list__filter_ataka__global_filter_buy__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_ataka__global_filter_buy__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_buy__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_artifacts
+    action: click
+    element: zashita_passive
+    expected: list__filter_zashita__global_filter_buy__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [301, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zashita__global_filter_buy__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_buy__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_artifacts
+    action: click
+    element: podderzhka_passive
+    expected: list__filter_podderzhka__global_filter_buy__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [416, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_podderzhka__global_filter_buy__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_buy__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_artifacts
+    action: click
+    element: balans_passive
+    expected: list__filter_balans__global_filter_buy__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [531, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_balans__global_filter_buy__tab_artifacts
+    action: click
+    element: vse_artifacts_passive
+    expected: list__filter_all__global_filter_buy__tab_artifacts
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_ataka__global_filter_buy__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zashita__global_filter_buy__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_podderzhka__global_filter_buy__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_balans__global_filter_buy__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_svotki
+    action: click
+    element: obychnye_passive
+    expected: list__filter_obychnye__global_filter_all__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_obychnye__global_filter_all__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_all__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_svotki
+    action: click
+    element: blag_passive
+    expected: list__filter_blag__global_filter_all__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [302, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_blag__global_filter_all__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_all__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_svotki
+    action: click
+    element: giganty_passive
+    expected: list__filter_giganty__global_filter_all__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [417, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_giganty__global_filter_all__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_all__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_svotki
+    action: click
+    element: drugie_passive
+    expected: list__filter_drugie__global_filter_all__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [532, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_drugie__global_filter_all__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_all__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_obychnye__global_filter_all__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_blag__global_filter_all__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_giganty__global_filter_all__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_drugie__global_filter_all__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_svotki
+    action: click
+    element: obychnye_passive
+    expected: list__filter_obychnye__global_filter_sell__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_obychnye__global_filter_sell__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_sell__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_svotki
+    action: click
+    element: blag_passive
+    expected: list__filter_blag__global_filter_sell__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [302, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_blag__global_filter_sell__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_sell__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_svotki
+    action: click
+    element: giganty_passive
+    expected: list__filter_giganty__global_filter_sell__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [417, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_giganty__global_filter_sell__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_sell__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_svotki
+    action: click
+    element: drugie_passive
+    expected: list__filter_drugie__global_filter_sell__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [532, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_drugie__global_filter_sell__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_sell__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_obychnye__global_filter_sell__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_blag__global_filter_sell__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_giganty__global_filter_sell__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_drugie__global_filter_sell__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_svotki
+    action: click
+    element: obychnye_passive
+    expected: list__filter_obychnye__global_filter_buy__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_obychnye__global_filter_buy__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_buy__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_svotki
+    action: click
+    element: blag_passive
+    expected: list__filter_blag__global_filter_buy__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [302, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_blag__global_filter_buy__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_buy__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_svotki
+    action: click
+    element: giganty_passive
+    expected: list__filter_giganty__global_filter_buy__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [417, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_giganty__global_filter_buy__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_buy__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_svotki
+    action: click
+    element: drugie_passive
+    expected: list__filter_drugie__global_filter_buy__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [532, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_drugie__global_filter_buy__tab_svotki
+    action: click
+    element: vse_svotki_passive
+    expected: list__filter_all__global_filter_buy__tab_svotki
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_obychnye__global_filter_buy__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_blag__global_filter_buy__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_giganty__global_filter_buy__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_drugie__global_filter_buy__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_pripasi
+    action: click
+    element: zaryady_dukha_passive
+    expected: list__filter_zaryady_dukha__global_filter_all__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dukha__global_filter_all__tab_pripasi
+    action: click
+    element: vse_pripasi_passive
+    expected: list__filter_all__global_filter_all__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_pripasi
+    action: click
+    element: zaryady_dushi_passive
+    expected: list__filter_zaryady_dushi__global_filter_all__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [302, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dushi__global_filter_all__tab_pripasi
+    action: click
+    element: vse_pripasi_passive
+    expected: list__filter_all__global_filter_all__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_pripasi
+    action: click
+    element: usileniya_passive
+    expected: list__filter_usileniya__global_filter_all__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [417, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usileniya__global_filter_all__tab_pripasi
+    action: click
+    element: vse_pripasi_passive
+    expected: list__filter_all__global_filter_all__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dukha__global_filter_all__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dushi__global_filter_all__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usileniya__global_filter_all__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_pripasi
+    action: click
+    element: zaryady_dukha_passive
+    expected: list__filter_zaryady_dukha__global_filter_sell__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dukha__global_filter_sell__tab_pripasi
+    action: click
+    element: vse_pripasi_passive
+    expected: list__filter_all__global_filter_sell__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_pripasi
+    action: click
+    element: zaryady_dushi_passive
+    expected: list__filter_zaryady_dushi__global_filter_sell__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [302, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dushi__global_filter_sell__tab_pripasi
+    action: click
+    element: vse_pripasi_passive
+    expected: list__filter_all__global_filter_sell__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_pripasi
+    action: click
+    element: usileniya_passive
+    expected: list__filter_usileniya__global_filter_sell__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [417, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usileniya__global_filter_sell__tab_pripasi
+    action: click
+    element: vse_pripasi_passive
+    expected: list__filter_all__global_filter_sell__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dukha__global_filter_sell__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dushi__global_filter_sell__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usileniya__global_filter_sell__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_pripasi
+    action: click
+    element: zaryady_dukha_passive
+    expected: list__filter_zaryady_dukha__global_filter_buy__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dukha__global_filter_buy__tab_pripasi
+    action: click
+    element: vse_pripasi_passive
+    expected: list__filter_all__global_filter_buy__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_pripasi
+    action: click
+    element: zaryady_dushi_passive
+    expected: list__filter_zaryady_dushi__global_filter_buy__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [302, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dushi__global_filter_buy__tab_pripasi
+    action: click
+    element: vse_pripasi_passive
+    expected: list__filter_all__global_filter_buy__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_pripasi
+    action: click
+    element: usileniya_passive
+    expected: list__filter_usileniya__global_filter_buy__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [417, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usileniya__global_filter_buy__tab_pripasi
+    action: click
+    element: vse_pripasi_passive
+    expected: list__filter_all__global_filter_buy__tab_pripasi
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dukha__global_filter_buy__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_zaryady_dushi__global_filter_buy__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usileniya__global_filter_buy__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_prochee
+    action: click
+    element: kamni_dukha_passive
+    expected: list__filter_kamni_dukha__global_filter_all__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kamni_dukha__global_filter_all__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_all__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_prochee
+    action: click
+    element: kraski_passive
+    expected: list__filter_kraski__global_filter_all__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [302, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kraski__global_filter_all__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_all__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_prochee
+    action: click
+    element: usil_predmety_passive
+    expected: list__filter_usil_predmety__global_filter_all__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [417, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usil_predmety__global_filter_all__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_all__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_prochee
+    action: click
+    element: prochee_passive
+    expected: list__filter_prochee__global_filter_all__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [532, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_prochee__global_filter_all__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_all__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_all_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kamni_dukha__global_filter_all__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kraski__global_filter_all__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usil_predmety__global_filter_all__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_prochee__global_filter_all__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_prochee
+    action: click
+    element: kamni_dukha_passive
+    expected: list__filter_kamni_dukha__global_filter_sell__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kamni_dukha__global_filter_sell__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_sell__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_prochee
+    action: click
+    element: kraski_passive
+    expected: list__filter_kraski__global_filter_sell__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [302, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kraski__global_filter_sell__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_sell__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_prochee
+    action: click
+    element: usil_predmety_passive
+    expected: list__filter_usil_predmety__global_filter_sell__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [417, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usil_predmety__global_filter_sell__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_sell__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_prochee
+    action: click
+    element: prochee_passive
+    expected: list__filter_prochee__global_filter_sell__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [532, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_prochee__global_filter_sell__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_sell__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_sell_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kamni_dukha__global_filter_sell__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kraski__global_filter_sell__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usil_predmety__global_filter_sell__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_prochee__global_filter_sell__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_prochee
+    action: click
+    element: kamni_dukha_passive
+    expected: list__filter_kamni_dukha__global_filter_buy__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [187, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kamni_dukha__global_filter_buy__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_buy__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_prochee
+    action: click
+    element: kraski_passive
+    expected: list__filter_kraski__global_filter_buy__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [302, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kraski__global_filter_buy__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_buy__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_prochee
+    action: click
+    element: usil_predmety_passive
+    expected: list__filter_usil_predmety__global_filter_buy__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [417, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usil_predmety__global_filter_buy__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_buy__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_prochee
+    action: click
+    element: prochee_passive
+    expected: list__filter_prochee__global_filter_buy__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [532, 208], color: [113, 101, 86]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_prochee__global_filter_buy__tab_prochee
+    action: click
+    element: vse_prochee_passive
+    expected: list__filter_all__global_filter_buy__tab_prochee
+    verify:
+      - kind: pixel_probe
+        points: [{at: [19, 209], color: [118, 103, 87]}]
+      - {kind: template, element: krujok_buy_active, variant: active}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kamni_dukha__global_filter_buy__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_kraski__global_filter_buy__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_usil_predmety__global_filter_buy__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_prochee__global_filter_buy__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  # Закрытие окна крестом из состояний global_filter (требование
+  # валидатора: путь в recover из каждого состояния). Семантика = закрытию
+  # из list__tab_home (scr_153551 -> scr_all_close); распространение на
+  # прочие состояния подтверждает владелец (Q10) — при отличии правим.
+  - from: list__filter_all__global_filter_sell__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  # Закрытие крестом из прочих list-состояний (Q10, ответ владельца при
+  # приёмке: крестик = ESC, закрывает окно из любого состояния — проверено
+  # на «Снаряжение»+«Продажа» и «Коллекции»). Verify/on_fail — как у закрытия
+  # из list__tab_home; guard-тест test_shipped_market_close_from_every_list_state
+  # следит, чтобы у каждого нового list-состояния переход появился.
+  - from: list__filter_all__global_filter_all__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_weapon__global_filter_all__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_armor__global_filter_all__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_acces__global_filter_all__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_weapon__global_filter_sell__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_armor__global_filter_sell__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_acces__global_filter_sell__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_weapon__global_filter_buy__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_armor__global_filter_buy__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_acces__global_filter_buy__tab_equipment
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_artifacts
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_svotki
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_pripasi
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_prochee
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_all__tab_kollekcia
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_sell__tab_kollekcia
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
+    on_fail: [press_esc, click_free_area]
+  - from: list__filter_all__global_filter_buy__tab_kollekcia
+    action: click
+    element: main_market_close_button
+    expected: recover_closed
+    verify:
+      - {kind: template, element: market_pic, variant: normal}
+      - {kind: template, element: open_buy_trade, variant: normal}
     on_fail: [press_esc, click_free_area]
   # Обратный таб: scr_153600 -> scr_153551. Элемент — таб «Главная» в
   # невыбранном виде (scr_153712, в мете вариант помечен active по ошибке

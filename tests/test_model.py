@@ -37,7 +37,14 @@ def test_load_common_dictionary():
     price = common.grammars["price"]
     assert price.kind == "price"
     assert "," in price.separators and "." in price.separators
-    assert dict(price.suffixes) == {"к": 1000, "кк": 1000000}
+    assert dict(price.suffixes) == {
+        "к": 1000,
+        "кк": 1000000,
+        "тыс": 1000,
+        "млн": 1000000,
+        "млрд": 1000000000,
+    }
+    assert price.units == ("аден",)
 
     assert common.grammars["digits"].kind == "digits"
     assert common.grammars["text"].kind == "text"
@@ -92,6 +99,25 @@ def test_load_shipped_market_model_round_trip():
     assert model.ocr_regions == {}
     assert model.table_geometry is not None
     assert model.table_geometry.columns["price"].grammar.kind == "price"
+
+
+def test_shipped_market_close_from_every_list_state():
+    """Q10 (владелец, приёмка): крестик закрытия = ESC — закрывает окно из
+    ЛЮБОГО list-состояния (проверено на «Снаряжение»+«Продажа» и
+    «Коллекции»). Страж: у каждого list__*-состояния размечен переход
+    закрытия в recover_closed — новые состояния без него ломают тест."""
+    common = load_common(UI_MODEL / "common.yaml")
+    model = load_model(UI_MODEL / "market.yaml", common)
+    list_states = {sid for sid in model.states if sid.startswith("list__")}
+    assert list_states, "list-состояний нет — тест ничего не проверяет"
+    close_sources = {
+        t.source
+        for t in model.transitions
+        if getattr(t.action, "element", None) == "main_market_close_button"
+        and t.expected == "recover_closed"
+    }
+    missing = sorted(list_states - close_sources)
+    assert not missing, f"из состояний нет перехода закрытия: {missing}"
 
 
 def test_empty_states_and_ocr_regions_are_valid(tmp_path):

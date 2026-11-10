@@ -68,15 +68,148 @@ ANCHOR_ABSENT = ("scr_153511", "scr_153527", "scr_all_close",
 # владельцем ожидаем честную не-находку, а не подгонку.
 ANCHOR_ABSENT_OPEN = ("scr_154318", "scr_154424")
 
-# Ложное подтверждение params: сигнатуры filter_button_all_active/
-# snaryag_all_active не дискриминируют фильтры (0.930 на чужом фильтре
-# при пороге 0.9, замер 3.4) — KNOWN_GAPS.yaml п. 4. Мета этим скринам
-# state не задавала (global_filter=sell / filter=weapon|armor|acces):
-# ожидание фиксирует факт; при закрытии пробела правкой модели оно
-# меняется на честный unknown.
-FALSE_CONFIRM_EQUIPMENT = (
-    "scr_153611", "scr_153619", "scr_153631", "scr_153646", "scr_153656",
-)
+# Факт детектора после закрытия Q4 (глобальные фильтры «Продажа/Покупка»,
+# ответ владельца + досъёмка): сигнатуры кружков global_filter
+# дискриминируют (позитивы >=0.97, ложные <=0.81 при пороге 0.9).
+# Мета state этим скринам не задавала, state_params знала только
+# global_filter: ожидание фиксирует подтверждённое состояние.
+# Подтабы снаряжения (Q5, ответ владельца: клик по пассивному подтабу
+# активирует его — подсветка рамки; повторный клик без эффекта):
+# дискриминация подтабов — пиксель-проба яркой рамки активной кнопки
+# (active (118,103,87) vs passive (70,66,60), дельта 48 при допуске 16;
+# template-кроссы подтабов 0.95+ не дискриминируют, замер Q5).
+FACT_FILTER_STATES = {
+    "scr_153611": (
+        "list__filter_all__global_filter_sell__tab_equipment",
+        {"filter": "all", "global_filter": "sell", "tab": "equipment"},
+    ),
+    "scr_153619": (
+        "list__filter_all__global_filter_buy__tab_equipment",
+        {"filter": "all", "global_filter": "buy", "tab": "equipment"},
+    ),
+    "scr_153631": (
+        "list__filter_weapon__global_filter_buy__tab_equipment",
+        {"filter": "weapon", "global_filter": "buy", "tab": "equipment"},
+    ),
+    "scr_153646": (
+        "list__filter_armor__global_filter_buy__tab_equipment",
+        {"filter": "armor", "global_filter": "buy", "tab": "equipment"},
+    ),
+    "scr_153656": (
+        "list__filter_acces__global_filter_buy__tab_equipment",
+        {"filter": "acces", "global_filter": "buy", "tab": "equipment"},
+    ),
+    # Табы (Q6, досъёмка владельца 09.11.2025): scr_153712/153802 — батч 1,
+    # scr_153901+ — батч 2 (якорь (202,103)); подтверждённые состояния
+    # сверены визуально (активный таб — нижняя кромка). Мета state не
+    # задавала (tab=scroll фиксировал скролл, не таб).
+    "scr_153712": (
+        "list__filter_all__global_filter_buy__tab_artifacts",
+        {"filter": "all", "global_filter": "buy", "tab": "artifacts"},
+    ),
+    "scr_153802": (
+        "list__filter_all__global_filter_buy__tab_svotki",
+        {"filter": "all", "global_filter": "buy", "tab": "svotki"},
+    ),
+    "scr_153901": (
+        "list__filter_all__global_filter_buy__tab_pripasi",
+        {"filter": "all", "global_filter": "buy", "tab": "pripasi"},
+    ),
+    "scr_154002": (
+        "list__filter_all__global_filter_all__tab_prochee",
+        {"filter": "all", "global_filter": "all", "tab": "prochee"},
+    ),
+    "scr_154103": (
+        "list__filter_all__global_filter_all__tab_kollekcia",
+        {"filter": "all", "global_filter": "all", "tab": "kollekcia"},
+    ),
+    "scr_154134": (
+        "list__filter_all__global_filter_all__tab_kollekcia",
+        {"filter": "all", "global_filter": "all", "tab": "kollekcia"},
+    ),
+    # Подтабы «Артефакты» (досъёмка владельца, приёмка): проба яркой рамки
+    # активного подтаба + кружки global_filter + проба активного таба.
+    # scr_153722/153731/153740/153750 ранее были честным unknown (состояния
+    # не были размечены) — сверено визуально: 153722 «Атака»+«Покупка»
+    # (пустой список, стрелки not_active — семантика Q9), 153731 «Защита»,
+    # 153740 «Поддержка», 153750 «Баланс», у всех фильтр «Покупка».
+    "scr_153722": (
+        "list__filter_ataka__global_filter_buy__tab_artifacts",
+        {"filter": "ataka", "global_filter": "buy", "tab": "artifacts"},
+    ),
+    "scr_153731": (
+        "list__filter_zashita__global_filter_buy__tab_artifacts",
+        {"filter": "zashita", "global_filter": "buy", "tab": "artifacts"},
+    ),
+    "scr_153740": (
+        "list__filter_podderzhka__global_filter_buy__tab_artifacts",
+        {"filter": "podderzhka", "global_filter": "buy", "tab": "artifacts"},
+    ),
+    "scr_153750": (
+        "list__filter_balans__global_filter_buy__tab_artifacts",
+        {"filter": "balans", "global_filter": "buy", "tab": "artifacts"},
+    ),
+    # Подтабы «Свитки» (досъёмка владельца, приёмка): 153810 «Обычные»,
+    # 153819 «Благ.Свитки», 153830 «Гиганты», 153840 «Другие»; фильтр
+    # «Покупка» у всех (сверено с кропами меты и классификацией детектора).
+    "scr_153810": (
+        "list__filter_obychnye__global_filter_buy__tab_svotki",
+        {"filter": "obychnye", "global_filter": "buy", "tab": "svotki"},
+    ),
+    "scr_153819": (
+        "list__filter_blag__global_filter_buy__tab_svotki",
+        {"filter": "blag", "global_filter": "buy", "tab": "svotki"},
+    ),
+    "scr_153830": (
+        "list__filter_giganty__global_filter_buy__tab_svotki",
+        {"filter": "giganty", "global_filter": "buy", "tab": "svotki"},
+    ),
+    "scr_153840": (
+        "list__filter_drugie__global_filter_buy__tab_svotki",
+        {"filter": "drugie", "global_filter": "buy", "tab": "svotki"},
+    ),
+    # Подтабы «Припасы» (досъёмка владельца, приёмка). ВНИМАНИЕ: мета
+    # перепутала имена кропов — soulshot_active лежит на 2-й кнопке,
+    # spiritshot_active на 3-й (сверено rect'ами кропов относительно якоря
+    # (202,103) и живой досъёмкой: 2-я кнопка = «Заряды Духа», 3-я =
+    # «Заряды Души»). Фильтр «Все» (кружки дискриминируют, Q4).
+    "scr_153929": (
+        "list__filter_zaryady_dukha__global_filter_all__tab_pripasi",
+        {"filter": "zaryady_dukha", "global_filter": "all", "tab": "pripasi"},
+    ),
+    "scr_153941": (
+        "list__filter_zaryady_dushi__global_filter_all__tab_pripasi",
+        {"filter": "zaryady_dushi", "global_filter": "all", "tab": "pripasi"},
+    ),
+    "scr_153949": (
+        "list__filter_usileniya__global_filter_all__tab_pripasi",
+        {"filter": "usileniya", "global_filter": "all", "tab": "pripasi"},
+    ),
+    # Подтабы «Прочее» (досъёмка владельца, приёмка): 154012 «Камни Духа»,
+    # 154021 «Краски», 154033 «Усил.предметы», 154049 «Прочее»; фильтр
+    # «Все» (имена кропов меты здесь верны).
+    "scr_154012": (
+        "list__filter_kamni_dukha__global_filter_all__tab_prochee",
+        {"filter": "kamni_dukha", "global_filter": "all", "tab": "prochee"},
+    ),
+    "scr_154021": (
+        "list__filter_kraski__global_filter_all__tab_prochee",
+        {"filter": "kraski", "global_filter": "all", "tab": "prochee"},
+    ),
+    "scr_154033": (
+        "list__filter_usil_predmety__global_filter_all__tab_prochee",
+        {"filter": "usil_predmety", "global_filter": "all", "tab": "prochee"},
+    ),
+    "scr_154049": (
+        "list__filter_prochee__global_filter_all__tab_prochee",
+        {"filter": "prochee", "global_filter": "all", "tab": "prochee"},
+    ),
+}
+
+# Ложное подтверждение params на табе «Снаряжение»: не осталось — категория
+# удержана пустой для будущих регрессий (закрыто Q4/Q5, KNOWN_GAPS п. 4
+# снят). scr_153631/153646/153656 переехали в FACT_FILTER_STATES.
+FALSE_CONFIRM_EQUIPMENT = ()
 
 # Мета state не размечена (R4); факт детектора — подтверждённое opening:
 # scr_154222 (лавка продажи, вывеска активна). Сырья «open»-состояния
@@ -84,11 +217,12 @@ FALSE_CONFIRM_EQUIPMENT = (
 # (KNOWN_GAPS.yaml п. 3, 5).
 SHOP_FACT_OPENING = ("scr_154222",)
 
-# Честный unknown при найденном якоре: состояния этих табов/фильтров/
-# подсостояний в модели не размечены (KNOWN_GAPS.yaml п. 3, 5:
-# scr_154355/154244 — сигнатуры opening на динамическом контенте
-# противоречат остальным признакам, строгое «все сигнатуры» даёт
-# unknown). Любое подтверждённое состояние здесь — падение.
+# Честный unknown при найденном якоре: оставшиеся неразмеченные
+# подсостояния (сигнатуры opening лавок — п. 5; скролл/поиск/обновление —
+# п. 3): scr_154355/154244 — сигнатуры opening на динамическом контенте
+# противоречат остальным признакам, строгое «все сигнатуры» даёт unknown.
+# Все подтабы «Обзора лавок» размечены (досъёмка владельца) — в
+# FACT_FILTER_STATES. Любое подтверждённое состояние здесь — падение.
 # Досъёмка живого прогона 9.4 (2026-11-10, Q30): обзор открыт владельцем
 # на живой игре (вкладка/фильтр как в мете не размечены — R4); факт
 # детектора на обоих кадрах (до/после прокрутки) — подтверждённое
@@ -103,11 +237,7 @@ FACT_FILTER_STATES["scr_live_rows_home_scrolled"] = (
 )
 
 HONEST_UNKNOWN = (
-    "scr_153712", "scr_153722", "scr_153731", "scr_153740", "scr_153750",
-    "scr_153802", "scr_153810", "scr_153819", "scr_153830", "scr_153840",
-    "scr_153901", "scr_153929", "scr_153941", "scr_153949", "scr_154002",
-    "scr_154012", "scr_154021", "scr_154033", "scr_154049", "scr_154103",
-    "scr_154134", "scr_154244", "scr_154355",
+    "scr_154244", "scr_154355",
 )
 
 _ANCHOR_ABSENT = object()  # маркер ожидания «якорь не найден»
@@ -163,10 +293,12 @@ def _expected(name: str, entry, model):
         return _resolve_meta_state(entry, model)
     if name in ANCHOR_ABSENT:
         return _ANCHOR_ABSENT
+    if name in FACT_FILTER_STATES:
+        return FACT_FILTER_STATES[name]
     if name in FALSE_CONFIRM_EQUIPMENT:
         return (
-            "list__filter_all__global_filter_all__tab_equipment",
-            {"filter": "all", "global_filter": "all", "tab": "equipment"},
+            "list__filter_all__global_filter_buy__tab_equipment",
+            {"filter": "all", "global_filter": "buy", "tab": "equipment"},
         )
     if name in SHOP_FACT_OPENING:
         return ("opening", {})
@@ -222,13 +354,13 @@ def test_meta_coverage_matches_policy():
     }
     covered = (
         set(meta_states) | set(ANCHOR_ABSENT) | set(ANCHOR_ABSENT_OPEN)
-        | set(FALSE_CONFIRM_EQUIPMENT) | set(SHOP_FACT_OPENING)
-        | set(HONEST_UNKNOWN)
+        | set(FACT_FILTER_STATES) | set(FALSE_CONFIRM_EQUIPMENT)
+        | set(SHOP_FACT_OPENING) | set(HONEST_UNKNOWN)
     )
     assert covered == set(META["screenshots"])
     # Категории не пересекаются: один скрин — одна ожидаемая категория.
     categories = [
-        set(ANCHOR_ABSENT), set(ANCHOR_ABSENT_OPEN),
+        set(ANCHOR_ABSENT), set(ANCHOR_ABSENT_OPEN), set(FACT_FILTER_STATES),
         set(FALSE_CONFIRM_EQUIPMENT), set(SHOP_FACT_OPENING),
         set(HONEST_UNKNOWN),
     ]

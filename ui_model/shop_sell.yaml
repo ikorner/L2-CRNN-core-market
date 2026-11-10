@@ -242,16 +242,19 @@ states:
   opening:
     params: {}
     signatures:
+    # Статические признаки окна подготовки продажи. Из сигнатур исключены
+    # kol-vo («(0/7)» — меняется с числом выставленных предметов) и
+    # trade_window_sell_all (целое окно с динамическим инвентарём): на
+    # живом кадре приёмки давали NCC 0.82 / 0.48 — состояние не
+    # подтверждалось никогда (KNOWN_GAPS п. 5 закрыт досъёмкой владельца).
     - {kind: template, element: cansel_sell_button, variant: normal}
     - {kind: template, element: close_sell_button, variant: normal}
     - {kind: template, element: history_button, variant: normal}
     - {kind: template, element: jakor_sell, variant: normal}
     - {kind: template, element: jakor_strelka_sell, variant: normal}
-    - {kind: template, element: kol-vo, variant: normal}
     - {kind: template, element: price_sell_button, variant: normal}
     - {kind: template, element: sell_start_button, variant: normal}
     - {kind: template, element: tcena_jakor, variant: normal}
-    - {kind: template, element: trade_window_sell_all, variant: normal}
     - {kind: template, element: viveska_button, variant: normal}
 transitions: []
 ocr_regions: {}

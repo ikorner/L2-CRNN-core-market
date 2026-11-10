@@ -215,13 +215,15 @@ states:
   opening:
     params: {}
     signatures:
+    # Статические признаки окна подготовки выкупа. Из сигнатур исключены
+    # bye_all_window (целое окно с динамическим инвентарём, NCC 0.50 на
+    # живом кадре) и kol-vo («(0/8)» меняется с числом предметов) — аналог
+    # правки shop_sell при приёмке (KNOWN_GAPS п. 5).
     - {kind: template, element: el_431_560_91_20, variant: normal}
     - {kind: template, element: el_523_557_8_27, variant: normal}
-    - {kind: template, element: bye_all_window, variant: normal}
     - {kind: template, element: cansel, variant: normal}
     - {kind: template, element: history, variant: normal}
     - {kind: template, element: jak, variant: normal}
-    - {kind: template, element: kol-vo, variant: normal}
     - {kind: template, element: start, variant: normal}
     - {kind: template, element: strelka, variant: normal}
     - {kind: template, element: viveska, variant: normal}

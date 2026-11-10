@@ -6,5 +6,5 @@ variants: [normal, hover, pressed, disabled, active, placeholder, focused, fille
 roles: [click_target, ocr_region, state_signature, icon_sample]
 grammars:
   digits: {kind: digits}
-  price: {kind: price, separators: [",", "."], suffixes: {"к": 1000, "кк": 1000000}}
+  price: {kind: price, separators: [",", "."], suffixes: {"к": 1000, "кк": 1000000, "тыс": 1000, "млн": 1000000, "млрд": 1000000000}, units: [аден]}
   text: {kind: text}

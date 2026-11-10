@@ -63,15 +63,19 @@ def _assert_confirmed_shape(transition):
 # --- market: HUD-иконка -> окно открыто ---
 
 
-def test_hud_click_market_pic_opens_home_tab():
+def test_hud_click_market_pic_opens_window_with_universal_verify():
+    # Q2 (приёмка): игра ЗАПОМИНАЕТ последний таб и страницу скролла —
+    # повторное открытие не гарантирует «Главную». Поэтому verify перехода —
+    # универсальный признак «окно открыто» (заголовок, общий для всех
+    # табов), а не признаки Главной; expected=list__tab_home — номинальная
+    # цель графа (дефолт первого открытия).
     market = _shipped("market")
     transition = _find_click(market, "recover_closed", "market_pic")
     assert transition is not None, "переход recover_closed --market_pic--> home нет"
     assert transition.expected == MARKET_HOME
     _assert_confirmed_shape(transition)
     checks = {(c.element, c.variant) for c in transition.verify if c.kind == "template"}
-    assert ("market_main_button_active", "active") in checks
-    assert ("market_main_menu", "normal") in checks
+    assert checks == {("window_title", "normal")}
 
 
 def test_recover_closed_state_present_with_observed_signatures():
