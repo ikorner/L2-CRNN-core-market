@@ -19,6 +19,13 @@ ui_model/FORMAT.md; поставляемые файлы — ui_model/common.yaml
 """
 
 from .loader import ModelFormatError, load_common, load_model
+from .navigation import (
+    EXPECT_ABSENT,
+    NavigationModel,
+    Recipe,
+    RecipeStep,
+    load_navigation,
+)
 from .grammars import (
     DEFAULT_DIGITS_MAX,
     DEFAULT_DIGITS_MIN,
@@ -77,6 +84,7 @@ __all__ = [
     "DEFAULT_PRICE_MAX",
     "DEFAULT_PRICE_MIN",
     "ElementSpec",
+    "EXPECT_ABSENT",
     "Gap",
     "GapCheckResult",
     "GrammarError",
@@ -85,9 +93,12 @@ __all__ = [
     "GridGeometry",
     "ModelFormatError",
     "OcrReadError",
+    "NavigationModel",
     "OcrRegionSpec",
     "ProbePoint",
     "ReadAttempt",
+    "Recipe",
+    "RecipeStep",
     "Rect",
     "RegionReadResult",
     "StateSpec",
@@ -105,6 +116,7 @@ __all__ = [
     "load_common",
     "load_gaps",
     "load_model",
+    "load_navigation",
     "parse_value",
     "read_confident",
     "read_region",

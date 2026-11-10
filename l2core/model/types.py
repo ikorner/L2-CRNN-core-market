@@ -26,6 +26,11 @@ class ProbePoint(NamedTuple):
     color: Tuple[int, int, int]
 
 
+# Значение поля expect template-проверки: элемент обязан ОТСУТСТВОВАТЬ
+# на кадре (отрицание; используется навигационной моделью — X toggle).
+EXPECT_ABSENT = "absent"
+
+
 @dataclass(frozen=True)
 class GrammarSpec:
     """Грамматика OCR-региона: вид и правила разбора.

@@ -673,14 +673,26 @@ def _parse_check(file: Path, section: str, raw: Any) -> Check:
         return Check(kind=kind, points=tuple(probes))
 
     if kind == "template":
-        _reject_unknown(file, section, raw, {"kind", "element", "variant"})
+        _reject_unknown(file, section, raw, {"kind", "element", "variant", "expect"})
         element = raw.get("element")
         if not isinstance(element, str) or not element:
             raise ModelFormatError(file, section, "template требует непустой element")
+        # Опциональное отрицание (навигационная модель): элемент обязан
+        # отсутствовать на кадре. Другие значения недопустимы.
+        from .types import EXPECT_ABSENT
+        expect = raw.get("expect")
+        if expect is not None and expect != EXPECT_ABSENT:
+            raise ModelFormatError(
+                file, section,
+                f"template: допустимое значение expect — {EXPECT_ABSENT!r} "
+                f"(получено {expect!r})")
         variant = raw.get("variant")
-        if not isinstance(variant, str) or not variant:
+        # Variant обязателен для проверки присутствия; для отрицания
+        # (expect: absent) допустимо опустить — оценщик возьмёт первый
+        # вариант элемента.
+        if (not isinstance(variant, str) or not variant) and expect is None:
             raise ModelFormatError(file, section, "template требует непустой variant")
-        return Check(kind=kind, element=element, variant=variant)
+        return Check(kind=kind, element=element, variant=variant, expect=expect)
 
     # ocr
     _reject_unknown(file, section, raw, {"kind", "region", "expect"})
