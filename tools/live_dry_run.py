@@ -16,10 +16,14 @@ l2core.dry_run + JSONL ActionLogger с ключевыми кадрами, 8.3). 
 """
 from __future__ import annotations
 
+import argparse
+import sys
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple
+from pathlib import Path
+from typing import Callable, Optional, Sequence, Tuple
 
-__all__ = ["StepReport", "ProbeReport", "run_probe"]
+__all__ = ["StepReport", "ProbeReport", "run_probe", "_resolve_model",
+           "main"]
 
 
 @dataclass(frozen=True)
@@ -154,3 +158,85 @@ def _print_summary(reports, *, killed: bool,
                    out: Callable[[str], None]) -> None:
     ok = sum(1 for s in reports if s.ok)
     out(f"Сводка: шагов={len(reports)} без_ошибок={ok} killed={killed}")
+
+
+def _resolve_model(config_model: str,
+                   override: Optional[str]) -> Optional[Path]:
+    """Чекпоинт OCR: --model побеждает paths.model конфига; файл не
+    существует — None (main даёт понятную ошибку и код выхода 2)."""
+    candidate = Path(override) if override else Path(config_model)
+    return candidate if candidate.is_file() else None
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Живая сборка прогона: KillSwitch + create_api(dry_run=True) + проба.
+
+    Код выхода: 0 — прогон завершён (FAILED-шаги — честные исходы dry-run);
+    2 — конфиг не читается или чекпоинт OCR не найден.
+    """
+    parser = argparse.ArgumentParser(
+        description="Живой dry-run прогон (9.4): состояния на живых кадрах, "
+                    "действия — намерения без HID.")
+    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--model", default=None,
+                        help="чекпоинт OCR (побеждает paths.model конфига)")
+    args = parser.parse_args(argv)
+
+    # Ленивые импорты: модуль остаётся лёгким для тестов пробы (без win32).
+    from l2core.adapters.ocr import create_ocr_client
+    from l2core.adapters.win32 import PyWin32Gateway, Win32HotkeySource
+    from l2core.api.dryrun import DryRunHid
+    from l2core.api.killswitch import KillSwitch
+    from l2core.api.wiring import create_api
+    from l2core.config import load_config
+
+    try:
+        cfg = load_config(args.config)
+    except Exception as exc:
+        print(f"ошибка чтения конфига {args.config}: {exc}", file=sys.stderr)
+        return 2
+
+    model = _resolve_model(cfg.paths.model, args.model)
+    if model is None:
+        print(f"чекпоинт OCR не найден: {args.model or cfg.paths.model} "
+              f"(передайте --model <путь>/crnn_best.pt)", file=sys.stderr)
+        return 2
+
+    gateway = PyWin32Gateway()
+    ks = KillSwitch(
+        cfg.kill_switch,
+        hotkey_source=Win32HotkeySource(cfg.kill_switch.hotkey),
+        set_cursor_pos=gateway.set_cursor_pos,
+        on_kill=lambda reason: print(f"KILL SWITCH: остановка ({reason})"))
+    ocr = create_ocr_client("torch", model_path=str(model))
+    api = create_api(cfg, gateway=gateway, ocr=ocr,
+                     cancelled=ks.cancelled, note_activity=ks.note_activity,
+                     dry_run=True)
+    # DryRunHid: release_all при kill — no-op с логом (доступ к wiring —
+    # прецедент README: api._w.hid.intentions).
+    ks.attach(hid=api._w.hid)
+
+    print(f"dry-run прогон: чекпоинт={model} "
+          f"хоткей={cfg.kill_switch.hotkey} "
+          f"логи: l2core.dry_run + {cfg.log.dir}")
+    ks.start()
+    report: Optional[ProbeReport] = None
+    try:
+        report = run_probe(api, cancelled=ks.is_killed)
+    except KeyboardInterrupt:
+        print("прервано пользователем (Ctrl+C)")
+    finally:
+        ks.stop()
+
+    hid = api._w.hid
+    intentions = len(hid.intentions) if isinstance(hid, DryRunHid) else None
+    print(f"намерений HID: "
+          f"{intentions if intentions is not None else 'н/д'}")
+    if report is not None:
+        reason = f" причина={ks.reason}" if ks.reason else ""
+        print(f"итог: killed={report.killed}{reason}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -127,3 +127,16 @@ def test_probe_cancelled_between_steps(probe):
     assert report.killed is True
     assert api.calls == ["health"]
     assert lines  # сводка выполненных шагов напечатана
+
+
+def test_resolve_model_override_wins(tmp_path, probe):
+    existing = tmp_path / "a.pt"
+    existing.write_bytes(b"fake")
+    missing = str(tmp_path / "missing.pt")
+    assert probe._resolve_model(missing, str(existing)) == existing
+
+
+def test_resolve_model_missing_returns_none(tmp_path, probe):
+    missing = str(tmp_path / "missing.pt")
+    assert probe._resolve_model(missing, None) is None
+    assert probe._resolve_model(missing, str(tmp_path / "also-missing.pt")) is None
