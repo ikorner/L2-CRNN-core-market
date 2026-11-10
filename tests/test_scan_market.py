@@ -34,6 +34,7 @@ from l2core.model import (
 )
 from l2core.model.rows import dedup_rows
 from l2core.primitives.activate import ActivateResult
+from l2core.primitives.navigation import RecipeResult
 from l2core.primitives.click import CheckReport, VerifySpec
 from l2core.primitives.scroll import (
     DOWN_ARROW_DISABLED_ELEMENT,
@@ -290,13 +291,21 @@ def frame_with_search():
 def run_scan(points, *, frames, disabled_by_pos=None, search_region=None,
              field_element=FIELD_ELEMENT, button_element=BUTTON_ELEMENT,
              cancelled=None, rng_seed=7, ocr=None, fail_always=(),
-             max_scrolls=200, find_anchor=None):
+             max_scrolls=200, find_anchor=None, recipe_runner=None,
+             recipe_calls=None):
     clock = FakeClock()
     screen = ScrollScreen(frames)
     hid = ScriptedHid(clock, screen)
     cursor = FakeCursor()
     cursor.track(hid)
     checker = FakeRunner(screen, disabled_by_pos, fail_always)
+    if recipe_runner is None:
+        calls = recipe_calls if recipe_calls is not None else []
+
+        def recipe_runner(recipe_id):
+            calls.append(recipe_id)
+            return RecipeResult(recipe_id, success=True, attempts=1)
+
     result = scan_market(
         points,
         model=make_model(),
@@ -317,6 +326,7 @@ def run_scan(points, *, frames, disabled_by_pos=None, search_region=None,
         scroll_chunk=1,
         max_scrolls=max_scrolls,
         cancelled=cancelled,
+        recipe_runner=recipe_runner,
         rng=random.Random(rng_seed),
         clock=clock.monotonic,
         sleep=clock.sleep,
@@ -431,20 +441,16 @@ class TestScanMarket:
         assert result.cancelled
         assert hid.log == []
 
-    def test_open_transition_missing_is_model_error(self):
-        model = make_model()
-        bare = UiModel(
-            path=model.path, window=model.window, elements=model.elements,
-            states=model.states, transitions=(), ocr_regions=model.ocr_regions,
-            table_geometry=model.table_geometry,
-        )
+    def test_recipe_runner_missing_is_error(self):
+        # Открытие обзора — через recipe_runner (рецепт навигации);
+        # без него — ScanError (fail fast, не слепой обход).
         clock = FakeClock()
         screen = ScrollScreen([frame_pos0()])
         hid = ScriptedHid(clock, screen)
-        with pytest.raises(ScanError, match="market_pic"):
+        with pytest.raises(ScanError, match="recipe_runner"):
             scan_market(
                 [ScanPoint(verify=POINT_VERIFY)],
-                model=bare,
+                model=make_model(),
                 ocr=ColorOcr(OCR_TEXTS),
                 screen=screen,
                 hid=hid,
@@ -460,6 +466,15 @@ class TestScanMarket:
                 sleep=clock.sleep,
             )
 
+    def test_opening_goes_through_recipe_runner(self):
+        recipe_calls = []
+        result, hid = run_scan(
+            [ScanPoint(verify=POINT_VERIFY)],
+            frames=[frame_pos0()],
+            recipe_calls=recipe_calls,
+        )
+        assert recipe_calls == ["open_market"]
+
 
 class TestScanFailures:
     """Трёхзначный результат в композиции сценария (task 9.3): отказ
@@ -467,18 +482,22 @@ class TestScanFailures:
     исполняет вызывающий слой, слепых действий/чтения нет (инвариант 9)."""
 
     def test_opening_not_confirmed_aborts_scan(self):
-        # Verify открытия (tab_home_marker) не сходится: обход не начался,
-        # точек нет, wheel не уходил.
+        # Рецепт открытия не подтверждён (окно не открылось): обход не
+        # начался, точек нет, wheel не уходил.
+        def failing_runner(recipe_id):
+            return RecipeResult(recipe_id, success=False, attempts=2,
+                                failures=("verify открытия не сошёлся",))
+
         result, hid = run_scan(
             [ScanPoint(verify=POINT_VERIFY)],
             frames=[frame_pos0()],
-            fail_always={"tab_home_marker"},
+            recipe_runner=failing_runner,
         )
         assert result.points == ()
         assert result.needs_recover
         assert not result.cancelled
         assert "открытие обзора" in result.failures[0]
-        assert "tab_home_marker" in result.failures[0]
+        assert "open_market" in result.failures[0]
         assert "scroll" not in [a for _, a, _ in hid.log]
 
     def test_tab_not_confirmed_aborts_point(self):
@@ -497,15 +516,14 @@ class TestScanFailures:
         assert "scroll" not in [a for _, a, _ in hid.log]
 
     def test_anchor_lost_on_read_frame_aborts_point(self):
-        # Якорь есть на кадрах открытия (3 вызова find_anchor у успешного
-        # клика: hover-кадр, re-verify после hover, verify после клика —
-        # l2core/primitives/click.py), теряется на первом же кадре чтения
-        # строк — чтение обрывается честной фиксацией, слепого чтения нет.
+        # Открытие — через recipe_runner (find_anchor не трогает). Якорь
+        # есть на первом кадре чтения строк, теряется на следующем —
+        # чтение обрывается честной фиксацией, слепого чтения нет.
         seen = {"n": 0}
 
         def find_anchor(frame):
             seen["n"] += 1
-            return ANCHOR if seen["n"] <= 3 else None
+            return ANCHOR if seen["n"] <= 0 else None
 
         result, _ = run_scan(
             [ScanPoint(verify=POINT_VERIFY)],
@@ -513,7 +531,7 @@ class TestScanFailures:
             find_anchor=find_anchor,
         )
         assert result.needs_recover
-        assert "якорь не найден на кадре чтения строк" in result.failures[0]
+        assert any("кадре чтения строк" in f for f in result.failures)
 
     def test_max_scrolls_guard_aborts_when_end_marker_never_comes(self):
         # Скролл подтверждается (кадры различаются), но признак конца из

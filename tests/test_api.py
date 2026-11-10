@@ -1048,6 +1048,7 @@ class TestSetupSell:
     def test_setup_sell_success(self):
         world, clock = World(), FakeClock()
         world.drag_ok = True
+        world.shop_sell_opened = True   # лавка открыта вызывающим слоем
         hid = ScriptedHid(clock, world)
         price_region = OcrRegionSpec(id="price_field", rect=Rect(0, 0, 10, 10),
                                      grammar=PRICE_GRAMMAR)
@@ -1057,7 +1058,7 @@ class TestSetupSell:
         result = api.setup_sell(
             [SellItem(slot=0, price=100)],
             source_locator=lambda item: (600, 900),
-            open_verify=VerifySpec(checks=()),
+            open_recipe=None,
             drag_verify=VerifySpec(checks=(Check(kind="template",
                                                  element="drag_marker",
                                                  variant="normal"),)),
@@ -1074,6 +1075,7 @@ class TestSetupSell:
     def test_setup_sell_needs_recover_on_drag_verify_fail(self):
         world, clock = World(), FakeClock()
         world.drag_ok = False   # предмет в слоте не подтверждён
+        world.shop_sell_opened = True   # лавка открыта вызывающим слоем
         hid = ScriptedHid(clock, world)
         price_region = OcrRegionSpec(id="price_field", rect=Rect(0, 0, 10, 10),
                                      grammar=PRICE_GRAMMAR)
@@ -1082,7 +1084,7 @@ class TestSetupSell:
         result = api.setup_sell(
             [SellItem(slot=0, price=100)],
             source_locator=lambda item: (600, 900),
-            open_verify=VerifySpec(checks=()),
+            open_recipe=None,
             drag_verify=VerifySpec(checks=(Check(kind="template",
                                                  element="drag_marker",
                                                  variant="normal"),)),

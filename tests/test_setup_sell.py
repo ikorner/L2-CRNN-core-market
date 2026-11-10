@@ -39,9 +39,9 @@ from l2core.model import (
 from l2core.primitives.activate import ActivateResult
 from l2core.primitives.click import (
     CheckReport,
-    ClickElementError,
     VerifySpec,
 )
+from l2core.primitives.navigation import RecipeResult
 from l2core.primitives.outcome import (
     ActionOutcome,
     IrreversibleGuard,
@@ -129,26 +129,6 @@ def make_shop_model(grid=None):
 PRICE_FIELD_ELEMENT = "price_field_element"
 
 
-def make_hud_model():
-    return UiModel(
-        path="test-hud",
-        window=WindowSpec(id="market", title="Обзор лавок", size=WINDOW_SIZE),
-        elements={
-            OPEN_ELEMENT: ElementSpec(
-                id=OPEN_ELEMENT, role="icon_sample", hud=True,
-                search_area=(180, 0, 30, 20),
-                variants={"normal": VariantSpec(name="normal",
-                                                template="test/open.png")}),
-        },
-        states={},
-        transitions=(),
-        ocr_regions={},
-        table_geometry=None,
-    )
-
-
-OPEN_VERIFY = VerifySpec(checks=(
-    Check(kind="template", element="open_marker", variant="normal"),))
 DRAG_VERIFY = VerifySpec(checks=(
     Check(kind="template", element=DRAG_MARKER, variant="normal"),))
 FINAL_VERIFY = VerifySpec(checks=(
@@ -341,17 +321,19 @@ def hud_locator(element, variant, frame):
 
 def run_setup(items, *, grid=GRID, model_grid=GRID, price_region=PRICE_REGION,
               source_points=None, fail_elements=(), find_anchor=None,
-              cancelled=None, rng_seed=7, ocr=None, hud_model="default"):
+              cancelled=None, rng_seed=7, ocr=None, recipe_runner="default"):
     clock = FakeClock()
     screen = ShopScreen()
     hid = ScriptedHid(clock, screen)
     cursor = FakeCursor()
     cursor.track(hid)
     source_iter = iter(source_points or {})
+    if recipe_runner == "default":
+        def recipe_runner(recipe_id):
+            return RecipeResult(recipe_id, success=True, attempts=1)
     result = setup_sell(
         items,
         model=make_shop_model(grid=model_grid),
-        hud_model=make_hud_model() if hud_model == "default" else hud_model,
         grid=grid,
         ocr=ocr or DictOcr(OCR_TEXTS),
         screen=screen,
@@ -363,9 +345,7 @@ def run_setup(items, *, grid=GRID, model_grid=GRID, price_region=PRICE_REGION,
         find_anchor=find_anchor or (lambda frame: ANCHOR),
         run_checks=FakeRunner(fail_elements),
         config=make_config(),
-        hud_locator=hud_locator,
-        open_element=OPEN_ELEMENT,
-        open_verify=OPEN_VERIFY,
+        recipe_runner=recipe_runner,
         source_locator=lambda item: next(source_iter, None),
         price_region=price_region,
         price_field_element=None,
@@ -408,9 +388,10 @@ class TestSetupSell:
         assert not result.needs_recover
         assert [o.item for o in result.items] == items
         actions = hid.actions()
-        # Открытие лавки через HUD — первый клик сценария.
+        # Открытие лавки — recipe_runner (фейк без HID); первое действие
+        # сценария — drag первого предмета.
         assert actions[0] == "move_rel"
-        assert "click" in actions
+        assert "mouse_down" in actions
         # Drag каждого предмета: press -> traj -> release.
         assert actions.count("mouse_down") == 2
         assert actions.count("traj") == 2
@@ -462,13 +443,12 @@ class TestSetupSell:
             run_setup([SellItem(slot=0, price=100)],
                       price_region=None, source_points=[(40, 120)])
 
-    def test_missing_hud_model_open_element_is_click_element_error(self):
-        # Контракт докстринга setup_sell: hud_model=None + open_element,
-        # которого нет в модели окна — честный fail fast ClickElementError
-        # из click.py (5.3: отсутствует элемент модели), не SetupSellError.
-        with pytest.raises(ClickElementError, match="open_sale_trade"):
+    def test_missing_recipe_runner_is_setup_error(self):
+        # Контракт setup_sell: открытие — рецепт навигации; runner не
+        # задан — честный fail fast SetupSellError, не слепой обход.
+        with pytest.raises(SetupSellError, match="recipe_runner"):
             run_setup([SellItem(slot=0, price=100)],
-                      hud_model=None, source_points=[(40, 120)])
+                      recipe_runner=None, source_points=[(40, 120)])
 
     def test_duplicate_slot_is_setup_error(self):
         with pytest.raises(SetupSellError, match="повтор"):
@@ -481,10 +461,14 @@ class TestSetupSell:
             run_setup([SellItem(slot=0, price=0)], source_points=[(40, 120)])
 
     def test_open_failure_aborts_without_drag(self):
+        def failing_runner(recipe_id):
+            return RecipeResult(recipe_id, success=False, attempts=2,
+                                failures=("verify открытия не сошёлся",))
+
         result, hid, _, _ = run_setup(
             [SellItem(slot=0, price=1500000)],
             source_points=[(40, 120)],
-            fail_elements=("open_marker",))
+            recipe_runner=failing_runner)
         assert result.needs_recover
         assert result.items == ()
         assert "mouse_down" not in hid.actions()

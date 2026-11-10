@@ -17,8 +17,9 @@ filters (element id фильтров, по порядку), search (текст �
 опционально), verify (VerifySpec состояния готовности списка — обязателен,
 клики без verify запрещены). Для каждой точки:
 
-    открыть обзор (первый раз: клик по market_pic, verify из перехода
-    модели recover_closed -> list__tab_home) -> таб -> фильтры -> поиск ->
+    открыть обзор (первый раз: рецепт навигации open_market через
+    recipe_runner — открытие при закрытом окне, пролог click_element 5.3
+    недостижим) -> таб -> фильтры -> поиск ->
     цикл: чтение строк read_rows (6.1, l2core.model.rows) -> скролл
     scroll_list вниз -> до признака конца из модели (disabled-стрелка
     «вниз», scroll_position 5.5) с предохранителем max_scrolls
@@ -36,7 +37,7 @@ search_button_element); точка с search без search_region — ScanError
 ОТКАЗЫ: needs_recover примитивов фиксируется в failures и обрывает обход
 (исполнение recover — 6.4, вызывающий слой); отмена (kill switch 8.1,
 инъекция cancelled) — результат с cancelled=True без эскалаций.
-Модельные ошибки (нет перехода открытия, нет search_region) — ScanError.
+Модельные ошибки (нет recipe_runner, нет search_region) — ScanError.
 
 ГРАНИЦЫ (R4): семантика params фильтров/табов и переходов между ними в
 модели не подтверждены метой — verify на точку обхода даёт стратегия;
@@ -58,6 +59,7 @@ from l2core.config import CoreConfig
 from l2core.detector.anchor import Anchor
 from l2core.detector.status import WindowStatus
 from l2core.model import OcrRegionSpec, UiModel
+from l2core.primitives.navigation import RecipeResult
 from l2core.model.rows import Row, RowsResult, dedup_rows, read_rows
 from l2core.primitives.activate import ActivateResult
 from l2core.primitives.click import (
@@ -140,24 +142,6 @@ class ScanResult:
         return bool(self.failures) and not self.cancelled
 
 
-def _resolve_open_verify(model: UiModel, open_element: str,
-                         open_from: str) -> VerifySpec:
-    """Verify открытия обзора из перехода модели (recover_closed -> tab).
-
-    Переход подтверждён метой (market.yaml); его отсутствие — ошибка
-    модели (ScanError, fail fast): открывать обзор «вслепую» нельзя.
-    """
-    for transition in model.transitions:
-        if (transition.source == open_from
-                and transition.action.type == "click"
-                and transition.action.element == open_element):
-            return VerifySpec.from_transition(transition)
-    raise ScanError(
-        f"в модели {model.path!r} нет перехода открытия обзора "
-        f"({open_from!r} --click {open_element!r}--> ...): verify "
-        f"открытия неизвестен, открытие отменено")
-
-
 def _click(element_id: str, *, verify: VerifySpec, model: UiModel,
            run_checks: CheckRunner, screen: Screen, hid,
            cursor_pos: Callable[[], Tuple[int, int]],
@@ -208,8 +192,8 @@ def scan_market(
     search_region_id: str = "search_field",
     search_field_element: Optional[str] = None,
     search_button_element: Optional[str] = None,
-    open_element: str = "market_pic",
-    open_from: str = "recover_closed",
+    open_recipe: str = "open_market",
+    recipe_runner: Optional[Callable[[str], RecipeResult]] = None,
     segmentation: Optional[TableSegmentation] = None,
     scroll_chunk: int = 3,
     max_scrolls: int = 200,
@@ -245,18 +229,16 @@ def scan_market(
     if cancelled is not None and cancelled():
         return ScanResult(points=(), cancelled=True)
 
-    open_verify = _resolve_open_verify(model, open_element, open_from)
-    opened = _click(
-        open_element, verify=open_verify, model=model, run_checks=run_checks,
-        screen=screen, hid=hid, cursor_pos=cursor_pos, activate=activate,
-        window_status=window_status, find_anchor=find_anchor, config=config,
-        hud_locator=hud_locator, on_fail=on_fail, cancelled=cancelled,
-        rng=rng, clock=clock, sleep=sleep)
+    if recipe_runner is None:
+        raise ScanError(
+            "открытие обзора невозможно: recipe_runner не задан (открытие "
+            "— рецепт навигации open_market; клики по market_pic удалены)")
+    opened = recipe_runner(open_recipe)
     if opened.cancelled:
         return ScanResult(points=(), cancelled=True)
     if opened.needs_recover:
         return ScanResult(points=(), failures=(
-            f"открытие обзора ({open_element!r}) не подтверждено: "
+            f"открытие обзора (рецепт {open_recipe!r}) не подтверждено: "
             f"{'; '.join(opened.failures) or 'verify не сошёлся'}",))
 
     # Поиск: регион подшивается в копию модели (модель frozen, ручные

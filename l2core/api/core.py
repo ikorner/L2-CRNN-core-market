@@ -769,7 +769,7 @@ class L2CoreAPI:
                    source_locator: Callable[[SellItem], Optional[Tuple[int, int]]],
                    grid=None,
                    price_region: Optional[OcrRegionSpec] = None,
-                   open_element: Optional[str] = "open_sale_trade",
+                   open_recipe: Optional[str] = "open_shop_sell",
                    open_verify: Optional[VerifySpec] = None,
                    price_field_element: Optional[str] = None,
                    drag_verify: VerifySpec,
@@ -778,9 +778,10 @@ class L2CoreAPI:
                    on_fail: Tuple[str, ...] = (),
                    cancelled: Optional[Callable[[], bool]] = None
                    ) -> SetupSellResult:
-        """Выставление лавки продажи (сценарий 6.2): открытие через HUD
-        (open_verify обязателен при open_element — межокнные переходы
-        моделью не выражены), drag+цена по слотам сетки. price_region —
+        """Выставление лавки продажи (сценарий 6.2): открытие — рецепт
+        навигации (recipe_runner исполнителя рецептов; open_recipe=None —
+        лавка открыта вызывающим слоем); open_verify — override verify
+        последнего шага рецепта. drag+цена по слотам сетки. price_region —
         wiring.price_region по умолчанию (региона цены в модели нет — 6.2)."""
         self._check_thread()
         c = self._cancelled(cancelled)
@@ -791,6 +792,10 @@ class L2CoreAPI:
                 "setup_sell: OCR-регион поля цены не задан (параметр "
                 "price_region / wiring.price_region; в модели лавки не "
                 "размечен — KNOWN_GAPS): ввод цены без OCR-verify запрещён")
+        recipe_runner = None
+        if open_recipe is not None:
+            recipe_runner = (
+                lambda rid: self._run_open_recipe(rid, open_verify, c))
         return self._log_action(
             "setup_sell",
             lambda: setup_sell(
@@ -800,8 +805,7 @@ class L2CoreAPI:
                 window_status=lambda frame: w.window_status(frame, "shop_sell"),
                 find_anchor=lambda frame: w.find_anchor(frame, "shop_sell"),
                 run_checks=w.run_checks, config=w.config, grid=grid,
-                hud_model=w.hud_model, hud_locator=w.hud_locator,
-                open_element=open_element, open_verify=open_verify,
+                open_recipe=open_recipe, recipe_runner=recipe_runner,
                 source_locator=source_locator, price_region=region,
                 price_field_element=price_field_element,
                 price_submit=price_submit, drag_verify=drag_verify,

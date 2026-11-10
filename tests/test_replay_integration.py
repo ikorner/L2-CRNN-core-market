@@ -56,6 +56,7 @@ from l2core.primitives.activate import ActivateResult
 from l2core.primitives.click import CheckReport
 from l2core.primitives.outcome import ActionOutcome, IrreversibleGuard
 from l2core.scenarios.monitor import ShopMonitor
+from l2core.primitives.navigation import RecipeResult
 from l2core.scenarios.scan import ScanPoint, scan_market
 from l2core.scenarios.setup_sell import SellItem, setup_sell, start_sell
 from tests.test_rows import vendor_state  # noqa: F401  (autouse: снапшот констант вендора)
@@ -86,14 +87,12 @@ from tests.test_setup_sell import (
     KEY_ESC_CODE,
     OCR_TEXTS as SHOP_OCR_TEXTS,
     OPEN_ELEMENT as SHOP_OPEN_ELEMENT,
-    OPEN_VERIFY,
     PRICE_REGION,
     SELL_START_ELEMENT,
     _DIGIT_BY_CODE,
     found_status as shop_found_status,
     hud_locator as shop_hud_locator,
     make_config,
-    make_hud_model,
     make_shop_model,
 )
 from tests.test_setup_sell import DictOcr as ShopDictOcr
@@ -354,7 +353,17 @@ class MarketWorld:
 
 def run_scan_scenario(hid):
     """Один и тот же closure для прохода записи и воспроизведения
-    (одинаковые seed/часы/инъекции — детерминированная пара проходов)."""
+    (одинаковые seed/часы/инъекции — детерминированная пара проходов).
+
+    Открытие обзора — recipe_runner: имитирует клик по иконке (мир
+    MarketWorld открывается по первому клику до открытия)."""
+    def recipe_runner(recipe_id):
+        # Клик по «иконке» открытия (точка из market_hud_locator):
+        # мир открывается по первому клику до открытия.
+        hid.move_rel(150, 90)
+        hid.click(1, 1, 50)
+        return RecipeResult(recipe_id, success=True, attempts=1)
+
     return scan_market(
         [ScanPoint(verify=POINT_VERIFY, tab=TAB_ELEMENT,
                    filters=(FILTER_ELEMENT,))],
@@ -370,6 +379,7 @@ def run_scan_scenario(hid):
         run_checks=MarkerRunner(MARKET_REGISTRY),
         config=make_market_config(),
         hud_locator=market_hud_locator,
+        recipe_runner=recipe_runner,
         scroll_chunk=1,
         rng=random.Random(7),
         clock=hid.clock.monotonic,
@@ -428,10 +438,15 @@ def run_setup_and_start_sell(hid, items=(SellItem(slot=1, price=1500000),)):
     """setup_sell() + start_sell() над одним экраном/сессией (closure общий
     для обоих проходов; items фиксирует обход — смена списка ломает
     воспроизведение, см. негативный тест)."""
+    def recipe_runner(recipe_id):
+        # Открытие лавки — клик (мир открывается по первому клику).
+        hid.move_rel(210, 10)
+        hid.click(1, 1, 50)
+        return RecipeResult(recipe_id, success=True, attempts=1)
+
     setup = setup_sell(
         list(items),
         model=make_shop_model(),
-        hud_model=make_hud_model(),
         grid=GRID,
         ocr=ShopDictOcr(SHOP_OCR_TEXTS),
         screen=hid.screen,
@@ -443,9 +458,7 @@ def run_setup_and_start_sell(hid, items=(SellItem(slot=1, price=1500000),)):
         find_anchor=lambda frame: SHOP_ANCHOR,
         run_checks=MarkerRunner(SHOP_REGISTRY),
         config=make_config(),
-        hud_locator=shop_hud_locator,
-        open_element=SHOP_OPEN_ELEMENT,
-        open_verify=OPEN_VERIFY,
+        recipe_runner=recipe_runner,
         source_locator=lambda item: (40, 120),
         price_region=PRICE_REGION,
         price_field_element=None,

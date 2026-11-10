@@ -28,9 +28,9 @@ window_status / run_checks / source_locator), ничего не кэширует
 
 ПОТОК setup_sell(items):
 
-    открытие лавки (open_shop_sell через HUD: клик по open_element —
-    HUD-иконка open_sale_trade из модели market, verify снаружи: переходы
-    межоконные формат модели не выражает, KNOWN_GAPS п.3) -> для каждого
+    открытие лавки — рецепт навигации (recipe_runner, open_recipe
+    по умолчанию "open_shop_sell"; open_recipe=None — лавка открыта
+    вызывающим слоем, сценарий открытием не занимается) -> для каждого
     SellItem(slot, price): свежий якорь + source_locator -> drag_item ->
     enter_price -> итоговый verify состояния (final_verify).
 
@@ -89,6 +89,7 @@ from l2core.primitives.click import (
 )
 from l2core.primitives.drag import DragResult, drag_item
 from l2core.primitives.enter import EnterResult, enter_price
+from l2core.primitives.navigation import RecipeResult
 from l2core.primitives.outcome import ActionOutcome, IrreversibleGuard, to_outcome
 
 __all__ = [
@@ -252,10 +253,8 @@ def setup_sell(
     run_checks: CheckRunner,
     config: CoreConfig,
     grid: Optional[GridGeometry] = None,
-    hud_model: Optional[UiModel] = None,
-    hud_locator=None,
-    open_element: Optional[str] = "open_sale_trade",
-    open_verify: Optional[VerifySpec] = None,
+    open_recipe: Optional[str] = "open_shop_sell",
+    recipe_runner: Optional[Callable[[str], RecipeResult]] = None,
     source_locator: Callable[[SellItem], Optional[Tuple[int, int]]],
     price_region: Optional[OcrRegionSpec] = None,
     price_region_id: str = "price_field",
@@ -273,13 +272,11 @@ def setup_sell(
     """Выставление лавки продажи: открытие -> drag+цена на предмет ->
     итоговый verify. Контракт — в докстринге модуля.
 
-    model — модель окна shop_sell; hud_model — модель, содержащая
-    HUD-элемент открытия (market, open_sale_trade). hud_model=None +
-    open_element задан: элемент ищется в модели окна и, если его там нет,
-    вылетает ClickElementError (честный fail fast — отсутствует элемент
-    модели, 5.3), не SetupSellError. open_element=None — открытие
-    пропускается (лавка открыта вызывающим слоем); тогда open_verify не
-    нужен.
+    model — модель окна shop_sell; открытие — рецепт навигации:
+    recipe_runner(open_recipe) (по умолчанию "open_shop_sell").
+    open_recipe=None — открытие пропускается (лавка открыта вызывающим
+    слоем); recipe_runner при заданном open_recipe обязателен
+    (SetupSellError, fail fast).
     """
     items = tuple(items)
     grid = _resolve_grid(grid, model)
@@ -306,40 +303,19 @@ def setup_sell(
     if cancelled is not None and cancelled():
         return SetupSellResult(items=(), cancelled=True)
 
-    # --- Открытие лавки через HUD (как open в 6.1, межоконный переход
-    # формат модели не выражает — verify открытия передаёт стратегия).
-    if open_element is not None:
-        open_model = hud_model if hud_model is not None else model
-        if open_verify is None:
+    # --- Открытие лавки — рецепт навигации (menu-quickslot-navigation;
+    # открытие при закрытом окне, пролог click_element 5.3 недостижим).
+    if open_recipe is not None:
+        if recipe_runner is None:
             raise SetupSellError(
-                f"открытие лавки ({open_element!r}) требует open_verify: "
-                f"клики без verify запрещены (инвариант 2), перехода "
-                f"модель не выражает (KNOWN_GAPS п.3)")
-        opened = click_element(
-            open_element,
-            model=open_model,
-            verify=open_verify,
-            run_checks=run_checks,
-            screen=screen,
-            hid=hid,
-            cursor_pos=cursor_pos,
-            activate=activate,
-            window_status=window_status,
-            find_anchor=find_anchor,
-            config=config,
-            hud_locator=hud_locator,
-            on_fail=on_fail,
-            free_area_point=free_area_point,
-            cancelled=cancelled,
-            rng=rng,
-            clock=clock,
-            sleep=sleep,
-        )
+                f"открытие лавки (рецепт {open_recipe!r}) невозможно: "
+                f"recipe_runner не задан (открытие — рецепт навигации)")
+        opened = recipe_runner(open_recipe)
         if opened.cancelled:
             return SetupSellResult(items=(), cancelled=True)
         if opened.needs_recover:
             return SetupSellResult(items=(), failures=(
-                f"открытие лавки ({open_element!r}) не подтверждено: "
+                f"открытие лавки (рецепт {open_recipe!r}) не подтверждено: "
                 f"{'; '.join(opened.failures) or 'verify не сошёлся'}",))
 
     outcomes: list = []
