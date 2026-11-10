@@ -76,6 +76,7 @@ recipes:
         when: [menu_open]
         verify:
           - {kind: template, element: menu_anchor, expect: absent}
+        on_fail: [press_esc]
       - action: click
         element: quickslot_buy_icon
         verify:
@@ -146,3 +147,124 @@ class TestLoadNavigation:
             "expect: absent}", "expect: present}", 1)
         with pytest.raises(ModelFormatError):
             load_navigation(_write_nav(tmp_path, bad))
+
+
+# ---------------------------------------------------------------------------
+# Валидатор навигационной модели (Task 4).
+# ---------------------------------------------------------------------------
+
+import dataclasses
+
+from l2core.model.validator import validate_navigation
+
+
+def _nav_with_assets(tmp_path):
+    """Валидная модель NAV_YAML + файлы шаблонов в tmp assets."""
+    import cv2
+    import numpy as np
+
+    assets = tmp_path / "assets"
+    (assets / "navigation").mkdir(parents=True)
+    for name in ("menu_anchor", "menu_market_icon", "hamburger",
+                 "quickslot_buy"):
+        cv2.imwrite(str(assets / "navigation" / f"{name}.png"),
+                    np.zeros((8, 8), dtype=np.uint8))
+    nav = load_navigation(_write_nav(tmp_path))
+    return nav, assets
+
+
+def _rules(violations):
+    return {v.rule for v in violations}
+
+
+class TestValidateNavigation:
+    def test_valid_model_passes(self, tmp_path):
+        nav, assets = _nav_with_assets(tmp_path)
+        assert validate_navigation(nav, assets) == []
+
+    def test_signature_with_single_check_fails(self, tmp_path):
+        nav, assets = _nav_with_assets(tmp_path)
+        nav = dataclasses.replace(
+            nav, signatures={"menu_open": nav.signatures["menu_open"][:1]})
+        assert "nav_signatures" in _rules(
+            validate_navigation(nav, assets))
+
+    def test_step_without_on_fail_fails(self, tmp_path):
+        nav, assets = _nav_with_assets(tmp_path)
+        recipe = nav.recipes["open_shop_buy"]
+        step0 = dataclasses.replace(recipe.steps[0], on_fail=())
+        nav = dataclasses.replace(nav, recipes={
+            **nav.recipes,
+            "open_shop_buy": dataclasses.replace(recipe, steps=(step0,) + recipe.steps[1:]),
+        })
+        assert "nav_step_verify" in _rules(
+            validate_navigation(nav, assets))
+
+    def test_recipe_without_on_fail_and_alternate_fails(self, tmp_path):
+        nav, assets = _nav_with_assets(tmp_path)
+        recipe = nav.recipes["open_shop_buy"]
+        nav = dataclasses.replace(nav, recipes={
+            **nav.recipes,
+            "open_shop_buy": dataclasses.replace(recipe, on_fail=()),
+        })
+        rules = _rules(validate_navigation(nav, assets))
+        assert "nav_recipe" in rules and "nav_recipe_no_exit" not in rules
+
+    def test_unknown_alternate_fails(self, tmp_path):
+        nav, assets = _nav_with_assets(tmp_path)
+        recipe = nav.recipes["open_market"]
+        nav = dataclasses.replace(nav, recipes={
+            **nav.recipes,
+            "open_market": dataclasses.replace(recipe, alternate="nope"),
+        })
+        assert "nav_recipe" in _rules(validate_navigation(nav, assets))
+
+    def test_step_with_unknown_element_fails(self, tmp_path):
+        nav, assets = _nav_with_assets(tmp_path)
+        recipe = nav.recipes["open_shop_buy"]
+        step1 = dataclasses.replace(recipe.steps[1], element="ghost")
+        nav = dataclasses.replace(nav, recipes={
+            **nav.recipes,
+            "open_shop_buy": dataclasses.replace(recipe, steps=recipe.steps[:1] + (step1,)),
+        })
+        assert "nav_refs" in _rules(validate_navigation(nav, assets))
+
+    def test_unknown_on_fail_step_fails(self, tmp_path):
+        nav, assets = _nav_with_assets(tmp_path)
+        recipe = nav.recipes["open_shop_buy"]
+        step1 = dataclasses.replace(
+            recipe.steps[1], on_fail=("press_esc", "click_at_0_0"))
+        nav = dataclasses.replace(nav, recipes={
+            **nav.recipes,
+            "open_shop_buy": dataclasses.replace(recipe, steps=recipe.steps[:1] + (step1,)),
+        })
+        assert "nav_on_fail_steps" in _rules(
+            validate_navigation(nav, assets))
+
+    def test_unknown_key_fails(self, tmp_path):
+        nav, assets = _nav_with_assets(tmp_path)
+        recipe = nav.recipes["open_shop_buy"]
+        step0 = dataclasses.replace(recipe.steps[0], key="Q")
+        nav = dataclasses.replace(nav, recipes={
+            **nav.recipes,
+            "open_shop_buy": dataclasses.replace(recipe, steps=(step0,) + recipe.steps[1:]),
+        })
+        assert "nav_key_known" in _rules(validate_navigation(nav, assets))
+
+    def test_missing_template_fails(self, tmp_path):
+        nav, assets = _nav_with_assets(tmp_path)
+        empty_assets = tmp_path / "empty_assets"
+        empty_assets.mkdir()
+        assert "nav_templates" in _rules(
+            validate_navigation(nav, empty_assets))
+
+    def test_menu_element_without_anchor_fails(self, tmp_path):
+        # rect-элемент есть, а hud-якоря меню в модели нет.
+        nav, assets = _nav_with_assets(tmp_path)
+        nav = dataclasses.replace(
+            nav,
+            elements={
+                "stray": nav.elements["menu_market_icon"],
+            })
+        assert "nav_menu_anchor" in _rules(
+            validate_navigation(nav, assets))

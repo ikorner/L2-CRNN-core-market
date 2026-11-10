@@ -53,17 +53,20 @@ from dataclasses import dataclass
 from typing import Dict, List, Set
 
 from .types import UiModel
-from .validator import RECOVER_STATE_PREFIX, Violation
+from .validator import (  # noqa: F401  (KNOWN_ON_FAIL_STEPS — реэкспорт)
+    KNOWN_ON_FAIL_STEPS,
+    RECOVER_STATE_PREFIX,
+    Violation,
+)
 
 # Синтезированный узел трассировки: runtime-unknown детектора 3.4.
 UNKNOWN_NODE = "unknown"
 
-# Именованные шаги on_fail, исполняемые примитивами (l2core.primitives.click
-# _run_on_fail; дизайн, решение 6: ESC -> клик в свободную область). Паритет
-# со словарём исполнителя — guard-тест tests/test_trace.py. Координатные
-# действия в переходах модели недопустимы: точки кликов происходят из
-# rect/click_point элементов (слой якоря), а не из литералов графа.
-KNOWN_ON_FAIL_STEPS = frozenset({"press_esc", "click_free_area"})
+# Именованные шаги on_fail исполняют примитивы (l2core.primitives.click
+# _run_on_fail); источник единого словаря — валидатор (см. импорт выше):
+# трассировка и валидатор навигационной модели ссылаются на одно множество,
+# координатные действия в шагах недопустимы (точки кликов — из rect'ов
+# элементов, а не литералов графа).
 
 
 @dataclass(frozen=True)

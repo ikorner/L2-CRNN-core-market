@@ -42,11 +42,13 @@ from .grammars import (
 from .validator import (
     Gap,
     GapCheckResult,
+    KNOWN_ON_FAIL_STEPS,
     Violation,
     check_against_gaps,
     format_report,
     load_gaps,
     validate_model,
+    validate_navigation,
 )
 from .reading import (
     OcrReadError,
@@ -91,6 +93,7 @@ __all__ = [
     "GrammarMismatch",
     "GrammarSpec",
     "GridGeometry",
+    "KNOWN_ON_FAIL_STEPS",
     "ModelFormatError",
     "OcrReadError",
     "NavigationModel",
@@ -117,9 +120,10 @@ __all__ = [
     "load_gaps",
     "load_model",
     "load_navigation",
-    "parse_value",
+    "load_navigation",    "parse_value",
     "read_confident",
     "read_region",
     "read_stable",
     "validate_model",
+    "validate_navigation",
 ]

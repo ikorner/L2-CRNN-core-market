@@ -49,7 +49,7 @@ import argparse
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, NamedTuple, Optional, Sequence, Tuple, Union
+from typing import Collection, List, NamedTuple, Optional, Sequence, Tuple, Union
 
 import yaml
 
@@ -65,6 +65,13 @@ WINDOWS_WITH_LISTS = ("market",)
 
 # Соглашение: recover-состояние — id с этим префиксом (см. модульный docstring).
 RECOVER_STATE_PREFIX = "recover"
+
+# Именованные шаги on_fail, исполняемые примитивами (l2core.primitives.click
+# _run_on_fail; дизайн, решение 6: ESC -> клик в свободную область). Источник
+# одного словаря — здесь: трассировка (l2core.model.trace) и валидатор
+# навигационной модели ссылаются на это множество; координатные действия в
+# шагах недопустимы (точки кликов — из rect/click_point элементов).
+KNOWN_ON_FAIL_STEPS = frozenset({"press_esc", "click_free_area"})
 
 
 @dataclass(frozen=True)
@@ -297,6 +304,123 @@ def _check_probe_points(
 
 def _transition_label(transition: TransitionSpec) -> str:
     return f"{transition.source} -> {transition.expected}"
+
+
+# --- Навигационная модель (menu-quickslot-navigation) ---
+
+def validate_navigation(nav, assets_dir, *,
+                        known_keys: Optional[Collection[str]] = None
+                        ) -> List[Violation]:
+    """Проверить инварианты навигационной модели (ui_model/navigation.yaml).
+
+    nav — NavigationModel (l2core.model.navigation); assets_dir — каталог
+    assets/ ядра. known_keys — допустимые имена клавиш шагов key (по
+    умолчанию словарь KEYCODES адаптера keycodes).
+
+    Правила: nav_signatures (>=2 проверки на сигнатуру), nav_refs
+    (элементы/сигнатуры существуют), nav_step_verify (непустые verify/
+    on_fail шага), nav_recipe (непустой on_fail, alternate существует),
+    nav_on_fail_steps (только KNOWN_ON_FAIL_STEPS), nav_key_known,
+    nav_templates (шаблоны в assets/), nav_menu_anchor (rect-элемент меню
+    требует HUD-якоря menu_anchor).
+    """
+    from l2core.adapters.keycodes import KEYCODES
+
+    if known_keys is None:
+        known_keys = set(KEYCODES)
+    file = nav.path
+    assets = Path(assets_dir)
+    violations: List[Violation] = []
+
+    # --- шаблоны элементов существуют в assets/ ---
+    for element_id, element in nav.elements.items():
+        for variant_name, spec in element.variants.items():
+            path = assets / spec.template
+            if not path.is_file():
+                violations.append(Violation(
+                    rule="nav_templates", file=file,
+                    subject=f"{element_id}/{variant_name}",
+                    detail=f"шаблон не найден: {spec.template}"))
+
+    # --- якорь меню: rect-элементы навигации отсчитываются от HUD-якоря ---
+    anchor = nav.elements.get("menu_anchor")
+    for element_id, element in nav.elements.items():
+        if element.hud or element.rect is None:
+            continue
+        if anchor is None or not anchor.hud:
+            violations.append(Violation(
+                rule="nav_menu_anchor", file=file, subject=element_id,
+                detail="rect-элемент навигации требует HUD-элемента "
+                       "menu_anchor (координаты элемента — 1:1 от якоря "
+                       "меню, инвариант 3)"))
+            break
+
+    # --- сигнатуры: минимум два независимых признака ---
+    for sig_id, checks in nav.signatures.items():
+        if len(checks) < 2:
+            violations.append(Violation(
+                rule="nav_signatures", file=file, subject=sig_id,
+                detail=f"сигнатура {sig_id} имеет {len(checks)} признак(а), "
+                       "минимум два (как у состояний окон)"))
+
+    def check_refs(checks, subject: str) -> None:
+        for check in checks:
+            if check.kind == "template" and check.element not in nav.elements:
+                violations.append(Violation(
+                    rule="nav_refs", file=file, subject=subject,
+                    detail=f"неизвестный элемент {check.element!r}"))
+
+    def check_on_fail(steps, subject: str) -> None:
+        for step in steps:
+            for name in step:
+                if name not in KNOWN_ON_FAIL_STEPS:
+                    violations.append(Violation(
+                        rule="nav_on_fail_steps", file=file,
+                        subject=subject,
+                        detail=f"неизвестный шаг on_fail {name!r}: шаги — "
+                               "только именованные шаги исполнителя "
+                               f"{sorted(KNOWN_ON_FAIL_STEPS)}"))
+
+    # --- рецепты ---
+    for recipe_id, recipe in nav.recipes.items():
+        rsec = f"recipes.{recipe_id}"
+        if not recipe.on_fail:
+            violations.append(Violation(
+                rule="nav_recipe", file=file, subject=rsec,
+                detail="on_fail рецепта обязателен (неуспех — выход в "
+                       "recover-цепочку)"))
+        if recipe.alternate is not None and recipe.alternate not in nav.recipes:
+            violations.append(Violation(
+                rule="nav_recipe", file=file, subject=rsec,
+                detail=f"alternate ссылается на несуществующий рецепт "
+                       f"{recipe.alternate!r}"))
+        check_on_fail((recipe.on_fail,), rsec)
+        for i, step in enumerate(recipe.steps):
+            ssec = f"{rsec}.steps[{i}]"
+            if not step.verify:
+                violations.append(Violation(
+                    rule="nav_step_verify", file=file, subject=ssec,
+                    detail="verify шага обязателен (клики/нажатия без "
+                           "verify запрещены, инвариант 2)"))
+            if not step.on_fail:
+                violations.append(Violation(
+                    rule="nav_step_verify", file=file, subject=ssec,
+                    detail="on_fail шага обязателен (retry -> on_fail -> "
+                           "следующий шаг)"))
+            if step.action == "click" and step.element not in nav.elements:
+                violations.append(Violation(
+                    rule="nav_refs", file=file, subject=ssec,
+                    detail=f"неизвестный элемент {step.element!r}"))
+            if step.action == "key" and step.key not in known_keys:
+                violations.append(Violation(
+                    rule="nav_key_known", file=file, subject=ssec,
+                    detail=f"неизвестная клавиша {step.key!r} "
+                           f"(допустимы {sorted(known_keys)})"))
+            check_refs(step.verify, ssec)
+            check_refs(step.when, ssec)
+            check_refs(step.skip_if, ssec)
+            check_on_fail((step.on_fail,), ssec)
+    return violations
 
 
 def _check_recover_paths(model: UiModel, file: str) -> List[Violation]:
