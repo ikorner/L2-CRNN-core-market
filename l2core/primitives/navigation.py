@@ -197,7 +197,7 @@ class _StepUnconfirmed(Exception):
     """Шаг click прерван UNKNOWN (HID-сбой): клик мог уйти."""
 
 
-def run_recipe(recipe_id: str, *,
+def run_recipe(recipe_id: str, *, recipe: Optional[Recipe] = None,
                nav_model: NavigationModel,
                evaluate: EvaluateChecks,
                hud_locator,
@@ -213,12 +213,15 @@ def run_recipe(recipe_id: str, *,
                sleep: Callable[[float], None] = time.sleep,
                ) -> RecipeResult:
     """Исполнить рецепт открытия окна (контракт — в docstring модуля).
-    Рецепта нет — RecipeError (fail fast)."""
-    recipe = nav_model.recipes.get(recipe_id)
+    Рецепта нет — RecipeError (fail fast). recipe — готовый объект рецепта
+    (override вызывающего слоя, например замена verify последнего шага);
+    иначе рецепт ищется по recipe_id в модели."""
     if recipe is None:
-        raise RecipeError(
-            f"рецепт {recipe_id!r} отсутствует в навигационной модели "
-            f"{nav_model.path!r}")
+        recipe = nav_model.recipes.get(recipe_id)
+        if recipe is None:
+            raise RecipeError(
+                f"рецепт {recipe_id!r} отсутствует в навигационной модели "
+                f"{nav_model.path!r}")
     return _run_recipe_obj(
         recipe, nav_model=nav_model, evaluate=evaluate,
         hud_locator=hud_locator, screen=screen, hid=hid,

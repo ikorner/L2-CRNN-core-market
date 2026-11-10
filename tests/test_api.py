@@ -427,12 +427,178 @@ def make_hud_locator(world, calls):
     return hud_locator
 
 
+# --- Навигация через рецепты (menu-quickslot-navigation, Task 9) ---
+
+MENU_ANCHOR_POINT = (820, 420)
+MENU_ICON_POINT = (884, 504)   # якорь (820,420) + rect (40,60) + click (24,24)
+HAMBURGER_POINT = (1850, 1020)
+QS_BUY_POINT = (300, 950)
+QS_SELL_POINT = (360, 950)
+
+
+class NavWorld:
+    """Мир навигации: X toggles меню; клики по точкам открывают окна."""
+
+    def __init__(self):
+        self.menu_open = False
+        self.market_opened = False
+        self.shop_buy_opened = False
+        self.shop_sell_opened = False
+        self.open_click_works = True
+
+    def react_click(self, pos):
+        if pos == HAMBURGER_POINT:
+            self.menu_open = True
+        elif (pos == MENU_ICON_POINT and self.menu_open
+                and self.open_click_works):
+            self.market_opened = True
+        elif pos == QS_BUY_POINT and self.open_click_works:
+            self.shop_buy_opened = True
+        elif pos == QS_SELL_POINT and self.open_click_works:
+            self.shop_sell_opened = True
+
+
+class NavHid(ScriptedHid):
+    """HID навигации: X (0x1B) toggles меню в мире."""
+
+    def key_press(self, code):
+        super().key_press(code)
+        if code == 0x1B:
+            self.world.menu_open = not self.world.menu_open
+
+
+def _nav_elem_hud(eid, point):
+    return ElementSpec(
+        id=eid, role="icon_sample", hud=True,
+        search_area=Rect(0, 0, 1920, 1080),
+        variants={"normal": VariantSpec(name="normal",
+                                        template=f"t/{eid}.png",
+                                        click_point=point)})
+
+
+def make_nav_model(*, with_alternate=True):
+    """Навигационная модель: market через меню (X/гамбургер), лавки через
+    quick-slot; verify финальных шагов — условные маркеры окон."""
+    from l2core.model.navigation import NavigationModel, Recipe, RecipeStep
+
+    menu_open_checks = (
+        Check(kind="template", element="menu_anchor", variant="normal"),
+        Check(kind="template", element="menu_market_icon", variant="normal"))
+    menu_gone_checks = (
+        Check(kind="template", element="menu_anchor", variant="normal",
+              expect="absent"),)
+    market_checks = (Check(kind="template", element="window_title_market"),)
+    buy_checks = (Check(kind="template", element="window_title_buy"),)
+    sell_checks = (Check(kind="template", element="window_title_sell"),)
+
+    elements = {
+        "menu_anchor": _nav_elem_hud("menu_anchor", (20, 20)),
+        "hamburger_button": _nav_elem_hud("hamburger_button", (10, 10)),
+        "quickslot_buy_icon": _nav_elem_hud("quickslot_buy_icon", (20, 20)),
+        "quickslot_sell_icon": _nav_elem_hud("quickslot_sell_icon", (20, 20)),
+        "menu_market_icon": ElementSpec(
+            id="menu_market_icon", role="click_target", hud=False,
+            rect=Rect(40, 60, 48, 48),
+            variants={"normal": VariantSpec(
+                name="normal", template="t/menu_market_icon.png",
+                click_point=(24, 24))}),
+    }
+
+    def click_step(element, verify):
+        return RecipeStep(action="click", element=element, key=None,
+                          verify=verify,
+                          on_fail=("press_esc", "click_free_area"))
+
+    def key_step(verify, *, when=(), skip_if=()):
+        return RecipeStep(action="key", element=None, key="X", verify=verify,
+                          on_fail=("press_esc",), when=when, skip_if=skip_if)
+
+    recipes = {
+        "open_market": Recipe(
+            id="open_market", opens="market",
+            steps=(key_step(menu_open_checks, skip_if=menu_open_checks),
+                   click_step("menu_market_icon", market_checks)),
+            on_fail=("press_esc", "click_free_area"),
+            alternate="open_market_via_hamburger" if with_alternate else None),
+        "open_market_via_hamburger": Recipe(
+            id="open_market_via_hamburger", opens="market",
+            steps=(click_step("hamburger_button", menu_open_checks),
+                   click_step("menu_market_icon", market_checks)),
+            on_fail=("press_esc", "click_free_area")),
+        "open_shop_buy": Recipe(
+            id="open_shop_buy", opens="shop_buy",
+            steps=(key_step(menu_gone_checks, when=menu_open_checks),
+                   click_step("quickslot_buy_icon", buy_checks)),
+            on_fail=("press_esc", "click_free_area")),
+        "open_shop_sell": Recipe(
+            id="open_shop_sell", opens="shop_sell",
+            steps=(key_step(menu_gone_checks, when=menu_open_checks),
+                   click_step("quickslot_sell_icon", sell_checks)),
+            on_fail=("press_esc", "click_free_area")),
+    }
+    return NavigationModel(path="navigation", elements=elements,
+                           signatures={"menu_open": menu_open_checks},
+                           recipes=recipes)
+
+
+def make_nav_evaluate(world, calls):
+    """evaluate-заглушка навигации: признаки из мира, expect absent —
+    отрицание."""
+
+    def found(check):
+        element = check.element
+        if element in ("menu_anchor", "menu_market_icon"):
+            return world.menu_open
+        if element == "hamburger_button":
+            return True
+        if element in ("quickslot_buy_icon", "quickslot_sell_icon"):
+            return True
+        if element == "window_title_market":
+            return world.market_opened
+        if element == "window_title_buy":
+            return world.shop_buy_opened
+        if element == "window_title_sell":
+            return world.shop_sell_opened
+        return True
+
+    def evaluate(checks, frame):
+        calls.append(checks)
+        failures = []
+        for check in checks:
+            ok = found(check)
+            if check.expect == "absent":
+                ok = not ok
+            if not ok:
+                failures.append(f"fail:{check.element}")
+        return CheckReport(passed=not failures, failures=tuple(failures))
+
+    return evaluate
+
+
+def make_nav_hud_locator(world, calls):
+    """hud_locator навигации: якорь меню — только при открытом меню."""
+
+    points = {"menu_anchor": MENU_ANCHOR_POINT,
+              "hamburger_button": HAMBURGER_POINT,
+              "quickslot_buy_icon": QS_BUY_POINT,
+              "quickslot_sell_icon": QS_SELL_POINT}
+
+    def hud_locator(element, variant, frame):
+        calls.append(element.id)
+        if element.id == "menu_anchor" and not world.menu_open:
+            return None
+        return points.get(element.id)
+
+    return hud_locator
+
+
 def make_wiring(world, hid, *, clock, run_checks_calls=None,
                 hud_calls=None, anchor_script=None, screen=None, ocr=None,
                 segmentation=None, search_region=None, price_region=None,
                 shop_regions=None, detect_state=None, current_window=None,
                 game_window=None, ocr_health=None, hid_health=None,
-                cancelled=None, run_checks=None, hud_locator=None):
+                cancelled=None, run_checks=None, hud_locator=None,
+                navigation=None, nav_evaluate=None):
     market = make_market_model()
     anchors = anchor_script or AnchorScript({
         "market": MARKET_ANCHOR, "shop_sell": SELL_ANCHOR,
@@ -473,7 +639,24 @@ def make_wiring(world, hid, *, clock, run_checks_calls=None,
         rng=random.Random(42),
         clock=clock.monotonic,
         sleep=clock.sleep,
+        navigation=navigation,
+        nav_evaluate=nav_evaluate,
     )
+
+
+def make_nav_api(nav_world, clock=None, nav_calls=None, hud_calls=None,
+                 **wiring_kwargs):
+    """API на навигационном мире: X toggles меню, точки — из NavWorld."""
+    clock = clock or FakeClock()
+    nav_calls = nav_calls if nav_calls is not None else []
+    hud_calls = hud_calls if hud_calls is not None else []
+    hid = NavHid(clock, nav_world)
+    api = make_api(nav_world, hid, clock=clock,
+                   navigation=make_nav_model(),
+                   nav_evaluate=make_nav_evaluate(nav_world, nav_calls),
+                   hud_locator=make_nav_hud_locator(nav_world, hud_calls),
+                   **wiring_kwargs)
+    return api, hid
 
 
 def make_api(world=None, hid=None, clock=None, events=None, **wiring_kwargs):
@@ -527,14 +710,12 @@ class TestThreadOwner:
 
 
 class TestOpenMarket:
-    """Сценарий «Открытие обзора»: клик по иконке HUD + блокирующее
-    ожидание сигнатуры окна; по таймауту — FAILED/UNKNOWN."""
+    """Открытие обзора рецептом навигации: X (skip_if, если меню открыто)
+    -> клик по иконке обзора в меню; alternate — через гамбургер."""
 
     def test_open_success_outcome_ok(self):
-        world, clock = World(), FakeClock()
-        hid = ScriptedHid(clock, world)
-        hud_calls = []
-        api = make_api(world, hid, clock=clock, hud_calls=hud_calls)
+        nav_world, clock = NavWorld(), FakeClock()
+        api, hid = make_nav_api(nav_world, clock=clock)
 
         result = api.open_market()
 
@@ -542,54 +723,46 @@ class TestOpenMarket:
         assert result.success
         assert result.outcome is ActionOutcome.OK
         assert not result.needs_recover
-        assert world.market_opened
-        assert hud_calls == ["market_pic"]
+        assert nav_world.market_opened
+        # Один X (меню было закрыто) и один клик по иконке обзора.
+        assert [a[2] for a in hid.log if a[1] == "key_press"] == [(0x1B,)]
+        assert MENU_ICON_POINT in click_positions(hid)
 
-    def test_verify_timeout_is_failed_with_on_fail(self):
-        # Сигнатура окна не появилась за таймаут: FAILED (verify выполнялся
-        # и провалился — эффект опровергнут). Механика открытия — один
-        # клик + ожидание (паттерн 5.8): on_fail[] не применяется.
-        world, clock = World(), FakeClock()
-        world.open_click_works = False
-        hid = ScriptedHid(clock, world)
-        api = make_api(world, hid, clock=clock)
+    def test_skip_if_menu_already_open(self):
+        nav_world, clock = NavWorld(), FakeClock()
+        nav_world.menu_open = True
+        api, hid = make_nav_api(nav_world, clock=clock)
+
+        result = api.open_market()
+
+        assert result.success
+        assert not [a for a in hid.log if a[1] == "key_press"]
+        assert nav_world.market_opened
+
+    def test_verify_timeout_is_failed(self):
+        # Окно не открылось (клик не работает): рецепт и alternate
+        # исчерпаны -> FAILED (эффект опровергнут), сигнал recover.
+        nav_world, clock = NavWorld(), FakeClock()
+        nav_world.open_click_works = False
+        api, hid = make_nav_api(nav_world, clock=clock)
 
         result = api.open_market()
 
         assert not result.success
         assert result.outcome is ActionOutcome.FAILED
         assert result.needs_recover
-        assert not result.on_fail_executed
-        assert "key_press" not in actions(hid)
-
-    def test_anchor_lost_after_click_is_unknown(self):
-        # Якорь потерян на кадре verify: клик ушёл, подтвердить нельзя —
-        # UNKNOWN (не FAILED), сигнал recover.
-        world, clock = World(), FakeClock()
-        hid = ScriptedHid(clock, world)
-        script = AnchorScript({"market": MARKET_ANCHOR})
-        hid.on_click = lambda: setattr(script, "lose_all", True)
-        api = make_api(world, hid, clock=clock, anchor_script=script)
-
-        result = api.open_market()
-
-        assert not result.success
-        assert result.outcome is ActionOutcome.UNKNOWN
-        assert result.unconfirmed
-        assert result.needs_recover
 
     def test_hid_error_is_unknown(self):
-        # Транспортный сбой HID при открытии: клик мог уйти, мог нет —
+        # Транспортный сбой HID при клике: клик мог уйти, мог нет —
         # UNKNOWN (инвариант 4), сигнал recover.
         from l2core.adapters.hid import HidError
-        world, clock = World(), FakeClock()
-        hid = ScriptedHid(clock, world)
+        nav_world, clock = NavWorld(), FakeClock()
+        api, hid = make_nav_api(nav_world, clock=clock)
 
         def _boom(button=1, count=1, hold_ms=None):
             raise HidError("транспортный сбой")
 
         hid.click = _boom
-        api = make_api(world, hid, clock=clock)
 
         result = api.open_market()
 
@@ -599,9 +772,9 @@ class TestOpenMarket:
         assert result.needs_recover
 
     def test_cancelled_returns_cancelled_without_hid(self):
-        world, clock = World(), FakeClock()
-        hid = ScriptedHid(clock, world)
-        api = make_api(world, hid, clock=clock, cancelled=lambda: True)
+        nav_world, clock = NavWorld(), FakeClock()
+        api, hid = make_nav_api(nav_world, clock=clock,
+                                cancelled=lambda: True)
 
         result = api.open_market()
 
@@ -609,21 +782,33 @@ class TestOpenMarket:
         assert result.outcome is None
         assert hid.log == []
 
-    def test_hud_icon_not_located_is_failed_without_click(self):
-        # Иконку HUD не нашли — клик НЕ выполнялся (слепых кликов нет):
-        # честный FAILED (эффект отсутствует), не UNKNOWN.
-        world, clock = World(), FakeClock()
-        hid = ScriptedHid(clock, world)
-        api = make_api(world, hid, clock=clock,
-                       hud_locator=lambda element, variant, frame: None)
+    def test_menu_anchor_not_located_is_failed_without_click(self):
+        # Меню не открылось (X не сработал): якорь меню не локализован —
+        # клик по иконке НЕ выполнялся (слепых кликов нет), штатный FAILED.
+        nav_world, clock = NavWorld(), FakeClock()
+
+        class NoToggleHid(NavHid):
+            def key_press(self, code):
+                # X не трогает меню (лаг/перехват окном).
+                from tests.test_click import ScriptedHid
+                ScriptedHid.key_press(self, code)
+
+        api = make_api(nav_world, NoToggleHid(clock, nav_world), clock=clock,
+                       navigation=make_nav_model(with_alternate=False),
+                       nav_evaluate=make_nav_evaluate(nav_world, []),
+                       hud_locator=make_nav_hud_locator(nav_world, []))
 
         result = api.open_market()
 
         assert not result.success
         assert result.outcome is ActionOutcome.FAILED
         assert not result.unconfirmed
-        assert "не локализована" in result.failures[0]
-        assert "click" not in actions(hid)
+        assert not nav_world.market_opened
+
+    def test_navigation_not_configured_fails_fast(self):
+        api = make_api()
+        with pytest.raises(ApiError):
+            api.open_market()
 
 
 class TestCloseMarket:
@@ -641,80 +826,72 @@ class TestCloseMarket:
 
 
 class TestOpenShop:
-    """open_shop_buy/open_shop_sell: клик по HUD-иконке; межокнные переходы
-    моделью не выражены (KNOWN_GAPS п.3) — verify передаёт стратегия."""
+    """open_shop_buy/open_shop_sell: рецепты quick-slot; verify из рецепта
+    (параметр verify — override последнего шага)."""
 
     def test_open_shop_buy_success(self):
-        world, clock = World(), FakeClock()
-        hid = ScriptedHid(clock, world)
-        api = make_api(world, hid, clock=clock)
+        nav_world, clock = NavWorld(), FakeClock()
+        api, hid = make_nav_api(nav_world, clock=clock)
 
-        result = api.open_shop_buy(verify=VerifySpec(checks=()))
+        result = api.open_shop_buy()
 
         assert result.success
         assert result.outcome is ActionOutcome.OK
-        assert world.shop_buy_opened
-        assert OPEN_BUY_POINT in click_positions(hid)
+        assert nav_world.shop_buy_opened
+        assert QS_BUY_POINT in click_positions(hid)
+        # Меню было закрыто — шаг «закрыть меню» пропущен (X не нажат).
+        assert not [a for a in hid.log if a[1] == "key_press"]
 
     def test_open_shop_sell_success(self):
-        world, clock = World(), FakeClock()
-        hid = ScriptedHid(clock, world)
-        api = make_api(world, hid, clock=clock)
+        nav_world, clock = NavWorld(), FakeClock()
+        api, hid = make_nav_api(nav_world, clock=clock)
 
-        result = api.open_shop_sell(verify=VerifySpec(checks=()))
+        result = api.open_shop_sell()
 
         assert result.success
-        assert world.shop_sell_opened
-        assert OPEN_SELL_POINT in click_positions(hid)
+        assert nav_world.shop_sell_opened
+        assert QS_SELL_POINT in click_positions(hid)
 
-    def test_verify_required_fail_fast(self):
-        api = make_api()
-        with pytest.raises(ApiError):
-            api.open_shop_buy()
+    def test_open_shop_closes_open_menu_first(self):
+        # Меню открыто: сначала X (закрыть меню), затем клик по quick-slot.
+        nav_world, clock = NavWorld(), FakeClock()
+        nav_world.menu_open = True
+        api, hid = make_nav_api(nav_world, clock=clock)
+
+        result = api.open_shop_buy()
+
+        assert result.success
+        assert [a[2] for a in hid.log if a[1] == "key_press"] == [(0x1B,)]
+        assert not nav_world.menu_open
+        assert nav_world.shop_buy_opened
+
+    def test_verify_override_replaces_final_step_checks(self):
+        # verify параметром заменяет verify последнего шага рецепта.
+        nav_world, clock = NavWorld(), FakeClock()
+        nav_calls = []
+        api, hid = make_nav_api(nav_world, clock=clock, nav_calls=nav_calls)
+        override = VerifySpec(checks=(
+            Check(kind="template", element="custom_marker"),))
+
+        result = api.open_shop_buy(verify=override)
+
+        assert result.success
+        seen = {check.element for checks in nav_calls for check in checks}
+        assert "custom_marker" in seen
+        assert "window_title_buy" not in seen
 
     @pytest.mark.parametrize("method", ["open_shop_buy", "open_shop_sell"])
     def test_open_shop_verify_timeout_is_failed(self, method):
-        # Сигнатура лавки не сошлась за таймаут (verify от стратегии не
-        # подтверждён): FAILED (якорь был, verify выполнялся), без повторных
-        # кликов — общий _open_via_hud, ветки как у open_market.
-        world, clock = World(), FakeClock()
-        hid = ScriptedHid(clock, world)
+        # Окно лавки не открылось: рецепт исчерпан -> FAILED, не UNKNOWN.
+        nav_world, clock = NavWorld(), FakeClock()
+        nav_world.open_click_works = False
+        api, hid = make_nav_api(nav_world, clock=clock)
 
-        def run_checks(checks, frame, anchor):
-            for check in checks:
-                if check.element == "shop_open_marker":
-                    return CheckReport(
-                        False, ("признак открытия лавки не найден",))
-            return CheckReport(True, ())
-
-        api = make_api(world, hid, clock=clock, run_checks=run_checks)
-        verify = VerifySpec(checks=(
-            Check(kind="template", element="shop_open_marker"),))
-
-        result = getattr(api, method)(verify=verify)
+        result = getattr(api, method)()
 
         assert not result.success
         assert result.outcome is ActionOutcome.FAILED
         assert not result.unconfirmed
-        assert result.needs_recover
-        assert len([a for a in actions(hid) if a == "click"]) == 1
-
-    @pytest.mark.parametrize("method", ["open_shop_buy", "open_shop_sell"])
-    def test_open_shop_anchor_lost_after_click_is_unknown(self, method):
-        # Якоря лавки ни разу не было на кадрах после клика: клик ушёл,
-        # подтвердить нельзя — UNKNOWN (инвариант 4), не FAILED.
-        world, clock = World(), FakeClock()
-        hid = ScriptedHid(clock, world)
-        script = AnchorScript({"shop_buy": BUY_ANCHOR,
-                               "shop_sell": SELL_ANCHOR})
-        hid.on_click = lambda: setattr(script, "lose_all", True)
-        api = make_api(world, hid, clock=clock, anchor_script=script)
-
-        result = getattr(api, method)(verify=VerifySpec(checks=()))
-
-        assert not result.success
-        assert result.outcome is ActionOutcome.UNKNOWN
-        assert result.unconfirmed
         assert result.needs_recover
 
 

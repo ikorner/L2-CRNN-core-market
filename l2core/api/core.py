@@ -20,18 +20,18 @@ L2CoreAPI — ТОНКИЙ ФАСАД поверх существующих сц
 - on/wait_event/get_events — события двух форм и журнал (7.3, R14:
   push — dispatcher-поток, pull — строго из потока стратегии).
 
-ОТКРЫТИЕ ОКОН ЧЕРЕЗ HUD (open_*): click_element 5.3 сюда НЕ подходит — его
-пролог требует якорь окна на кадре, а при закрытом обзоре якоря нет (это же
-латентная граница открытия в scan 6.1: там открытие работает на
-скриптованных якорях тестов). Реальная механика открытия — паттерн
-переоткрытия 5.8: пролог активации (фокус окна игры) → точку иконки даёт
-hud_locator → РОВНО ОДИН клик → блокирующее ожидание сигнатуры окна на
-свежих кадрах (wait_until, тайминги конфига). Исходы (инвариант 4):
-сигнатура подтверждена — OK; verify выполнялся (якорь был на poll'ах), но не
-сошёлся за таймаут — FAILED (эффект опровергнут); якоря не было ни разу —
-UNKNOWN (клик ушёл, подтвердить нельзя). Повторных кликов по таймауту нет:
-неоткрытие за таймаут — штатный FAILED/UNKNOWN с диагностикой (предусловия
-открытия за таймаут не меняются — та же логика, что в 5.8).
+ОТКРЫТИЕ ОКОН (open_*, menu-quickslot-navigation): исполнители рецептов
+навигационной модели (l2core.model.navigation, l2core.primitives.
+navigation): обзор открывается через игровое «Меню» (клавиша X / alternate
+гамбургер -> иконка обзора в меню), лавки — кликом по иконкам quick-slot;
+«Меню» перед кликом нормализуется (when/skip_if: X — toggle, слепое
+нажатие опасно). click_element 5.3 сюда НЕ подходит — его пролог требует
+якорь окна на кадре, а при закрытом окне якоря нет. Verify рецепта —
+навигационные признаки (меню, якоря open-окон через многоопорный якорь
+3.3); open_shop_* принимают verify — override последнего шага. Исходы
+(инвариант 4): OK / FAILED (эффект отсутствует или опровергнут) / UNKNOWN
+(HID-сбой или эффект не подтверждён — unconfirmed). Сборка без
+навигационной модели — ApiError (fail fast).
 
 ПОТОК-ВЛАДЕЛЕЦ (spec: «стратегия MUST вызывать блокирующий API только из
 своего потока»): владелец фиксируется при создании (поток-конструктор или
@@ -46,8 +46,7 @@ threading.current_thread() — чужой поток → RuntimeError (диск�
 результат не адаптируется в ActionOutcome (outcome=None) — to_outcome на
 отмене fail fast (5.7).
 
-ГРАНИЦЫ (R4, KNOWN_GAPS): open_shop_buy/open_shop_sell требуют verify
-(межокнные переходы моделью не выражены — KNOWN_GAPS п.3); search требует
+ГРАНИЦЫ (R4, KNOWN_GAPS): search требует
 search_region (ocr_regions обзора не размечены — 6.1); setup_sell требует
 price_region и drag_verify (6.2); read_shop_state требует регион показателей
 (6.3). Всё это — ApiError (fail fast: клики/ввод без verify запрещены,
@@ -66,7 +65,6 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
-import random
 import threading
 import time
 from dataclasses import dataclass
@@ -74,7 +72,6 @@ from typing import TYPE_CHECKING, Callable, Mapping, Optional, Tuple
 
 import numpy as np
 
-from l2core.adapters.hid import BTN_LEFT, HidError
 from l2core.api.events import EVENT_ESCALATION, EVENT_RECOVERED
 from l2core.detector.anchor import Anchor
 from l2core.detector.status import STATUS_NOT_FOUND
@@ -84,13 +81,12 @@ from l2core.model.rows import RowsResult, read_rows
 from l2core.primitives.click import (
     ClickResult,
     VerifySpec,
-    _move_to,
     click_element,
 )
 from l2core.primitives.enter import EnterResult, enter_text
+from l2core.primitives.navigation import RecipeResult, run_recipe
 from l2core.primitives.outcome import ActionOutcome, IrreversibleGuard, to_outcome
 from l2core.primitives.scroll import DIR_DOWN, ScrollResult, scroll_list
-from l2core.primitives.wait import wait_until
 from l2core.scenarios.recover import RecoverCause, RecoverResult, scenario_recover
 from l2core.scenarios.setup_sell import (
     CancelSellResult,
@@ -247,13 +243,6 @@ def _resolve_transition(model: UiModel, element_id: str):
         f"verify запрещены, инвариант 2)")
 
 
-def _require_verify(verify: Optional[VerifySpec], what: str) -> VerifySpec:
-    if verify is None:
-        raise ApiError(f"{what}: verify обязателен (модель перехода не "
-                       f"выражает — KNOWN_GAPS): клики без verify запрещены")
-    return verify
-
-
 class L2CoreAPI:
     """Синхронный блокирующий фасад для модулей стратегий.
 
@@ -392,90 +381,59 @@ class L2CoreAPI:
         return result
 
     # ------------------------------------------------------------------
-    # Навигация
+    # Навигация (рецепты навигационной модели, menu-quickslot-navigation)
 
-    def _open_via_hud(self, element_id: str, target_window: str,
-                      verify: VerifySpec,
-                      cancelled: Optional[Callable[[], bool]]
-                      ) -> NavigationResult:
-        """Открытие окна кликом по HUD-иконке: пролог активации → один
-        клик → блокирующее ожидание сигнатуры окна (см. докстринг модуля:
-        почему не click_element 5.3)."""
-        w = self._w
-        element = w.hud_model.elements.get(element_id)
-        if element is None:
-            raise ApiError(
-                f"HUD-элемент {element_id!r} отсутствует в модели "
-                f"{w.hud_model.path!r}")
-        activated = w.activate()
-        if activated.cancelled:
-            return NavigationResult(success=False, outcome=None,
-                                    cancelled=True)
-        frame = np.asarray(w.screen.grab())
-        point = (w.hud_locator(element, None, frame)
-                 if w.hud_locator is not None else None)
-        if point is None:
-            # Иконку не нашли — клик НЕ выполнялся: FAILED (эффект отсутствует).
+    def _navigation_from_recipe(self, r: RecipeResult) -> NavigationResult:
+        """Адаптация RecipeResult в NavigationResult (отмена — outcome=None:
+        to_outcome на отменённом результате fail fast, 5.7)."""
+        if r.cancelled:
             return NavigationResult(
-                success=False, outcome=ActionOutcome.FAILED,
-                failures=(f"HUD-иконка {element_id!r} не локализована в "
-                          f"search_area — клик отменён (слепых кликов нет)",))
-        _move_to(w.hid, w.cursor_pos, point)
-        rng = w.rng or random.Random()
-        try:
-            w.hid.click(BTN_LEFT, 1, rng.randint(
-                w.config.behavior.press_delay_min_ms,
-                w.config.behavior.press_delay_max_ms))
-        except HidError as exc:
-            # Транспортный сбой: клик мог уйти, мог нет — подтвердить
-            # невозможно → UNKNOWN (инвариант 4), сигнал recover.
-            return NavigationResult(
-                success=False, outcome=ActionOutcome.UNKNOWN,
-                unconfirmed=True,
-                failures=(f"HID-сбой при открытии через {element_id!r}: "
-                          f"{exc}",))
-
-        # Блокирующее ожидание сигнатуры окна на свежих кадрах.
-        anchor_seen = [False]
-
-        def _settled() -> bool:
-            fresh = np.asarray(w.screen.grab())
-            anchor = w.find_anchor(fresh, target_window)
-            if anchor is None:
-                return False
-            anchor_seen[0] = True   # verify выполнялся — дальше FAILED-земля
-            return w.run_checks(verify.checks, fresh, anchor).passed
-
-        waited = wait_until(
-            _settled,
-            timeout=w.config.timing.wait_default_timeout,
-            interval=w.config.timing.verify_interval,
-            cancelled=cancelled, clock=w.clock, sleep=w.sleep)
-        if waited.cancelled:
-            return NavigationResult(success=False, outcome=None,
-                                    cancelled=True, unconfirmed=True)
-        if waited.success:
-            return NavigationResult(success=True, outcome=ActionOutcome.OK)
-        if not anchor_seen[0]:
-            # Окно ни разу не появилось на кадрах: клик ушёл, подтвердить
-            # невозможно — UNKNOWN (инвариант 4), не FAILED.
-            return NavigationResult(
-                success=False, outcome=ActionOutcome.UNKNOWN,
-                unconfirmed=True,
-                failures=(f"окно {target_window!r} не появилось на кадрах "
-                          f"за таймаут {w.config.timing.wait_default_timeout} с "
-                          f"— эффект клика не подтверждён",))
+                success=False, outcome=None, cancelled=True,
+                unconfirmed=r.unconfirmed,
+                on_fail_executed=r.on_fail_executed, failures=r.failures)
         return NavigationResult(
-            success=False, outcome=ActionOutcome.FAILED,
-            failures=(f"сигнатуры окна {target_window!r} не сошлись за "
-                      f"таймаут {w.config.timing.wait_default_timeout} с "
-                      f"(verify={verify.expected!r})",))
+            success=r.success, outcome=to_outcome(r),
+            unconfirmed=r.unconfirmed,
+            on_fail_executed=r.on_fail_executed, failures=r.failures)
+
+    def _run_open_recipe(self, recipe_id: str,
+                         verify: Optional[VerifySpec],
+                         cancelled: Optional[Callable[[], bool]]
+                         ) -> NavigationResult:
+        """Исполнение рецепта открытия окна. verify — опциональный override
+        стратегии: заменяет verify последнего шага рецепта (межоконные
+        переходы формат модели окон не выражает — рецепт несёт свой
+        verify; стратегия может подменить наблюдаемые признаки)."""
+        w = self._w
+        if w.navigation is None or w.nav_evaluate is None:
+            raise ApiError(
+                "навигационная модель не подключена (сборка без "
+                "navigation.yaml): открытие окон невозможно")
+        recipe = w.navigation.recipes.get(recipe_id)
+        if recipe is None:
+            raise ApiError(
+                f"рецепт {recipe_id!r} отсутствует в навигационной модели "
+                f"{w.navigation.path!r}")
+        if verify is not None:
+            recipe = dataclasses.replace(
+                recipe,
+                steps=recipe.steps[:-1] + (
+                    dataclasses.replace(recipe.steps[-1],
+                                        verify=verify.checks),))
+        result = run_recipe(
+            recipe.id, recipe=recipe,
+            nav_model=w.navigation, evaluate=w.nav_evaluate,
+            hud_locator=w.hud_locator, screen=w.screen, hid=w.hid,
+            cursor_pos=w.cursor_pos, activate=w.activate, config=w.config,
+            free_area_point=w.free_area_point, cancelled=cancelled,
+            rng=w.rng, clock=w.clock, sleep=w.sleep)
+        return self._navigation_from_recipe(result)
 
     def open_market(self, *, cancelled: Optional[Callable[[], bool]] = None
                     ) -> NavigationResult:
-        """Открыть «Обзор лавок»: клик по market_pic + ожидание сигнатуры
-        (verify/on_fail — из перехода модели recover_closed -> list__tab_home,
-        как открытие в 6.1). По таймауту — FAILED/UNKNOWN."""
+        """Открыть «Обзор лавок» рецептом навигации: X (skip_if, если
+        «Меню» уже открыто) -> клик по иконке обзора в меню; alternate —
+        гамбургер. По таймауту — FAILED/UNKNOWN (исполнитель рецептов)."""
         self._check_thread()
         c = self._cancelled(cancelled)
 
@@ -483,13 +441,11 @@ class L2CoreAPI:
             if c is not None and c():
                 return NavigationResult(success=False, outcome=None,
                                         cancelled=True)
-            transition = _resolve_transition(self._w.market, "market_pic")
-            verify = VerifySpec.from_transition(transition)
-            return self._open_via_hud("market_pic", "market", verify, c)
+            return self._run_open_recipe("open_market", None, c)
 
         return self._log_action(
             "open_market", _call,
-            target="market", args={"element": "market_pic"})
+            target="market", args={"recipe": "open_market"})
 
     def close_market(self, *, cancelled: Optional[Callable[[], bool]] = None
                      ) -> NavigationResult:
@@ -511,11 +467,9 @@ class L2CoreAPI:
     def open_shop_buy(self, *, verify: Optional[VerifySpec] = None,
                       cancelled: Optional[Callable[[], bool]] = None
                       ) -> NavigationResult:
-        """Открыть лавку выкупа через HUD-иконку open_buy_trade.
-
-        verify обязателен: межоконный переход формат модели не выражает
-        (KNOWN_GAPS п.3) — наблюдаемые признаки открытия передаёт стратегия.
-        """
+        """Открыть лавку выкупа рецептом quick-slot (нормализация «Меню»:
+        если открыто — закрыть через X; verify из рецепта, параметр verify
+        — override последнего шага)."""
         self._check_thread()
         c = self._cancelled(cancelled)
 
@@ -523,19 +477,16 @@ class L2CoreAPI:
             if c is not None and c():
                 return NavigationResult(success=False, outcome=None,
                                         cancelled=True)
-            return self._open_via_hud(
-                "open_buy_trade", "shop_buy",
-                _require_verify(verify, "open_shop_buy"), c)
+            return self._run_open_recipe("open_shop_buy", verify, c)
 
         return self._log_action(
             "open_shop_buy", _call,
-            target="shop_buy", args={"element": "open_buy_trade"})
+            target="shop_buy", args={"recipe": "open_shop_buy"})
 
     def open_shop_sell(self, *, verify: Optional[VerifySpec] = None,
                        cancelled: Optional[Callable[[], bool]] = None
                        ) -> NavigationResult:
-        """Открыть лавку продажи через HUD-иконку open_sale_trade
-        (verify обязателен — см. open_shop_buy)."""
+        """Открыть лавку продажи рецептом quick-slot (см. open_shop_buy)."""
         self._check_thread()
         c = self._cancelled(cancelled)
 
@@ -543,13 +494,11 @@ class L2CoreAPI:
             if c is not None and c():
                 return NavigationResult(success=False, outcome=None,
                                         cancelled=True)
-            return self._open_via_hud(
-                "open_sale_trade", "shop_sell",
-                _require_verify(verify, "open_shop_sell"), c)
+            return self._run_open_recipe("open_shop_sell", verify, c)
 
         return self._log_action(
             "open_shop_sell", _call,
-            target="shop_sell", args={"element": "open_sale_trade"})
+            target="shop_sell", args={"recipe": "open_shop_sell"})
 
     # ------------------------------------------------------------------
     # Управление обзором

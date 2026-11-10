@@ -24,7 +24,8 @@ from l2core.api.wiring import create_api
 from l2core.config import CoreConfig
 from l2core.primitives.outcome import ActionOutcome
 from tests.test_api import (
-    MARKET_ANCHOR, AnchorScript, FakeClock, World, make_wiring,
+    MARKET_ANCHOR, AnchorScript, FakeClock, NavWorld, World,
+    make_wiring,
 )
 
 
@@ -286,55 +287,53 @@ class TestThreadOwnerComposition:
 
 class TestOpenMarketDryRun:
     """Поведенческий сценарий спеки «Действия логируются без выполнения»:
-    полный контур api.open_market в dry-run — verify читает реальный
-    (скриптованный) экран, к HID обращений нет, намерения залогированы."""
+    полный контур api.open_market (рецепт навигации) в dry-run — verify
+    читает реальный (скриптованный) экран, к HID обращений нет, намерения
+    залогированы. В dry-run DryRunHid не мутирует мир: X не открывает меню,
+    клики не открывают окна — неуспех честный (FAILED, не притворство OK)."""
 
-    def _api(self, world, hid, clock, hud_calls, anchors):
-        wiring = make_wiring(world, hid, clock=clock, hud_calls=hud_calls,
-                             anchor_script=AnchorScript(anchors))
+    def _api(self, world, hid, clock, nav_calls=None, hud_calls=None,
+             with_alternate=False):
+        from tests.test_api import (
+            make_nav_evaluate, make_nav_hud_locator, make_nav_model,
+        )
+        nav_calls = nav_calls if nav_calls is not None else []
+        hud_calls = hud_calls if hud_calls is not None else []
+        wiring = make_wiring(
+            world, hid, clock=clock,
+            navigation=make_nav_model(with_alternate=with_alternate),
+            nav_evaluate=make_nav_evaluate(world, nav_calls),
+            hud_locator=make_nav_hud_locator(world, hud_calls))
         wiring = dataclasses.replace(wiring, cursor_pos=lambda: (0, 0),
                                      dry_run=True)
         return L2CoreAPI(wiring)
 
     def test_intention_logged_verify_reports_failed(self):
-        # Экран «до действия»: якорь обзора виден (verify выполняется), но
-        # клик не выполнялся — сигнатура не сходится: честный FAILED.
-        world, clock = World(), FakeClock()
+        # Меню не откроется (намерение не исполняется): verify шага X не
+        # сходится — честный FAILED; намерение key_press залогировано.
+        world, clock = NavWorld(), FakeClock()
         hid = DryRunHid()
-        hud_calls = []
-        api = self._api(world, hid, clock, hud_calls,
-                        {"market": MARKET_ANCHOR})
+        api = self._api(world, hid, clock)
 
         result = api.open_market()
 
         assert not result.success
         assert result.outcome is ActionOutcome.FAILED
         assert not world.market_opened            # мир не мутировал
-        assert hud_calls == ["market_pic"]        # verify-контур реальный
-        assert [i.action for i in hid.intentions] == ["move_rel", "click"]
+        # Первое намерение — нажатие X; дальше on_fail-цепочки (ESC,
+        # клик в свободную область) — тоже только намерения.
+        actions = [i.action for i in hid.intentions]
+        assert actions[0] == "key_press"
+        assert "click" in actions
 
-    def test_no_anchor_on_frame_is_unknown(self):
-        # Окна на кадре нет: verify ни разу не выполнился — UNKNOWN
-        # (эффект «клика» не подтверждён; в dry-run он и не посылался).
-        world, clock = World(), FakeClock()
-        hid = DryRunHid()
-        api = self._api(world, hid, clock, [], {})
-
-        result = api.open_market()
-
-        assert not result.success
-        assert result.outcome is ActionOutcome.UNKNOWN
-        assert result.unconfirmed
-        assert [i.action for i in hid.intentions] == ["move_rel", "click"]
-
-    def test_already_open_window_reports_ok(self):
-        # Окно уже открыто (мир выставлен снаружи): verify сходится по
-        # реальному кадру — OK; намерение всё равно залогировано.
-        world, clock = World(), FakeClock()
+    def test_menu_already_open_skips_key_step(self):
+        # Меню открыто (мир выставлен снаружи), обзор тоже: skip_if
+        # пропускает X, клик — намерение, verify сходится — OK.
+        world, clock = NavWorld(), FakeClock()
+        world.menu_open = True
         world.market_opened = True
         hid = DryRunHid()
-        api = self._api(world, hid, clock, [],
-                        {"market": MARKET_ANCHOR})
+        api = self._api(world, hid, clock)
 
         result = api.open_market()
 
@@ -343,16 +342,18 @@ class TestOpenMarketDryRun:
         assert [i.action for i in hid.intentions] == ["move_rel", "click"]
 
     def test_repeated_calls_accumulate_intentions(self):
-        world, clock = World(), FakeClock()
+        world, clock = NavWorld(), FakeClock()
         hid = DryRunHid()
-        api = self._api(world, hid, clock, [],
-                        {"market": MARKET_ANCHOR})
+        api = self._api(world, hid, clock)
 
         api.open_market()
         api.open_market()
 
+        # Оба вызова оставили намерения (X, ESC, клик в свободную
+        # область — retry/on_fail-цепочки), к железу обращений не было.
         actions = [i.action for i in hid.intentions]
-        assert actions == ["move_rel", "click", "move_rel", "click"]
+        assert actions[0] == "key_press"
+        assert len(actions) >= 10
 
 
 def test_dry_run_intention_is_frozen():

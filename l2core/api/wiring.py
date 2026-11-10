@@ -64,9 +64,16 @@ from l2core.api.core import L2CoreAPI
 from l2core.api.dryrun import DryRunHid
 from l2core.config import CoreConfig, load_config
 from l2core.detector.anchor import Anchor, AnchorDetector, _to_gray
+from l2core.detector.navchecks import build_nav_evaluator
 from l2core.detector.states import StateDetector, StateReport
 from l2core.detector.status import WindowStatus, WindowStatusDetector
-from l2core.model import ElementSpec, OcrRegionSpec, UiModel, load_model
+from l2core.model import (
+    ElementSpec,
+    OcrRegionSpec,
+    UiModel,
+    load_model,
+    load_navigation,
+)
 from l2core.adapters.table_segmentation import TableSegmentation
 from l2core.api.actionlog import ActionLogger
 from l2core.primitives.activate import ActivateResult, activate_game
@@ -132,6 +139,10 @@ class ApiWiring:
     clock: Callable[[], float] = time.monotonic
     sleep: Callable[[float], None] = time.sleep
     dry_run: bool = False  # режим без HID (8.2): действия только логируются
+    # Навигационная модель (menu-quickslot-navigation): рецепты открытия
+    # окон; nav_evaluate — оценщик её проверок (detector.navchecks).
+    navigation: Optional[object] = None
+    nav_evaluate: Optional[Callable] = None
 
 
 def _load_hud_templates(models: Mapping[str, UiModel], assets_dir: Path) -> dict:
@@ -180,7 +191,10 @@ def build_wiring(*, config: CoreConfig,
                  rng: Optional[JitterRng] = None,
                  clock: Callable[[], float] = time.monotonic,
                  sleep: Callable[[float], None] = time.sleep,
-                 dry_run: Optional[bool] = None) -> ApiWiring:
+                 dry_run: Optional[bool] = None,
+                 navigation: Optional[object] = None,
+                 navigation_path=None,
+                 nav_evaluate: Optional[Callable] = None) -> ApiWiring:
     """Собрать провайдеров фасада из детекторов и адаптеров.
 
     models — модели трёх окон (market/shop_buy/shop_sell); детекторы по
@@ -188,6 +202,10 @@ def build_wiring(*, config: CoreConfig,
     подменяются (тесты на скриптованных кадрах). dry_run (8.2): None —
     флаг из config.dry_run, иначе явное значение (create_api передаёт
     эффективный флаг с учётом приоритета параметр > конфиг).
+
+    navigation — навигационная модель (l2core.model.navigation); None +
+    navigation_path — загрузить из файла. Оценщик проверок nav_evaluate
+    по умолчанию строится на navigation (detector.navchecks).
     """
     missing = [name for name in _MODEL_NAMES if name not in models]
     if missing:
@@ -202,7 +220,16 @@ def build_wiring(*, config: CoreConfig,
     status_detector = status_detector or WindowStatusDetector(
         game_finder, anchor_detector, state_detector=state_detector)
 
-    hud_templates = _load_hud_templates(models, assets_dir)
+    hud_models = dict(models)
+    if navigation is None and navigation_path is not None:
+        navigation_path = Path(navigation_path)
+        if navigation_path.is_file():
+            navigation = load_navigation(navigation_path)
+    if navigation is not None:
+        hud_models["navigation"] = navigation
+    if nav_evaluate is None and navigation is not None:
+        nav_evaluate = build_nav_evaluator(navigation, matcher, assets_dir)
+    hud_templates = _load_hud_templates(hud_models, assets_dir)
 
     def hud_locator(element: ElementSpec, variant: Optional[str],
                     frame: np.ndarray) -> Optional[Tuple[int, int]]:
@@ -303,7 +330,8 @@ def build_wiring(*, config: CoreConfig,
         cancelled=cancelled, note_activity=note_activity,
         action_logger=action_logger,
         rng=rng, clock=clock, sleep=sleep,
-        dry_run=config.dry_run if dry_run is None else dry_run)
+        dry_run=config.dry_run if dry_run is None else dry_run,
+        navigation=navigation, nav_evaluate=nav_evaluate)
 
 
 def create_api(config, *, models_dir="ui_model", assets_dir="assets",
@@ -380,5 +408,6 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
         shop_regions=shop_regions, segmentation=segmentation,
         cancelled=cancelled, note_activity=note_activity,
         action_logger=action_logger,
-        rng=rng, clock=clock, sleep=sleep, dry_run=effective_dry_run)
+        rng=rng, clock=clock, sleep=sleep, dry_run=effective_dry_run,
+        navigation_path=Path(models_dir) / "navigation.yaml")
     return L2CoreAPI(wiring, owner_thread=owner_thread)
