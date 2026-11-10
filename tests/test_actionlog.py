@@ -31,13 +31,15 @@ from l2core.config import ConfigError, CoreConfig, LogConfig, LogPolicy, \
 from l2core.primitives.click import VerifySpec
 from l2core.primitives.outcome import ActionOutcome
 from tests.test_api import (
-    MARKET_ANCHOR,
     SELL_ANCHOR,
     AnchorScript,
     FakeClock,
+    NavWorld,
     ScriptedHid,
     World,
-    make_api,
+    make_nav_evaluate,
+    make_nav_hud_locator,
+    make_nav_model,
     make_wiring,
 )
 
@@ -395,19 +397,42 @@ class TestFacadeIntegration:
         wiring = dataclasses.replace(wiring, action_logger=alog)
         return L2CoreAPI(wiring), log_dir
 
-    def test_wiring_default_has_no_logger(self):
-        api = make_api()
+    def _nav_api(self, tmp_path, nav_world, **wiring_kw):
+        clock = FakeClock()
+        hid = ScriptedHid(clock, nav_world)
+        log_dir = tmp_path / "actions"
+        alog = make_logger(log_dir)
+        wiring = make_wiring(
+            nav_world, hid, clock=clock,
+            navigation=make_nav_model(),
+            nav_evaluate=make_nav_evaluate(nav_world, []),
+            hud_locator=make_nav_hud_locator(nav_world, []),
+            **wiring_kw)
+        wiring = dataclasses.replace(wiring, action_logger=alog)
+        return L2CoreAPI(wiring), log_dir
+
+    def test_wiring_default_has_no_logger(self, tmp_path):
+        nav_world = NavWorld()
+        nav_world.menu_open = True
+        nav_world.market_opened = True
+        clock = FakeClock()
+        hid = ScriptedHid(clock, nav_world)
+        wiring = make_wiring(
+            nav_world, hid, clock=clock,
+            navigation=make_nav_model(),
+            nav_evaluate=make_nav_evaluate(nav_world, []),
+            hud_locator=make_nav_hud_locator(nav_world, []))
+        api = L2CoreAPI(wiring)
         assert api._w.action_logger is None
         result = api.open_market()      # логирование off — работает без него
         assert result.outcome is not None
 
     def test_open_market_failed_logged_with_frames(self, tmp_path):
-        # FAILED (якорь есть, эффекта нет — клик не открывает обзор):
-        # ключевая запись с кадрами.
-        world = World()
-        world.open_click_works = False
-        api, log_dir = self._api(tmp_path, world,
-                                 anchors={"market": MARKET_ANCHOR})
+        # FAILED (эффекта нет — клик не открывает обзор): ключевая запись
+        # с кадрами.
+        nav_world = NavWorld()
+        nav_world.open_click_works = False
+        api, log_dir = self._nav_api(tmp_path, nav_world)
 
         result = api.open_market()
 
@@ -421,10 +446,10 @@ class TestFacadeIntegration:
         assert (log_dir / record["frames"]["before"]).is_file()
 
     def test_open_market_ok_not_key(self, tmp_path):
-        world = World()
-        world.market_opened = True
-        api, log_dir = self._api(tmp_path, world,
-                                 anchors={"market": MARKET_ANCHOR})
+        nav_world = NavWorld()
+        nav_world.menu_open = True
+        nav_world.market_opened = True
+        api, log_dir = self._nav_api(tmp_path, nav_world)
 
         result = api.open_market()
 

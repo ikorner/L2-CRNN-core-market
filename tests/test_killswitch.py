@@ -55,6 +55,7 @@ from l2core.config import (
 from l2core.detector.status import STATUS_NOT_FOUND, WindowStatus
 from l2core.model import (
     ActionSpec,
+    Check,
     ElementSpec,
     TransitionSpec,
     UiModel,
@@ -123,6 +124,9 @@ class RecordingHid:
 
     def click(self, *args, **kwargs):
         self.calls.append("click")
+
+    def key_press(self, *args, **kwargs):
+        self.calls.append("key_press")
 
     def move_rel(self, *args, **kwargs):
         self.calls.append("move_rel")
@@ -371,7 +375,7 @@ class TestBlockingInterruption:
         ks.start()
         try:
             thread.start()
-            assert wait_for(lambda: "click" in hid.calls)  # клик ушёл, ждём verify
+            assert wait_for(lambda: "key_press" in hid.calls)  # X ушла, ждём verify
             source.press()                      # пользователь жмёт хоткей
             thread.join(timeout=5.0)
             assert not thread.is_alive()
@@ -386,21 +390,39 @@ class TestBlockingInterruption:
 
 
 def _blocking_wiring(hid, *, cancelled=None, note_activity=None):
-    """Сборка wiring, где open_market блокируется в ожидании сигнатуры:
-    HUD-иконка находится, клик уходит, сигнатура не сходится никогда."""
+    """Сборка wiring, где open_market блокируется в ожидании verify шага
+    рецепта: нажатие X уходит, признаки не сходятся никогда."""
+    from l2core.model.navigation import (
+        NavigationModel,
+        Recipe,
+        RecipeStep,
+    )
+
+    never_checks = (Check(kind="template", element="never"),)
+    key_step = RecipeStep(action="key", element=None, key="X",
+                          verify=never_checks, on_fail=())
+    navigation = NavigationModel(
+        path="navigation",
+        elements={},
+        signatures={},
+        recipes={
+            "open_market": Recipe(id="open_market", opens="market",
+                                  steps=(key_step,), on_fail=()),
+            "open_shop_buy": Recipe(id="open_shop_buy", opens="shop_buy",
+                                    steps=(key_step,), on_fail=()),
+            "open_shop_sell": Recipe(id="open_shop_sell", opens="shop_sell",
+                                     steps=(key_step,), on_fail=()),
+        })
+
+    def nav_evaluate(checks, frame):
+        return CheckReport(passed=False, failures=("never",))
+
     model = UiModel(
         path="market",
         window=WindowSpec(id="market", title="m", size=(100, 100)),
-        elements={"market_pic": ElementSpec(id="market_pic", role="hud",
-                                            hud=True)},
+        elements={},
         states={},
-        transitions=(
-            TransitionSpec(
-                source="recover_closed",
-                action=ActionSpec(type="click", element="market_pic"),
-                expected="list__tab_home",
-                verify=(), timeout=None, on_fail=()),
-        ),
+        transitions=(),
         ocr_regions={}, table_geometry=None)
     return ApiWiring(
         config=CoreConfig(
@@ -425,7 +447,9 @@ def _blocking_wiring(hid, *, cancelled=None, note_activity=None):
         ocr_health=lambda: True,
         hid_health=lambda: True,
         cancelled=cancelled,
-        note_activity=note_activity)
+        note_activity=note_activity,
+        navigation=navigation,
+        nav_evaluate=nav_evaluate)
 
 
 class _FakeScreen:
@@ -593,7 +617,7 @@ class TestBotCancelledDefault:
 
         thread = threading.Thread(target=strategy, name="strategy")
         thread.start()
-        assert wait_for(lambda: "click" in hid.calls)   # клик ушёл, ждём verify
+        assert wait_for(lambda: "key_press" in hid.calls)  # X ушла, ждём verify
         ks.kill(REASON_HOTKEY)
         thread.join(timeout=5.0)
         assert not thread.is_alive()
