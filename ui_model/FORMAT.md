@@ -11,6 +11,8 @@ table_geometry (2.4), детектор состояний (3.4–3.5), грам�
   грамматики OCR. Не является моделью окна.
 - `ui_model/<window>.yaml` — одна модель на окно, `<window>` — одно из
   `market`, `shop_buy`, `shop_sell`.
+- `ui_model/navigation.yaml` — навигационная модель (не окно): открытие
+  окон через «Меню»/quick-slot, формат — ниже.
 
 Каждая модель окна обязана содержать секции `window`, `elements`, `states`,
 `transitions`, `ocr_regions`; `table_geometry` — для окон со списком
@@ -192,10 +194,45 @@ grid_geometry:
 размечена (сырьё поле `slot` не описывает — KNOWN_GAPS): до калибровки
 константы сетки передаются сценарию параметром.
 
+## Навигационная модель (`ui_model/navigation.yaml`)
+
+Файл `navigation.yaml` — НЕ модель окна: секций `window`/`states`/
+`transitions` в нём нет, парсер моделей окон (`load_model`) его не
+принимает. Содержит навигацию открытия окон торговли — «Меню»
+(клавиша X / гамбургер) и панель быстрого доступа (quick-slot):
+
+- `elements` — элементы в формате элементов окон: HUD-элементы
+  (`hud: true`, `search_area` в клиентской области игры; меню и панель
+  перетаскиваемы/фиксированы — позиция не кэшируется), элементы внутри
+  «Меню» — `rect` 1:1 от HUD-якоря `menu_anchor` (инвариант 3).
+- `signatures` — именованные наборы проверок (минимум два признака, как
+  у состояний окон; `menu_open` — открытое «Меню»).
+- `recipes` — рецепты открытия окон. Рецепт: `opens` (целевое окно),
+  непустые `steps` и `on_fail`, опциональный `alternate` (резервный
+  рецепт). Шаг: `action: key|click`; `key`-шаг требует `key` (имя из
+  KEYCODES) и запрещает `element`, `click`-шаг — наоборот; `verify` и
+  `on_fail` обязательны; опционально `when: [checks]` (выполнять шаг
+  только если проверки сошлись на текущем кадре) и `skip_if: [checks]`
+  (пропускать, если сошлись). Элемент списка `verify`/`when`/`skip_if` —
+  mapping проверки или строка-ссылка на сигнатуру (разворачивается в
+  её проверки). Проверки: `template` (с опциональным отрицанием
+  `expect: absent`) и `pixel_probe`; `ocr` в навигации не поддержан.
+
+Связка с окнами — соглашение имён: рецепт `open_<window>` открывает
+окно из глобального состояния `recover_closed` (живёт в модели market);
+трассировка (6.5) проверяет достижимость каждого окна через рецепт.
+Исполнение — `l2core.primitives.navigation` (run_recipe) поверх
+примитивов; оценка проверок — `l2core.detector.navchecks`
+(build_nav_evaluator), без якоря окна торговли (меню открывается при
+закрытом окне). Координатных действий в рецептах нет — точки кликов
+происходят из `rect`/`click_point` элементов и template-поиска по
+`search_area`. Валидация — `validate_navigation` (те же правила
+осмысленности, что у валидатора окон).
+
 ## common.yaml
 
 ```yaml
-variants: [normal, hover, pressed, disabled, active, placeholder, focused, filled]
+variants: [normal, hover, pressed, disabled, active, placeholder, focused, filled, open]
 roles: [click_target, ocr_region, state_signature, icon_sample]
 grammars:
   digits: {kind: digits}

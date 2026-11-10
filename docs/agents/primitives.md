@@ -328,3 +328,37 @@ needs_recover примитивов 5.1–5.6 поверх существующи
   всегда False — recover сам необратимого эффекта не производит).
   Исполнение сценариями — 6.4; YAGNI: никакого event dispatcher/API/
   kill switch.
+
+## press_key (5.9) и исполнитель рецептов навигации (menu-quickslot-navigation)
+
+press_key (`l2core/primitives/key.py`) — нажатие клавиши с verify и
+трёхзначным исходом: пролог активации (без пролога статуса/якоря —
+клавиша X открывает «Меню» при закрытом окне торговли), key_press ->
+wait_until verify на свежих кадрах, retry из конфига -> on_fail ->
+FAILED; HID-сбой -> UNKNOWN (unconfirmed). Verify оценивает инъекция
+`evaluate(checks, frame) -> CheckReport` БЕЗ якоря окна: навигационные
+признаки — объекты клиентской области. Имена клавиш разрешаются по
+словарю `KEYCODES` (`l2core/adapters/keycodes.py` — вне вендоренного
+hid.py); неизвестное имя — PressKeyError (fail fast).
+
+Исполнитель рецептов (`l2core/primitives/navigation.py`, run_recipe)
+исполняет рецепты открытия окон из навигационной модели
+(`ui_model/navigation.yaml`, формат — FORMAT.md): шаги key (делегируются
+press_key) и click (паттерн открытия через HUD: точку даёт hud_locator
+или якорь «Меню» + rect элемента; иконка не локализована -> попытка
+потрачена БЕЗ клика; клик ушёл, verify не сошёлся -> retry; HID-сбой ->
+UNKNOWN и прерыв рецепта). Условные пометки шагов: `when`/`skip_if`
+оцениваются на текущем кадре до шага — нормализация «Меню» (X — toggle:
+open_market не должен закрыть открытое меню, лавки закрывают меню до
+клика по quick-slot). Проверки поддерживают отрицание `expect: absent`.
+Итог: все шаги успешны -> OK; провалы -> on_fail рецепта -> alternate
+(рекурсивно) -> FAILED (needs_recover). Координатных действий в рецептах
+нет (инвариант 3). RecipeResult совместим с to_outcome (5.7) по полям
+success/cancelled/unconfirmed.
+
+Оценщик проверок навигации — `l2core/detector/navchecks.py`
+(build_nav_evaluator): HUD-элементы — template matching по search_area,
+элементы меню — от якоря menu_anchor (1:1, инвариант 3), pixel_probe —
+точки от якоря меню (цвет модели RGB, кадр BGR, допуск на канал).
+Тесты: tests/test_press_key.py, tests/test_recipes.py,
+tests/test_navchecks.py.

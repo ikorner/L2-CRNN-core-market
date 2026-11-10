@@ -115,6 +115,11 @@ python tools/benchmark_ocr.py --model <путь>/crnn_best.pt
 # приёмки, не цикл бота.
 python tools/live_dry_run.py --model <путь>/crnn_best.pt
 
+# Инструментальная досъёмка кадров в base_screenshot/scr/ (ручная, вне CI;
+# игра запущена и видима): захват одного кадра + заглушка в meta.json
+# (разметка rect'ов кропов — отдельно). Имя — без расширения.
+python tools/capture_frame.py <имя-кадра> "описание"
+
 # Запуск бота: публичный API есть (create_api, задача 7.1), kill switch есть
 # (KillSwitch 8.1, компонент для сборки вызывающим слоем), готовый
 # цикл бота/CLI — нет (события 7.3, потоки 7.2 есть);
@@ -128,13 +133,19 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
 (MssScreen/ReplayScreen, TemplateMatcher, TorchOcr, HidArduino).
 
 - `l2core/model/` — интерпретатор UI-модели (YAML: окна, элементы, состояния,
-  переходы, OCR-регионы, table_geometry) + чтение строк таблицы (rows.py).
+  переходы, OCR-регионы, table_geometry) + чтение строк таблицы (rows.py) +
+  навигационная модель (navigation.py: элементы/сигнатуры/рецепты
+  открытия окон, формат — FORMAT.md, «Навигационная модель»).
 - `l2core/detector/` — детекция окна и состояний (anchor/states/status,
-  статусы `not_found / occluded_or_unstable / found`), перехватчик модалок,
-  транзакция кадра (FrameTransaction).
+  статусы `not_found / occluded_or_unstable / found`; якорь многоопорный —
+  кортеж опор на окно), перехватчик модалок, транзакция кадра
+  (FrameTransaction), оценщик проверок навигации (navchecks.py — меню и
+  quick-slot без якоря окна торговли).
 - `l2core/primitives/` — примитивы действий (wait_until, activate_game,
   click_element, enter_text/enter_price, scroll_list, drag_item, outcome,
-  recover).
+  recover, press_key 5.9) + исполнитель рецептов навигации (navigation.py:
+  шаги key/click с when/skip_if и alternate, открытие окон при закрытом
+  окне).
 - `l2core/scenarios/` — сценарии (scan_market, setup_sell, monitor_shop,
   scenario_recover).
 - `l2core/api/` — публичный синхронный API для модулей стратегий (L2CoreAPI,
@@ -143,11 +154,13 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
   формат сессии — session.py), win32-шлюз и находилка окна игры (win32.py,
   DPI-aware объявление процесса), TemplateMatcher (template.py),
   вендоренная копия OCR-кода (ocr_vendor/), OCR-адаптер (ocr.py),
-  сегментация таблицы (table_segmentation/), HidArduino.
+  сегментация таблицы (table_segmentation/), HidArduino, кейкоды клавиш
+  (keycodes.py — вне вендоренного hid.py: KEY_X и словарь KEYCODES).
 - `l2core/config.py` — схема и типизированный загрузчик `config.yaml`.
-- `tests/` — pytest; `ui_model/` — YAML UI-модель; `assets/` — шаблоны и
-  golden-кропы (версионируются вместе с моделью); `base_screenshot/scr/` —
-  сырьё (39 скриншотов + meta.json), не зависимость ядра.
+- `tests/` — pytest; `ui_model/` — YAML UI-модель (окна + common +
+  navigation.yaml); `assets/` — шаблоны и golden-кропы (версионируются
+  вместе с моделью); `base_screenshot/scr/` — сырьё (47 скриншотов +
+  meta.json), не зависимость ядра.
 
 Детальные заметки по слоям (механики, контракты, guard-тесты, отчёты) —
 `docs/agents/`, читаются по необходимости, содержимое прежнее (вынесено из
@@ -160,9 +173,10 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
 - `adapters.md` — вендоринг OCR-кода (4.1), OCR-адаптер (4.2), вендоринг
   сегментации таблицы (4.3), golden-набор OCR и бенчмарк (4.6), формат
   файла сессии replay (9.2).
-- `primitives.md` — примитивы 5.1–5.8: wait_until, activate_game,
+- `primitives.md` — примитивы 5.1–5.9: wait_until, activate_game,
   click_element, enter_text/enter_price, scroll_list, drag_item, outcome
-  (OK/FAILED/UNKNOWN + страж необратимых), recover-цепочка.
+  (OK/FAILED/UNKNOWN + страж необратимых), recover-цепочка, press_key
+  (нажатие клавиши с verify) и исполнитель рецептов навигации.
 - `scenarios.md` — scan_market и read_rows/дедуп (6.1), setup_sell/
   start_sell/cancel_sell (6.2), monitor_shop (6.3), scenario_recover (6.4).
 - `api-runtime.md` — L2CoreAPI и wiring (7.1), потоки L2CoreBot (7.2),

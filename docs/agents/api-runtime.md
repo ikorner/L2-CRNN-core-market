@@ -378,3 +378,22 @@ HID не тронут) и recover-эскалация (6.4 → событие esc
   восстановления/снятия модалки; «не кликая» — observer HID не получает
   по построению, hid движка чист в интеграционных тестах 7.2).
   YAGNI: live-прогоны (9.4/9.5) сюда не входят.
+
+## Навигация open_* на рецептах (menu-quickslot-navigation)
+
+open_market / open_shop_buy / open_shop_sell исполняют рецепты
+навигационной модели (wiring.navigation + nav_evaluate; сборка без
+navigation.yaml — ApiError, fail fast). open_market: X (skip_if, если
+«Меню» уже открыто) -> клик по иконке обзора в меню; alternate — через
+гамбургер. open_shop_*: условное закрытие «Меню» (when + expect: absent)
+-> клик по иконке quick-slot; verify финального шага — якорь
+open-состояния (многоопорный якорь 3.3: опоры opening + open). verify
+параметром — override последнего шага (dataclasses.replace копии
+рецепта; run_recipe принимает готовый recipe). _open_via_hud удалён;
+scan_market/setup_sell получают recipe_runner (Callable[[str],
+RecipeResult]) — открытие при закрытом окне, пролог click_element 5.3
+недостижим. Исходы NavigationResult по инварианту 4; открытие — обратимое
+действие, страж необратимых не задействован. Досъёмки: scr_nav_qs_panel /
+scr_nav_menu_open / scr_nav_shop_*_open (base_screenshot/scr, инструмент
+tools/capture_frame.py). Тесты: tests/test_api.py (TestOpenMarket/
+TestOpenShop), tests/test_navigation.py (отгруженная модель).
