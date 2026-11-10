@@ -235,3 +235,97 @@ def _element_by_template(model, template_path: str):
             if variant.template == template_path:
                 return element
     return None
+
+
+# ---------------------------------------------------------------------------
+# Многоопорный якорь (menu-quickslot-navigation, Task 1): на окно — кортеж
+# опор (element_id, variant); find_anchor перебирает опоры по порогу окна,
+# первая сошедшаяся даёт Anchor. Поведение market (frame_stage, одна опора)
+# не меняется.
+# ---------------------------------------------------------------------------
+
+from l2core.adapters.template import Match
+from l2core.detector.anchor import (
+    DEFAULT_ANCHOR_TEMPLATES,
+    AnchorDetector,
+)
+from l2core.model import ElementSpec, Rect, UiModel, VariantSpec, WindowSpec
+
+
+class _FakeMatcher:
+    """Matcher по содержимому шаблона: «нулевой» шаблон не находится,
+    «единичный» находится в (5, 7) с score 1.0."""
+
+    def match(self, gray, template):
+        if float(template.sum()) == 0.0:
+            return Match(x=0, y=0, score=0.0)
+        return Match(x=5, y=7, score=1.0)
+
+
+def _model_with_supports(tmp_path, assets_dir):
+    """Синтетическая модель окна с двумя элементами-опорами: op_a (нулевой
+    шаблон — никогда не находится) и op_b (единичный — находится)."""
+    blank = np.zeros((10, 10), dtype=np.uint8)
+    white = np.full((10, 10), 255, dtype=np.uint8)
+    cv2.imwrite(str(assets_dir / "t_a.png"), blank)
+    cv2.imwrite(str(assets_dir / "t_b.png"), white)
+    elements = {
+        "op_a": ElementSpec(
+            id="op_a", role="state_signature",
+            rect=Rect(0, 0, 10, 10),
+            variants={"normal": VariantSpec("normal", "t_a.png")}),
+        "op_b": ElementSpec(
+            id="op_b", role="state_signature",
+            rect=Rect(2, 3, 10, 10),
+            variants={"normal": VariantSpec("normal", "t_b.png")}),
+    }
+    model = UiModel(
+        path=str(tmp_path / "win.yaml"),
+        window=WindowSpec(id="win", title="тест", size=(100, 100)),
+        elements=elements, states={}, transitions=(), ocr_regions={},
+        table_geometry=None)
+    return {"win": model}
+
+
+class TestMultiSupportAnchor:
+    def test_second_support_matches_when_first_absent(self, tmp_path):
+        assets = tmp_path / "assets"
+        assets.mkdir()
+        models = _model_with_supports(tmp_path, assets)
+        detector = AnchorDetector(
+            models, _FakeMatcher(), assets,
+            anchor_templates={"win": (("op_a", "normal"), ("op_b", "normal"))})
+        anchor = detector.find_anchor(np.zeros((50, 50, 3), np.uint8), "win")
+        assert anchor is not None
+        assert anchor.method == "template"
+        # Anchor = позиция совпадения минус rect офсета элемента-опоры op_b.
+        assert (anchor.x, anchor.y) == (5 - 2, 7 - 3)
+
+    def test_none_support_matches_returns_none(self, tmp_path):
+        assets = tmp_path / "assets"
+        assets.mkdir()
+        models = _model_with_supports(tmp_path, assets)
+        # Обе опоры ссылаются на «нулевой» шаблон — matcher никогда не находит.
+        detector = AnchorDetector(
+            models, _FakeMatcher(), assets,
+            anchor_templates={"win": (("op_a", "normal"), ("op_a", "normal"))})
+        assert detector.find_anchor(
+            np.zeros((50, 50, 3), np.uint8), "win") is None
+
+    def test_legacy_single_support_normalized(self, tmp_path):
+        """Старый формат anchor_templates (element, variant) принимается:
+        нормализуется в одноопорный кортеж."""
+        assets = tmp_path / "assets"
+        assets.mkdir()
+        models = _model_with_supports(tmp_path, assets)
+        detector = AnchorDetector(
+            models, _FakeMatcher(), assets,
+            anchor_templates={"win": ("op_b", "normal")})
+        anchor = detector.find_anchor(np.zeros((50, 50, 3), np.uint8), "win")
+        assert (anchor.x, anchor.y) == (5 - 2, 7 - 3)
+
+    def test_default_anchor_templates_is_tuple_of_tuples(self):
+        for window_id, supports in DEFAULT_ANCHOR_TEMPLATES.items():
+            assert isinstance(supports, tuple)
+            for support in supports:
+                assert isinstance(support, tuple) and len(support) == 2

@@ -37,13 +37,30 @@ from l2core.model import UiModel
 # и рамка (204, 105) при якоре (202, 103).
 _FRAME_LINE_OFFSET = (2, 2)
 
-# Элементы-опоры якоря по умолчанию: market подтверждается целым окном
+# Элементы-опоры якоря по умолчанию: окно -> кортеж опор (element_id,
+# variant); find_anchor перебирает опоры template matching'ом по порогу окна,
+# первая сошедшаяся даёт Anchor. market подтверждается целым окном
 # (market_main_menu), лавки — заголовком (jak / jakor_sell).
 DEFAULT_ANCHOR_TEMPLATES = {
-    "market": ("market_main_menu", "normal"),
-    "shop_buy": ("jak", "normal"),
-    "shop_sell": ("jakor_sell", "normal"),
+    "market": (("market_main_menu", "normal"),),
+    "shop_buy": (("jak", "normal"),),
+    "shop_sell": (("jakor_sell", "normal"),),
 }
+
+# Допустимые форматы anchor_templates: (element, variant) — одна опора
+# (легаси-формат, нормализуется) или кортеж из нескольких опор.
+
+
+def _normalize_supports(supports) -> Tuple[Tuple[str, str], ...]:
+    """Нормализация опор окна: легаси (element, variant) -> 1-опорный
+    кортеж; кортеж опор — как есть."""
+    if (
+        isinstance(supports, tuple)
+        and len(supports) == 2
+        and all(isinstance(part, str) for part in supports)
+    ):
+        return (supports,)
+    return tuple(supports)
 
 # Окна, для которых работает numpy-only первый этап (яркие линии рамки):
 # рамка «Обзора лавок» даёт устойчивый признак, рамки лавок сырьё не покрывает.
@@ -167,8 +184,10 @@ class AnchorDetector:
             models: модели окон (id -> UiModel).
             matcher: реализация template matching (см. l2core.adapters.template).
             assets_dir: каталог assets/ с шаблонами модели.
-            anchor_templates: окно -> (element_id, variant) опоры якоря;
-                по умолчанию DEFAULT_ANCHOR_TEMPLATES.
+            anchor_templates: окно -> опоры якоря: (element_id, variant) —
+                одна опора или кортеж опор; по умолчанию
+                DEFAULT_ANCHOR_TEMPLATES (перебор по порогу окна, первая
+                сошедшаяся опора даёт Anchor).
             frame_stage: окна, для которых выполняется первый этап
                 (numpy-only рамка) перед template matching.
             market_threshold / shop_threshold: пороги NCC.
@@ -177,7 +196,11 @@ class AnchorDetector:
         self._models = dict(models)
         self._matcher = matcher
         self._assets_dir = Path(assets_dir)
-        self._anchor_templates = dict(anchor_templates or DEFAULT_ANCHOR_TEMPLATES)
+        self._anchor_templates = {
+            window_id: _normalize_supports(supports)
+            for window_id, supports in dict(
+                anchor_templates or DEFAULT_ANCHOR_TEMPLATES).items()
+        }
         self._frame_stage = tuple(frame_stage)
         self._market_threshold = market_threshold
         self._shop_threshold = shop_threshold
@@ -193,43 +216,52 @@ class AnchorDetector:
         import cv2
 
         templates = {}
-        for window_id, (element_id, variant) in self._anchor_templates.items():
+        for window_id, supports in self._anchor_templates.items():
             model = self._models[window_id]
-            element = model.elements[element_id]
-            spec = element.variants[variant]
-            path = self._assets_dir / spec.template
-            image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
-            if image is None:
-                raise FileNotFoundError(f"шаблон якоря не найден: {path}")
-            templates[window_id] = (np.asarray(image, dtype=np.float64), element)
+            loaded = []
+            for element_id, variant in supports:
+                element = model.elements[element_id]
+                spec = element.variants[variant]
+                path = self._assets_dir / spec.template
+                image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+                if image is None:
+                    raise FileNotFoundError(f"шаблон якоря не найден: {path}")
+                loaded.append(
+                    (np.asarray(image, dtype=np.float64), element))
+            templates[window_id] = loaded
         return templates
 
     def find_anchor(self, frame: np.ndarray, window_id: str) -> Optional[Anchor]:
         """Свежий поиск якоря окна на кадре (без кэша между кадрами).
 
         Возвращает Anchor или None (окно не найдено/не подтверждено).
+        Опоры перебираются по порогу окна; первая сошедшаяся даёт Anchor.
         """
         if window_id not in self._templates:
             raise KeyError(f"неизвестное окно торговли: {window_id!r}")
-        template, element = self._templates[window_id]
+        supports = self._templates[window_id]
         gray = _to_gray(frame)
         if window_id in self._frame_stage:
+            # Первый этап market: кандидат рамки подтверждается первой опорой.
+            template, _element = supports[0]
             candidate = detect_window(frame, self._models[window_id].window.size)
             if candidate is not None:
                 match = self._match_near(gray, template, candidate)
                 if match.score >= self._market_threshold:
                     return Anchor(window_id, candidate[0], candidate[1],
                                   match.score, "frame")
-        match = self._matcher.match(gray, template)
         threshold = (self._market_threshold
                      if window_id in self._frame_stage
                      else self._shop_threshold)
-        if match.score < threshold:
-            return None
-        rect = element.rect
-        offset_x, offset_y = (rect.x, rect.y) if rect is not None else (0, 0)
-        return Anchor(window_id, match.x - offset_x, match.y - offset_y,
-                      match.score, "template")
+        for template, element in supports:
+            match = self._matcher.match(gray, template)
+            if match.score < threshold:
+                continue
+            rect = element.rect
+            offset_x, offset_y = (rect.x, rect.y) if rect is not None else (0, 0)
+            return Anchor(window_id, match.x - offset_x, match.y - offset_y,
+                          match.score, "template")
+        return None
 
     def _match_near(self, gray: np.ndarray, template: np.ndarray,
                     anchor: Tuple[int, int]):
