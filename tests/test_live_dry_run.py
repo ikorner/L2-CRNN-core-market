@@ -42,10 +42,13 @@ def probe():
 class StubApi:
     """Минимальный двойник фасада: фиксирует вызовы, отдаёт к canned-итоги."""
 
-    def __init__(self, *, state_after_open=None, fail_on=None):
+    def __init__(self, *, state_after_open=None, fail_on=None,
+                 fail_state_on_call=None):
         self.calls = []
         self._state_after_open = state_after_open
         self._fail_on = fail_on
+        self._fail_state_on_call = fail_state_on_call
+        self._state_calls = 0
 
     def health(self, **kwargs):
         self.calls.append("health")
@@ -54,6 +57,9 @@ class StubApi:
 
     def get_state(self, **kwargs):
         self.calls.append("get_state")
+        self._state_calls += 1
+        if self._fail_state_on_call == self._state_calls:
+            raise RuntimeError("экран недоступен")
         if self._state_after_open is not None and "open_market" in self.calls:
             return self._state_after_open
         return CoreState(window=None, status="not_found", state=None)
@@ -111,6 +117,21 @@ def test_probe_continues_after_step_error(probe):
     assert "RuntimeError" in by_name["open_market"].error
     assert by_name["close_market"].ok
     assert "close_market" in api.calls  # проба продолжилась после ошибки
+    assert lines
+
+
+def test_probe_survives_second_state_failure(probe):
+    # Второй get_state (после open_market) бросает: ошибка фиксируется
+    # шагом, проба продолжается (close_market), раннер не падает.
+    api = StubApi(state_after_open=CoreState(
+        window="market", status="found", state="list__tab_home"),
+        fail_state_on_call=2)
+    lines = []
+    report = probe.run_probe(api, out=lines.append)
+    states = [s for s in report.steps if s.name == "get_state"]
+    assert states[-1].error is not None
+    assert "RuntimeError" in states[-1].error
+    assert "close_market" in api.calls
     assert lines
 
 

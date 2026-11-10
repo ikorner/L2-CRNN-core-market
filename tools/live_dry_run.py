@@ -126,7 +126,7 @@ def run_probe(api, *, out: Callable[[str], None] = print,
                 name="get_state", detail="",
                 error=f"{type(exc).__name__}: {exc}"))
             out(f"  [get_state] ОШИБКА: {reports[-1].error}")
-            opened = state.window == "market" and state.status == "found"
+            opened = False  # состояние не прочитано — таблицу не читаем
         following = (("read_rows", _step_read_rows),
                      ("scroll_list", _make_step_scroll(scroll_n)),
                      ("read_rows", _step_read_rows)) if opened else ()
