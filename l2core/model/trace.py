@@ -50,7 +50,7 @@
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Tuple
 
 from .types import UiModel
 from .validator import (  # noqa: F401  (KNOWN_ON_FAIL_STEPS — реэкспорт)
@@ -151,6 +151,86 @@ def reachable(
 
 def _transition_label(transition) -> str:
     return f"{transition.source} -> {transition.expected}"
+
+
+def trace_navigation(models: Dict[str, UiModel], nav) -> List[Violation]:
+    """Трассировка навигационной модели (рецепты открытия окон).
+
+    Связка с окнами — соглашение имён: рецепт `open_<window>` открывает
+    окно из `recover_closed` своей модели (поле opens). Проверяется:
+    - nav_window_unreachable — на каждое окно обязан существовать рецепт
+      open_<window> с opens == <window>;
+    - nav_recover_state_missing — в модели окна нет recover_closed;
+    - nav_recipe_no_exit — неуспех рецепта не имеет выхода в recover
+      (ни on_fail, ни alternate);
+    - nav_on_fail_steps — шаги on_fail рецептов только именованные
+      (паритет KNOWN_ON_FAIL_STEPS, как для переходов окон).
+    """
+    file = nav.path
+    violations: List[Violation] = []
+
+    def check_on_fail(steps: Tuple[str, ...], subject: str) -> None:
+        for step in steps:
+            if step not in KNOWN_ON_FAIL_STEPS:
+                violations.append(Violation(
+                    rule="nav_on_fail_steps",
+                    file=file,
+                    subject=subject,
+                    detail=(
+                        f"неизвестный шаг on_fail {step!r}: шаги — только "
+                        "именованные шаги исполнителя "
+                        f"{sorted(KNOWN_ON_FAIL_STEPS)}"
+                    ),
+                ))
+
+    for window_id, model in models.items():
+        recipe_id = f"open_{window_id}"
+        recipe = nav.recipes.get(recipe_id)
+        if recipe is None:
+            violations.append(Violation(
+                rule="nav_window_unreachable",
+                file=file,
+                subject=window_id,
+                detail=(
+                    f"нет рецепта {recipe_id!r}: окно недостижимо из "
+                    "recover_closed через навигационную модель"
+                ),
+            ))
+            continue
+        if recipe.opens != window_id:
+            violations.append(Violation(
+                rule="nav_window_unreachable",
+                file=file,
+                subject=window_id,
+                detail=(
+                    f"рецепт {recipe_id!r} открывает {recipe.opens!r} "
+                    f"вместо {window_id!r}"
+                ),
+            ))
+        if "recover_closed" not in model.states:
+            violations.append(Violation(
+                rule="nav_recover_state_missing",
+                file=file,
+                subject=window_id,
+                detail=(
+                    "в модели окна нет состояния recover_closed — точки "
+                    "входа рецепта open_<window> не существует"
+                ),
+            ))
+        if not recipe.on_fail and recipe.alternate is None:
+            violations.append(Violation(
+                rule="nav_recipe_no_exit",
+                file=file,
+                subject=f"recipes.{recipe_id}",
+                detail=(
+                    "неуспех рецепта не имеет выхода в recover: ни on_fail, "
+                    "ни alternate"
+                ),
+            ))
+        check_on_fail(recipe.on_fail, f"recipes.{recipe_id}")
+        for i, step in enumerate(recipe.steps):
+            check_on_fail(step.on_fail, f"recipes.{recipe_id}.steps[{i}]")
+    return violations
 
 
 def trace_model(model: UiModel) -> List[Violation]:

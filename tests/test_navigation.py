@@ -268,3 +268,108 @@ class TestValidateNavigation:
             })
         assert "nav_menu_anchor" in _rules(
             validate_navigation(nav, assets))
+
+
+# ---------------------------------------------------------------------------
+# Трассировка навигационных рецептов (Task 5): окно достижимо из своего
+# recover_closed через рецепт open_<window> (соглашение имён + opens);
+# неуспех рецепта имеет выход в recover (on_fail/alternate).
+# ---------------------------------------------------------------------------
+
+import dataclasses as _dc
+
+from l2core.model import (
+    Check,
+    StateSpec,
+    UiModel,
+    WindowSpec,
+)
+from l2core.model.trace import trace_navigation
+
+
+def _window_model(tmp_path, window_id: str) -> UiModel:
+    """Минимальная модель окна: одно состояние recover_closed."""
+    return UiModel(
+        path=str(tmp_path / f"{window_id}.yaml"),
+        window=WindowSpec(id=window_id, title=window_id, size=(100, 100)),
+        elements={},
+        states={"recover_closed": StateSpec(
+            id="recover_closed", params={},
+            signatures=(Check(kind="pixel_probe", points=()),))},
+        transitions=(),
+        ocr_regions={},
+        table_geometry=None)
+
+
+class TestTraceNavigation:
+    def test_all_windows_reachable_via_recipes(self, tmp_path):
+        nav, _ = _nav_with_assets(tmp_path)
+        nav = _dc.replace(nav, recipes={
+            **nav.recipes,
+            "open_shop_sell": _dc.replace(
+                nav.recipes["open_shop_buy"],
+                id="open_shop_sell", opens="shop_sell"),
+        })
+        models = {
+            "market": _window_model(tmp_path, "market"),
+            "shop_buy": _window_model(tmp_path, "shop_buy"),
+            "shop_sell": _window_model(tmp_path, "shop_sell"),
+        }
+        assert trace_navigation(models, nav) == []
+
+    def test_missing_recipe_fails(self, tmp_path):
+        nav, _ = _nav_with_assets(tmp_path)
+        models = {
+            "market": _window_model(tmp_path, "market"),
+            "shop_buy": _window_model(tmp_path, "shop_buy"),
+            "shop_sell": _window_model(tmp_path, "shop_sell"),
+        }
+        rules = {v.rule for v in trace_navigation(models, nav)}
+        assert "nav_window_unreachable" in rules
+        subjects = {v.subject for v in trace_navigation(models, nav)
+                    if v.rule == "nav_window_unreachable"}
+        assert subjects == {"shop_sell"}
+
+    def test_recipe_without_exit_fails(self, tmp_path):
+        nav, _ = _nav_with_assets(tmp_path)
+        # open_shop_buy без on_fail и без alternate — неуспех не имеет выхода.
+        recipe = nav.recipes["open_shop_buy"]
+        nav = _dc.replace(nav, recipes={
+            **nav.recipes,
+            "open_shop_sell": _dc.replace(
+                nav.recipes["open_shop_buy"],
+                id="open_shop_sell", opens="shop_sell"),
+            "open_shop_buy": _dc.replace(
+                recipe, on_fail=(), alternate=None),
+        })
+        models = {
+            "market": _window_model(tmp_path, "market"),
+            "shop_buy": _window_model(tmp_path, "shop_buy"),
+            "shop_sell": _window_model(tmp_path, "shop_sell"),
+        }
+        violations = trace_navigation(models, nav)
+        rules = {v.rule for v in violations}
+        assert "nav_recipe_no_exit" in rules
+        subjects = {v.subject for v in violations
+                    if v.rule == "nav_recipe_no_exit"}
+        assert subjects == {"recipes.open_shop_buy"}
+
+    def test_recover_closed_missing_fails(self, tmp_path):
+        nav, _ = _nav_with_assets(tmp_path)
+        nav = _dc.replace(nav, recipes={
+            **nav.recipes,
+            "open_shop_sell": _dc.replace(
+                nav.recipes["open_shop_buy"],
+                id="open_shop_sell", opens="shop_sell"),
+        })
+        model = _window_model(tmp_path, "shop_sell")
+        model = _dc.replace(model, states={
+            "some_state": model.states["recover_closed"],
+        })
+        models = {
+            "market": _window_model(tmp_path, "market"),
+            "shop_buy": _window_model(tmp_path, "shop_buy"),
+            "shop_sell": model,
+        }
+        rules = {v.rule for v in trace_navigation(models, nav)}
+        assert "nav_recover_state_missing" in rules
