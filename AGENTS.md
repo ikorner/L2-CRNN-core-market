@@ -107,6 +107,14 @@ python tools/gen_ocr_golden.py
 # GPU; без crnn_best.pt — понятная ошибка, код выхода 2
 python tools/benchmark_ocr.py --model <путь>/crnn_best.pt
 
+# Живой dry-run прогон (ручной, вне CI; приёмка 9.4): требует запущенную и
+# видимую игру; проба по фасаду (health/get_state/open_market/read_rows/
+# scroll_list/close_market), действия — намерения без HID, kill switch
+# (хоткей + таймаут неактивности) активен на прогоне; --model побеждает
+# paths.model; без чекпоинта — понятная ошибка, код выхода 2. Это зонд
+# приёмки, не цикл бота.
+python tools/live_dry_run.py --model <путь>/crnn_best.pt
+
 # Запуск бота: публичный API есть (create_api, задача 7.1), kill switch есть
 # (KillSwitch 8.1, компонент для сборки вызывающим слоем), готовый
 # цикл бота/CLI — нет (события 7.3, потоки 7.2 есть);
