@@ -45,11 +45,13 @@ _FRAME_LINE_OFFSET = (2, 2)
 # NCC 0.22 при пороге 0.18, при смене лотов подтверждение рамы проваливается
 # и статус дёргается occluded_or_unstable — 2026-11-12). Лавки — заголовок;
 # у лавок две опоры: «opening» (jak / jakor_sell) и «open» (заголовок
-# открытого окна — досъёмка menu-quickslot-navigation, развязка KNOWN_GAPS п. 6).
+# открытого окна; у shop_sell это jak_start (заголовок «<Продажа>» рабочей
+# лавки, NCC 1.0; шаблон jakor_sell/open с досъёмки живому окну не
+# соответствует — 2026-11-12, развязка KNOWN_GAPS п. 6).
 DEFAULT_ANCHOR_TEMPLATES = {
     "market": (("window_title", "normal"), ("market_main_menu", "normal")),
     "shop_buy": (("jak", "normal"), ("jak", "open")),
-    "shop_sell": (("jakor_sell", "normal"), ("jakor_sell", "open")),
+    "shop_sell": (("jakor_sell", "normal"), ("jak_start", "normal")),
 }
 
 # Допустимые форматы anchor_templates: (element, variant) — одна опора

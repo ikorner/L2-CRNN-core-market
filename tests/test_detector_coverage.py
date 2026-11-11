@@ -64,13 +64,13 @@ ANCHOR_ABSENT = ("scr_153511", "scr_153527", "scr_all_close",
                # открытое «Меню» — окон торговли на кадре нет
                "scr_menu_closed", "scr_menu_open")
 
-# Мета задала state (open), но якорь честно не находится: scr_154318/
-# scr_154424 — окна истории торговли «<Продажа>»/«<Покупка>» (KNOWN_GAPS
-# п. 1, отдельные окна, не смоделированные); их заголовки отличаются от
-# опор opening/open лавок (позитивы open-опор — на досъёмке
-# scr_nav_shop_*_open, tests/test_anchor.py::TestShopOpenAnchors).
-# Не-находка здесь честная, не пробел якоря (п. 6 закрыт).
-ANCHOR_ABSENT_OPEN = ("scr_154318", "scr_154424")
+# Мета задала state (open), но якорь честно не находится: scr_154424 —
+# окно истории покупок «<Покупка>» (KNOWN_GAPS п. 1, отдельное окно, не
+# смоделированное); досъёмочный scr_nav_shop_buy_open_title живому окну
+# не соответствует (NCC 0.32, 2026-11-12). scr_154318 («<Продажа>») с
+# 2026-11-12 на якоре: опора open-состояния shop_sell — jak_start
+# (DEFAULT_ANCHOR_TEMPLATES, tests/test_anchor.py::TestShopSellAnchors).
+ANCHOR_ABSENT_OPEN = ("scr_154424",)
 
 # Кадры навигационной модели (досъёмка menu-quickslot-navigation,
 # 2026-11-10): окна торговли на кадре нет, детектор окон не применяется —
