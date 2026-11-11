@@ -104,10 +104,14 @@ recover.
   не подтверждает). Сошёлся — успех; иначе UNKNOWN (5.7), повтор
   необратимого — за стражом. Для ПОТЕНЦИАЛЬНО НЕОБРАТИМЫХ действий
   (start_sell) вызывающая сторона передаёт `allow_anchorless_verify=False`:
-  окно обязано остаться, потеря якоря — UNKNOWN со стражем (живой кейс
-  2026-11-12: закрытие «Обзора лавок» уходило в UNKNOWN, хотя окно
-  закрывалось). Тесты: tests/test_click.py::TestAnchorlessVerifyAfterClose,
-  tests/test_states.py::TestEvaluateWithoutAnchor.
+  окно обязано остаться, потеря якоря — UNKNOWN со стражем; anchorless- и
+  settle-подтверждения для него запрещены (живой кейс 2026-11-12: закрытие
+  «Обзора лавок» уходило в UNKNOWN, хотя окно закрывалось). Второй путь
+  подтверждения — settle-цикл (2 с, wait_until по инъецированным часам):
+  клик переключил ВИД окна (старт/отмена лавки), якорь нового вида
+  появляется через анимацию — verify ждёт свежий кадр+якорь. Тесты:
+  tests/test_click.py::TestAnchorlessVerifyAfterClose,
+  TestVerifySettleAfterAnchorLoss, tests/test_states.py::TestEvaluateWithoutAnchor.
 
 ## enter_text / enter_price (задача 5.4, spec action-primitives)
 
