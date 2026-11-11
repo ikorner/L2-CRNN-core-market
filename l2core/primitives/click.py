@@ -101,6 +101,10 @@ __all__ = [
 # число пикселей (тултипы встают над элементом/справа от курсора; точное
 # направление не принципиально — следующая попытка возвращает курсор к цели).
 TOOLTIP_SHIFT_PX = 24
+# Дедлайн settle-подтверждения verify после потери якоря (смена вида
+# окна, анимация): дольше — UNKNOWN. Не конфиг: компромисс скорости
+# ретрая и шанса дождаться анимации.
+_VERIFY_SETTLE_TIMEOUT = 2.0
 
 # Шаги on_fail[], известные примитиву (остальные — ошибка модели).
 _ON_FAIL_PRESS_ESC = "press_esc"
@@ -424,18 +428,49 @@ def click_element(
             verify_frame = tx.refresh()
             verify_anchor = find_anchor(verify_frame)
             if verify_anchor is None:
-                # Клик мог закрыть/сменить окно: якорь исчез с verify-кадра
-                # раньше анимации. Verify-наборы таких переходов — HUD-
-                # признаки целевого глобального состояния (recover_closed),
-                # якорь закрытого окна им не нужен — оцениваем без якоря.
-                # Пустой verify без якоря не подтверждает ничего: UNKNOWN
-                # (страж необратимых, 5.7 — пустой набор с якорем истинен
-                # вакуумно, без якоря доверия к кадру нет).
+                # Клик мог закрыть/сменить вид окна: якорь исчез с
+                # verify-кадра раньше анимации. Два пути подтверждения:
+                # 1) якорно-независимый verify — HUD-признаки целевого
+                #    глобального состояния (recover_closed; пустой verify
+                #    без якоря ничего не подтверждает — UNKNOWN, страж 5.7:
+                #    с якорем пустой набор истинен вакуумно, без якоря
+                #    доверия к кадру нет);
+                # 2) settle-цикл — клик переключил ВИД окна (старт/отмена
+                #    лавки): якорь нового вида появится через анимацию,
+                #    ждём свежий кадр+якорь коротким опросом (живой кейс
+                #    2026-11-12: cancel_sell останавливал лавку, но уходил
+                #    в unconfirmed, не дождавшись формы).
                 if allow_anchorless_verify and verify.checks:
                     report = run_checks(verify.checks, verify_frame, None)
                     if report.passed:
                         return ClickResult(element_id, success=True,
                                            attempts=attempt)
+
+                if not allow_anchorless_verify:
+                    # Необратимое: без якоря на verify-кадре подтверждений
+                    # нет — ни якорно-независимых, ни settle (пустой verify
+                    # со свежим якорем истинен вакуумно — settle на него
+                    # не должен опираться, страж 5.7).
+                    failures.append(f"попытка {attempt}: якорь потерян перед verify")
+                    effect_unconfirmed = True  # клик ушёл, подтвердить нельзя
+                    continue
+
+                def _settled() -> bool:
+                    fresh = tx.refresh()
+                    anchor = find_anchor(fresh)
+                    if anchor is None:
+                        return False
+                    return run_checks(verify.checks, fresh, anchor).passed
+
+                settled = wait_until(
+                    _settled, timeout=_VERIFY_SETTLE_TIMEOUT, config=config,
+                    cancelled=cancelled, clock=clock, sleep=sleep)
+                if settled.cancelled:
+                    return ClickResult(element_id, success=False,
+                                       attempts=attempt, cancelled=True)
+                if settled.success:
+                    return ClickResult(element_id, success=True,
+                                       attempts=attempt)
                 failures.append(f"попытка {attempt}: якорь потерян перед verify")
                 effect_unconfirmed = True  # клик ушёл, подтвердить нельзя
                 continue

@@ -867,6 +867,7 @@ class L2CoreAPI:
                 find_anchor=lambda frame: w.find_anchor(frame, "shop_sell"),
                 run_checks=w.run_checks, config=w.config, verify=verify,
                 element_id=element_id, on_fail=on_fail,
+                hud_locator=w.hud_locator,
                 free_area_point=w.free_area_point, cancelled=c,
                 rng=w.rng, clock=w.clock, sleep=w.sleep),
             target="shop_sell",

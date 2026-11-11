@@ -4,7 +4,9 @@
 window:
   id: shop_sell
   title: Торговая лавка (Продажа)
-  size: [520, 421]
+  # Форма подготовки — 520x421; вид рабочей лавки («<Продажа>») шире:
+  # правый край ~595. Общий бокс обоих видов (2026-11-12).
+  size: [600, 421]
 elements:
   acc:
     rect: [66, 249, 108, 30]
@@ -67,14 +69,13 @@ elements:
     variants:
       normal: {template: shop_sell/scr_154244_3.png}
   el_364_418_137_19:
-    rect: [210, 195, 137, 19]
+    rect: [304, 84, 137, 19]
     role: click_target
     variants:
       normal: {template: shop_sell/scr_154318_364_418_137_19.png}
   el_3end:
+    rect: [288, 356, 101, 22]
     role: click_target
-    hud: true
-    search_area: [348, 690, 101, 22]
     variants:
       normal: {template: shop_sell/scr_154318_3end.png}
   el_4:
@@ -108,9 +109,8 @@ elements:
     variants:
       normal: {template: shop_sell/scr_154244_9.png}
   history:
+    rect: [455, 355, 97, 25]
     role: click_target
-    hud: true
-    search_area: [515, 689, 97, 25]
     variants:
       normal: {template: shop_sell/scr_154318_history.png}
   history_button:
@@ -124,7 +124,10 @@ elements:
     variants:
       normal: {template: shop_sell/scr_154244_jak1.png}
   jak_start:
-    rect: [152, 133, 76, 24]
+    # Якорь вида «<Продажа>»: начало координат — верхний левый угол окна
+    # (живой замер 2026-11-12; прежний rect (152,133) давал начало внутри
+    # окна — координаты вида продажи уходили в минус, loader их отклонял)
+    rect: [246, 22, 76, 24]
     role: click_target
     variants:
       normal: {template: shop_sell/scr_154318_jak_start.png}
@@ -148,30 +151,27 @@ elements:
     variants:
       normal: {template: shop_sell/scr_154213_kol-vo.png}
   obshaya_pribil:
+    rect: [12, 323, 92, 20]
     role: click_target
-    hud: true
-    search_area: [72, 657, 92, 20]
     variants:
       normal: {template: shop_sell/scr_154318_obshaya_pribil.png}
   ostalos:
-    rect: [126, 194, 81, 21]
+    rect: [220, 83, 81, 21]
     role: click_target
     variants:
       normal: {template: shop_sell/scr_154318_ostalos.png}
   ozhidaemaya_pribil:
+    rect: [290, 323, 111, 21]
     role: click_target
-    hud: true
-    search_area: [350, 657, 111, 21]
     variants:
       normal: {template: shop_sell/scr_154318_ozhidaemaya_pribil.png}
   predm:
+    rect: [11, 82, 208, 23]
     role: click_target
-    hud: true
-    search_area: [71, 416, 208, 23]
     variants:
       normal: {template: shop_sell/scr_154318_predm.png}
   pribil:
-    rect: [353, 194, 106, 21]
+    rect: [447, 83, 106, 21]
     role: click_target
     variants:
       normal: {template: shop_sell/scr_154318_pribil.png}
@@ -187,14 +187,13 @@ elements:
     variants:
       normal: {template: shop_sell/scr_154244_prodazha_window.png}
   razdelitel:
-    rect: [343, 192, 15, 23]
+    rect: [437, 81, 15, 23]
     role: click_target
     variants:
       normal: {template: shop_sell/scr_154318_razdelitel.png}
   redakt:
+    rect: [176, 354, 103, 25]
     role: click_target
-    hud: true
-    search_area: [236, 688, 103, 25]
     variants:
       normal: {template: shop_sell/scr_154318_redakt.png}
   sell_start_button:
@@ -213,7 +212,7 @@ elements:
     variants:
       normal: {template: shop_sell/scr_154213_trade_window_sell_all.png}
   viveska2:
-    rect: [439, 166, 17, 16]
+    rect: [533, 55, 17, 16]
     role: click_target
     variants:
       normal: {template: shop_sell/scr_154318_viveska2.png}
@@ -251,8 +250,6 @@ states:
     # trade_window_sell_all (целое окно с динамическим инвентарём): на
     # живом кадре приёмки давали NCC 0.82 / 0.48 — состояние не
     # подтверждалось никогда (KNOWN_GAPS п. 5 закрыт досъёмкой владельца).
-    - {kind: template, element: cansel_sell_button, variant: normal}
-    - {kind: template, element: close_sell_button, variant: normal}
     - {kind: template, element: history_button, variant: normal}
     - {kind: template, element: jakor_sell, variant: normal}
     - {kind: template, element: jakor_strelka_sell, variant: normal}

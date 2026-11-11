@@ -448,9 +448,24 @@ class StateDetector:
                            origin: Optional[Tuple[int, int]], window_id: str,
                            gray: np.ndarray, frame_w: int, frame_h: int,
                            state_id: str, name: str) -> SignatureResult:
-        template, element = self._load_template(
-            window_id, check.element, check.variant,
-            context="проверка перехода")
+        try:
+            template, element = self._load_template(
+                window_id, check.element, check.variant,
+                context="проверка перехода")
+        except KeyError:
+            if origin is not None:
+                raise
+            # anchorless-verify: элемент может принадлежать другому окну
+            # (hud_window — только точка входа по умолчанию, 2026-11-12)
+            for other_id, other in self._models.items():
+                if check.element in other.elements:
+                    window_id = other_id
+                    template, element = self._load_template(
+                        other_id, check.element, check.variant,
+                        context="проверка перехода")
+                    break
+            else:
+                raise
         h, w = template.shape
         if element.hud:
             # HUD-элемент: search_area — в клиентской области игры

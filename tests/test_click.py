@@ -641,3 +641,33 @@ class TestAnchorlessVerifyAfterClose:
         assert result.attempts == 1
         # последний (verify) вызов — без якоря
         assert calls[-1] is None
+
+
+class TestVerifySettleAfterAnchorLoss:
+    """Клик переключил вид окна (старт/отмена лавки): якорь старого вида
+    исчез с verify-кадра, якорь нового вида появляется через анимацию.
+    Verify обязан дождаться свежего якоря (короткий settle-цикл), а не
+    падать в UNKNOWN с первого кадра (живой кейс 2026-11-12: cancel_sell
+    физически останавливал лавку, но уходил в unconfirmed)."""
+
+    def test_verify_settles_when_anchor_reappears(self):
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        anchors = iter([ANCHOR, ANCHOR, None, ANCHOR])
+
+        def find_anchor(frame):
+            return next(anchors, ANCHOR)
+
+        def checker(checks, frame, anchor):
+            return _report(anchor is not None, checks)
+
+        result = run_click(
+            hid, clock, checker, find_anchor=find_anchor,
+            verify=VerifySpec(
+                checks=(Check(kind="template", element=ELEMENT_ID,
+                              variant="active"),),
+                expected="target_state"),
+        )
+
+        assert result.success
+        assert result.attempts == 1
