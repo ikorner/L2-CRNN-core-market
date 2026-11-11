@@ -434,3 +434,157 @@ class TestCreateApi:
         # health() агрегирует провайдеров собранного wiring.
         health = api.health()
         assert health.game_window
+
+
+class TestHudLocatorClientOrigin:
+    """search_area HUD — в клиентской области игры: hud_locator смещает
+    область на начало клиента окна игры (окно не fullscreen — 2026-11-12)."""
+
+    def test_hud_point_offset_by_client_origin(self, tmp_path):
+        assets = tmp_path / "assets"
+        (assets / "hud").mkdir(parents=True)
+        assert cv2.imwrite(str(assets / "hud" / "mp.png"),
+                           np.full((8, 8), 200, dtype=np.uint8))
+        spec = VariantSpec(name="normal", template="hud/mp.png",
+                           click_point=(86, 64))
+        market = make_model("market", elements={
+            "market_pic": ElementSpec(
+                id="market_pic", role="icon_sample", hud=True,
+                search_area=Rect(1000, 420, 200, 160),
+                variants={"normal": spec}),
+        })
+        models = make_models()
+        models["market"] = market
+        matcher = FakeMatcher(Match(5, 7, 0.99))
+        wiring = build_wiring(
+            config=load_config(None), models=models, screen=None,
+            hid=FakeHid(), ocr=FakeOcr(), matcher=matcher,
+            assets_dir=assets, cursor_pos=lambda: (0, 0),
+            activate=lambda: None,
+            game_finder=FakeGameFinder(
+                GameWindow.found(1, (150, 160, 1136, 833))),
+            anchor_detector=FakeAnchorDetector({}),
+            state_detector=FakeStateDetector(report=STATE_REPORT))
+        element = models["market"].elements["market_pic"]
+
+        point = wiring.hud_locator(element, "normal", FRAME)
+
+        # origin (150,160) + search_area (1000,420) + match (5,7) + click (86,64)
+        assert point == (150 + 1091, 160 + 491)
+
+
+class TestHidAutoflash:
+    """Несовместимая прошивка HID: авто-прошивка штатным flasher'ом
+    L2-CRNN-arduino и повторное подключение (контракт: плата ищется сама,
+    прошивается при необходимости — порт в конфиг не задаётся)."""
+
+    def _patch(self, monkeypatch, hid_cls):
+        import l2core.api.wiring as wiring_module
+
+        class FakeScreen:
+            def grab(self):
+                return FRAME
+
+            def close(self):
+                pass
+
+        class FakeGateway:
+            def find_windows(self, title, class_name):
+                return [1]
+
+            def get_client_rect(self, hwnd):
+                return (0, 0, 1920, 1080)
+
+            def is_iconic(self, hwnd):
+                return False
+
+            def get_foreground_window(self):
+                return 1
+
+            def set_foreground(self, hwnd):
+                return True
+
+            def set_process_dpi_aware(self):
+                return True
+
+            def get_cursor_pos(self):
+                return (100, 200)
+
+        monkeypatch.setattr(wiring_module, "MssScreen", FakeScreen)
+        monkeypatch.setattr(wiring_module, "HidDevice", hid_cls)
+        monkeypatch.setattr(wiring_module, "create_ocr_client",
+                            lambda *a, **kw: FakeOcr())
+        monkeypatch.setattr(wiring_module, "PyWin32Gateway", FakeGateway)
+
+    def test_outdated_firmware_flashed_and_reconnected(self, tmp_path,
+                                                       monkeypatch):
+        from l2core.adapters.hid import IncompatibleFirmwareError
+        stats = {"connects": 0, "flashes": 0}
+        patched = self
+
+        class FlakyHid:
+            def __init__(self, port=None, *args, **kwargs):
+                self.connected = False
+
+            def connect(self):
+                stats["connects"] += 1
+                if stats["connects"] == 1:
+                    raise IncompatibleFirmwareError("прошивка устарела")
+                self.connected = True
+
+            def is_connected(self):
+                return self.connected
+
+        self._patch(monkeypatch, FlakyHid)
+        repo = Path(__file__).resolve().parent.parent
+
+        api = create_api(
+            load_config(None),
+            models_dir=repo / "ui_model",
+            assets_dir=repo / "assets",
+            firmware_flasher=lambda: stats.__setitem__("flashes", 1),
+        )
+
+        assert stats["flashes"] == 1
+        assert stats["connects"] == 2
+        assert api.health().hid
+
+    def test_outdated_firmware_without_flasher_raises(self, tmp_path,
+                                                      monkeypatch):
+        from l2core.adapters.hid import IncompatibleFirmwareError
+
+        class OldHid:
+            def __init__(self, port=None, *args, **kwargs):
+                pass
+
+            def connect(self):
+                raise IncompatibleFirmwareError("прошивка устарела")
+
+            def is_connected(self):
+                return False
+
+        self._patch(monkeypatch, OldHid)
+        repo = Path(__file__).resolve().parent.parent
+        with pytest.raises(IncompatibleFirmwareError):
+            create_api(
+                load_config(None),
+                models_dir=repo / "ui_model",
+                assets_dir=repo / "assets",
+                firmware_flasher=None,  # авто-прошивка отключена
+            )
+
+    def test_find_arduino_repo_env_override(self, tmp_path, monkeypatch):
+        import l2core.api.wiring as wiring_module
+        fake = tmp_path / "arduino"
+        fake.mkdir()
+        (fake / "flasher.py").write_text("", encoding="utf-8")
+        monkeypatch.setenv("L2CRNN_ARDUINO_DIR", str(fake))
+        assert wiring_module._find_arduino_repo() == fake
+
+    def test_find_arduino_repo_missing(self, tmp_path, monkeypatch):
+        import l2core.api.wiring as wiring_module
+        monkeypatch.delenv("L2CRNN_ARDUINO_DIR", raising=False)
+        # соседский каталог на машине разработчика может существовать —
+        # проверяем только отсутствие исключений и тип результата
+        repo = wiring_module._find_arduino_repo()
+        assert repo is None or (repo / "flasher.py").is_file()

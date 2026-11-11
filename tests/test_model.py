@@ -74,7 +74,7 @@ def test_load_shipped_market_model_round_trip():
     # (menu-quickslot-navigation).
     opener = model.elements["hamburger_button"]
     assert opener.hud
-    assert opener.search_area == (1000, 740, 136, 100)
+    assert opener.search_area == (1000, 740, 160, 100)
     assert opener.rect is None
 
     # quickslot_sell_icon: HUD-элемент панели быстрого доступа (слот F2).

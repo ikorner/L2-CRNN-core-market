@@ -33,7 +33,6 @@ paths:
   model: retrain/crnn_retrained.pt  # чекпоинт CRNN (файл вне git): ретрейн
                                    # 2026-11-11 под новый рендеринг клиента,
                                    # golden-бенчмарк 24/24 (было 10/24)
-  arduino_port: COM3  # порт HID-адаптера arduino
 
 kill_switch:
   hotkey: ctrl+shift+k  # локальный хоткей мгновенной остановки (клавиатура, не arduino)

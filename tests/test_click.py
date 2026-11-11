@@ -606,3 +606,38 @@ class TestVerifyContract:
         assert verify is not None, "click_element обязан принимать verify"
         assert defaults[kwonly.index(verify)] is None, \
             "verify не должен иметь дефолта — клики без verify запрещены"
+
+
+class TestAnchorlessVerifyAfterClose:
+    """Клик по кнопке закрытия: окно закрывается, якорь исчезает с verify-
+    кадра (анимация закрытия). Verify-наборы таких переходов — HUD-признаки
+    целевого глобального состояния (recover_closed: гамбургер/quick-slot),
+    якорь закрытого окна им не нужен: оцениваем без якоря (живой кейс
+    2026-11-12: close_market физически закрывал окно, но уходил в UNKNOWN)."""
+
+    def test_close_click_verify_without_anchor(self):
+        clock = FakeClock()
+        hid = ScriptedHid(clock)
+        anchors = iter([ANCHOR, ANCHOR, None])
+
+        def find_anchor(frame):
+            return next(anchors, None)
+
+        calls = []
+
+        def checker(checks, frame, anchor):
+            calls.append(anchor)
+            return _report(True, checks)
+
+        result = run_click(
+            hid, clock, checker, find_anchor=find_anchor,
+            verify=VerifySpec(
+                checks=(Check(kind="template", element=ELEMENT_ID,
+                              variant="active"),),
+                expected="recover_closed"),
+        )
+
+        assert result.success
+        assert result.attempts == 1
+        # последний (verify) вызов — без якоря
+        assert calls[-1] is None

@@ -39,12 +39,15 @@ _FRAME_LINE_OFFSET = (2, 2)
 
 # Элементы-опоры якоря по умолчанию: окно -> кортеж опор (element_id,
 # variant); find_anchor перебирает опоры template matching'ом по порогу окна,
-# первая сошедшаяся даёт Anchor. market подтверждается целым окном
-# (market_main_menu), лавки — заголовком; у лавок две опоры: «opening»
-# (jak / jakor_sell) и «open» (заголовок открытого окна — досъёмка
-# menu-quickslot-navigation, развязка KNOWN_GAPS п. 6).
+# первая сошедшаяся даёт Anchor. market: первичная опора — заголовок окна
+# (window_title, статичный хром, NCC ~0.998 на живых кадрах), запасная —
+# целое окно (market_main_menu содержит содержимое таблицы: на живом кадре
+# NCC 0.22 при пороге 0.18, при смене лотов подтверждение рамы проваливается
+# и статус дёргается occluded_or_unstable — 2026-11-12). Лавки — заголовок;
+# у лавок две опоры: «opening» (jak / jakor_sell) и «open» (заголовок
+# открытого окна — досъёмка menu-quickslot-navigation, развязка KNOWN_GAPS п. 6).
 DEFAULT_ANCHOR_TEMPLATES = {
-    "market": (("market_main_menu", "normal"),),
+    "market": (("window_title", "normal"), ("market_main_menu", "normal")),
     "shop_buy": (("jak", "normal"), ("jak", "open")),
     "shop_sell": (("jakor_sell", "normal"), ("jakor_sell", "open")),
 }
@@ -67,6 +70,16 @@ def _normalize_supports(supports) -> Tuple[Tuple[str, str], ...]:
 # Окна, для которых работает numpy-only первый этап (яркие линии рамки):
 # рамка «Обзора лавок» даёт устойчивый признак, рамки лавок сырьё не покрывает.
 DEFAULT_FRAME_STAGE = ("market",)
+
+# Пороги полного поиска по опорам (для окон с несколькими опорами и
+# разной «различительной силой» шаблонов): окно -> кортеж порогов 1:1
+# опорам DEFAULT_ANCHOR_TEMPLATES. У market опора-заголовок (короткий
+# текст) похожа на заголовки лавок (max чужого 0.743 — замер 3.3), поэтому
+# её порог — как у лавок; опора из целого окна содержит содержимое таблицы
+# и на живых кадрах даёт 0.22 — ей нужен низкий порог market_threshold.
+DEFAULT_SUPPORT_THRESHOLDS = {
+    "market": (0.9, 0.18),
+}
 
 
 @dataclass(frozen=True)
@@ -180,6 +193,7 @@ class AnchorDetector:
         market_threshold: float = 0.18,
         shop_threshold: float = 0.9,
         search_radius: int = 8,
+        support_thresholds: Optional[Mapping[str, Tuple[float, ...]]] = None,
     ):
         """
         Args:
@@ -194,6 +208,9 @@ class AnchorDetector:
                 (numpy-only рамка) перед template matching.
             market_threshold / shop_threshold: пороги NCC.
             search_radius: окрестность кандидата рамки для подтверждения.
+            support_thresholds: окно -> кортеж порогов полного поиска 1:1
+                опорам (DEFAULT_SUPPORT_THRESHOLDS: у market заголовок
+                отличается от заголовков лавок, порог как у лавок).
         """
         self._models = dict(models)
         self._matcher = matcher
@@ -203,6 +220,9 @@ class AnchorDetector:
             for window_id, supports in dict(
                 anchor_templates or DEFAULT_ANCHOR_TEMPLATES).items()
         }
+        self._support_thresholds = dict(
+            support_thresholds if support_thresholds is not None
+            else DEFAULT_SUPPORT_THRESHOLDS)
         self._frame_stage = tuple(frame_stage)
         self._market_threshold = market_threshold
         self._shop_threshold = shop_threshold
@@ -244,20 +264,30 @@ class AnchorDetector:
         supports = self._templates[window_id]
         gray = _to_gray(frame)
         if window_id in self._frame_stage:
-            # Первый этап market: кандидат рамки подтверждается первой опорой.
-            template, _element = supports[0]
+            # Первый этап market: кандидат рамки подтверждается первой опорой
+            # (поиск в окрестности позиции элемента-опоры внутри окна —
+            # опора не обязана начинаться в начале координат окна).
+            template, element = supports[0]
             candidate = detect_window(frame, self._models[window_id].window.size)
             if candidate is not None:
-                match = self._match_near(gray, template, candidate)
+                off = element.rect
+                probe = (candidate[0] + (off.x if off else 0),
+                         candidate[1] + (off.y if off else 0))
+                match = self._match_near(gray, template, probe)
                 if match.score >= self._market_threshold:
                     return Anchor(window_id, candidate[0], candidate[1],
                                   match.score, "frame")
         threshold = (self._market_threshold
                      if window_id in self._frame_stage
                      else self._shop_threshold)
-        for template, element in supports:
+        support_thresholds = self._support_thresholds.get(window_id)
+        for idx, (template, element) in enumerate(supports):
             match = self._matcher.match(gray, template)
-            if match.score < threshold:
+            support_floor = (support_thresholds[idx]
+                             if support_thresholds
+                             and idx < len(support_thresholds)
+                             else threshold)
+            if match.score < max(threshold, support_floor):
                 continue
             rect = element.rect
             offset_x, offset_y = (rect.x, rect.y) if rect is not None else (0, 0)

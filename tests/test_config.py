@@ -1,13 +1,9 @@
 """Тесты загрузчика конфигурации l2core.config.
-
 Покрывают: дефолты без файла, полный YAML, частичный YAML поверх дефолтов,
 валидацию диапазонов (тайминги, доли, пороги) и обязательные пути.
 """
-
 import pytest
-
 from l2core.config import ConfigError, load_config
-
 # Полный конфиг со всеми секциями (значения отличны от дефолтов, чтобы
 # отличать «прочитано из файла» от «взято из дефолта»).
 FULL_YAML = """
@@ -16,11 +12,9 @@ timing:
   verify_interval: 0.5
   hover_pause: 0.8
   click_retry_count: 4
-
 ocr:
   confidence_threshold: 0.7
   reread_count: 5
-
 behavior:
   numpad_fraction: 0.3
   enter_fraction: 0.6
@@ -34,23 +28,16 @@ behavior:
   move_step_delay_max_ms: 18
   drag_midpoints_min: 0
   drag_midpoints_max: 2
-
 paths:
   model: /opt/models/crnn_best.pt
-  arduino_port: COM7
-
 kill_switch:
   hotkey: ctrl+alt+p
   inactivity_timeout: 600.0
-
 resolution:
   width: 1600
   height: 900
-
 dry_run: true
 """
-
-
 def test_defaults_without_file():
     config = load_config(None)
     assert config.ocr.confidence_threshold == 0.85
@@ -58,7 +45,6 @@ def test_defaults_without_file():
     assert config.resolution.width == 1920
     assert config.resolution.height == 1080
     assert config.paths.model == "retrain/crnn_retrained.pt"
-    assert config.paths.arduino_port
     assert config.kill_switch.hotkey
     assert config.timing.wait_default_timeout > 0
     assert config.timing.verify_interval > 0
@@ -73,13 +59,10 @@ def test_defaults_without_file():
     assert config.behavior.drag_midpoints_min <= config.behavior.drag_midpoints_max
     assert config.kill_switch.inactivity_timeout > 0
     assert config.dry_run is False
-
-
 def test_load_full_yaml(tmp_path):
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text(FULL_YAML, encoding="utf-8")
     config = load_config(cfg_path)
-
     assert config.timing.wait_default_timeout == 20.0
     assert config.timing.verify_interval == 0.5
     assert config.timing.hover_pause == 0.8
@@ -99,14 +82,11 @@ def test_load_full_yaml(tmp_path):
     assert config.behavior.drag_midpoints_min == 0
     assert config.behavior.drag_midpoints_max == 2
     assert config.paths.model == "/opt/models/crnn_best.pt"
-    assert config.paths.arduino_port == "COM7"
     assert config.kill_switch.hotkey == "ctrl+alt+p"
     assert config.kill_switch.inactivity_timeout == 600.0
     assert config.resolution.width == 1600
     assert config.resolution.height == 900
     assert config.dry_run is True
-
-
 def test_partial_yaml_overrides_defaults(tmp_path):
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text(
@@ -119,7 +99,6 @@ timing:
         encoding="utf-8",
     )
     config = load_config(cfg_path)
-
     # Переопределённые значения
     assert config.ocr.confidence_threshold == 0.9
     assert config.timing.wait_default_timeout == 3.0
@@ -128,16 +107,12 @@ timing:
     assert config.timing.verify_interval == 0.2
     assert config.resolution.width == 1920
     assert config.paths.model == "retrain/crnn_retrained.pt"
-
-
 def test_empty_file_gives_defaults(tmp_path):
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text("", encoding="utf-8")
     config = load_config(cfg_path)
     assert config.ocr.confidence_threshold == 0.85
     assert config.resolution.width == 1920
-
-
 @pytest.mark.parametrize(
     "yaml_text,path_to_none",
     [
@@ -175,11 +150,12 @@ def test_empty_file_gives_defaults(tmp_path):
         ("timing:\n  wait_default_timeout: abc\n", "timing.wait_default_timeout"),
         ("ocr:\n  reread_count: много\n", "ocr.reread_count"),
         # Отсутствует обязательный путь модели
-        ("paths:\n  arduino_port: COM4\n", "paths.model"),
+        ("paths:\n  arduino_port: COM4\n", "arduino_port"),
         ("paths:\n  model: ''\n", "paths.model"),
         ("paths:\n  model: null\n", "paths.model"),
-        # Отсутствует порт arduino
-        ("paths:\n  model: crnn_best.pt\n", "paths.arduino_port"),
+        # Порт HID в конфиге не задаётся: адаптер сам ищет плату (VID/PID)
+        ("paths:\n  model: crnn_best.pt\n  arduino_port: COM4\n",
+         "paths.arduino_port"),
         # Некорректное разрешение
         ("resolution:\n  width: 0\n", "resolution.width"),
         ("resolution:\n  height: -1080\n", "resolution.height"),
@@ -200,23 +176,16 @@ def test_validation_errors(tmp_path, yaml_text, path_to_none):
     if path_to_none is not None:
         key = path_to_none.split(".")[-1] if "." in path_to_none else path_to_none
         assert key in str(excinfo.value) or path_to_none in str(excinfo.value)
-
-
 def test_top_level_not_mapping(tmp_path):
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text("- just\n- a list\n", encoding="utf-8")
     with pytest.raises(ConfigError):
         load_config(cfg_path)
-
-
 def test_missing_file_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_config(tmp_path / "absent.yaml")
-
-
 def test_shipped_config_yaml_valid_and_matches_defaults():
     """Поставляемый в корне config.yaml валиден и не расходится с дефолтами."""
     from pathlib import Path
-
     repo_root = Path(__file__).resolve().parent.parent
     assert load_config(repo_root / "config.yaml") == load_config(None)

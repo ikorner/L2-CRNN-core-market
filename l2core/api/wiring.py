@@ -42,6 +42,7 @@ design.md решение 8); новых кэшей сборка не вводи�
 """
 from __future__ import annotations
 
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -145,6 +146,16 @@ class ApiWiring:
     nav_evaluate: Optional[Callable] = None
 
 
+def _client_origin(game_finder) -> Callable[[], Tuple[int, int]]:
+    """Начало клиентской области игры в кадре (0,0 — окно не найдено)."""
+    def origin() -> Tuple[int, int]:
+        win = game_finder.find()
+        if not win.ok or win.rect is None:
+            return (0, 0)
+        return (win.rect[0], win.rect[1])
+    return origin
+
+
 def _load_hud_templates(models: Mapping[str, UiModel], assets_dir: Path) -> dict:
     """Шаблоны HUD-элементов (element_id, variant) -> (серый шаблон,
     элемент, вариант). HUD-элементы живут в моделях окон (market держит
@@ -238,7 +249,8 @@ def build_wiring(*, config: CoreConfig,
     anchor_detector = anchor_detector or AnchorDetector.for_windows(
         models, matcher, assets_dir)
     state_detector = state_detector or StateDetector(
-        models, matcher, assets_dir, ocr_client=ocr)
+        models, matcher, assets_dir, ocr_client=ocr,
+        client_origin=_client_origin(game_finder))
     status_detector = status_detector or WindowStatusDetector(
         game_finder, anchor_detector, state_detector=state_detector)
 
@@ -250,35 +262,45 @@ def build_wiring(*, config: CoreConfig,
     if navigation is not None:
         hud_models["navigation"] = navigation
     if nav_evaluate is None and navigation is not None:
-        nav_evaluate = build_nav_evaluator(navigation, matcher, assets_dir)
+        nav_evaluate = build_nav_evaluator(
+            navigation, matcher, assets_dir,
+            client_origin=_client_origin(game_finder))
     hud_templates = _load_hud_templates(hud_models, assets_dir)
 
     def hud_locator(element: ElementSpec, variant: Optional[str],
                     frame: np.ndarray) -> Optional[Tuple[int, int]]:
         """Точка HUD-иконки: template matching в search_area; порог —
         hud_threshold (семейство порогов template-детекции 3.3/3.4);
-        точка клика — click_point варианта (иначе центр шаблона)."""
+        точка клика — click_point варианта (иначе центр шаблона).
+        search_area задана в клиентской области игры (navigation.py) —
+        смещаем на начало клиента окна (окно не fullscreen, 2026-11-12);
+        окно не найдено — локализация невозможна (None, слепых кликов нет)."""
         key = (element.id, variant or next(iter(element.variants), None))
         loaded = hud_templates.get(key)
         if loaded is None or element.search_area is None:
             return None
         template, _, spec = loaded
+        win = game_finder.find()
+        if not win.ok or win.rect is None:
+            return None
+        ox, oy = win.rect[0], win.rect[1]
         area = element.search_area
+        ax, ay = area.x + ox, area.y + oy
         gray = _to_gray(np.asarray(frame))
         h, w = template.shape
-        if (area.y < 0 or area.x < 0
-                or area.y + area.height > gray.shape[0]
-                or area.x + area.width > gray.shape[1]):
+        if (ay < 0 or ax < 0
+                or ay + area.height > gray.shape[0]
+                or ax + area.width > gray.shape[1]):
             return None
-        crop = gray[area.y:area.y + area.height, area.x:area.x + area.width]
+        crop = gray[ay:ay + area.height, ax:ax + area.width]
         if crop.shape[0] < h or crop.shape[1] < w:
             return None
         match = matcher.match(crop, template)
         if match.score < hud_threshold:
             return None
         click_point = spec.click_point or (w // 2, h // 2)
-        return (area.x + match.x + click_point[0],
-                area.y + match.y + click_point[1])
+        return (ax + match.x + click_point[0],
+                ay + match.y + click_point[1])
 
     def close_point(window_id: str,
                     frame: np.ndarray) -> Optional[Tuple[int, int]]:
@@ -356,6 +378,75 @@ def build_wiring(*, config: CoreConfig,
         navigation=navigation, nav_evaluate=nav_evaluate)
 
 
+_AUTO_FLASH = object()  # сентинел: авто-прошивка штатным flasher'ом по умолчанию
+
+
+def _find_arduino_repo() -> Optional[Path]:
+    """Локализация проекта L2-CRNN-arduino (штатный flasher.py).
+
+    Порядок: переменная окружения L2CRNN_ARDUINO_DIR, соседний каталог
+    репозитория (../L2-CRNN-arduino), каталог внутри репозитория. Не найден
+    — None (авто-прошивка невозможна, ошибка прошивки остаётся на вызывающем).
+    """
+    import os
+    env = os.environ.get("L2CRNN_ARDUINO_DIR")
+    if env and (Path(env) / "flasher.py").is_file():
+        return Path(env)
+    repo_root = Path(__file__).resolve().parents[2]
+    for candidate in (repo_root.parent / "L2-CRNN-arduino",
+                      repo_root / "L2-CRNN-arduino"):
+        if (candidate / "flasher.py").is_file():
+            return candidate
+    return None
+
+
+def _default_firmware_flasher() -> None:
+    """Прошивка подключённой Leonardo штатным flasher'ом L2-CRNN-arduino."""
+    import subprocess
+    from l2core.adapters.hid import IncompatibleFirmwareError
+    repo = _find_arduino_repo()
+    if repo is None:
+        raise IncompatibleFirmwareError(
+            "прошивка HID устарела, а репозиторий L2-CRNN-arduino не найден "
+            "(ищите его через L2CRNN_ARDUINO_DIR или соседний каталог); "
+            "прошейте вручную: python flasher.py")
+    proc = subprocess.run(
+        [sys.executable, "flasher.py"], cwd=str(repo),
+        capture_output=True, text=True, timeout=600)
+    if proc.returncode != 0:
+        raise IncompatibleFirmwareError(
+            f"авто-прошивка не удалась (код {proc.returncode}): "
+            f"{proc.stdout[-500:]} {proc.stderr[-500:]}")
+
+
+def _connect_hid(hid, firmware_flasher: Optional[Callable[[], None]]):
+    """Подключение HID с авто-прошивкой при несовместимой версии прошивки.
+
+    Контракт проекта L2-CRNN-arduino: плата ищется сама (VID/PID), прошивается
+    при необходимости — порт в конфиг не задаётся. flasher по умолчанию
+    (_AUTO_FLASH) — авто-поиск штатного flasher'а L2-CRNN-arduino; None —
+    авто-прошивка отключена (исходное исключение); callable — свой вызов.
+    После прошивки соединение пересоздаётся (порт перезагружается).
+    """
+    from l2core.adapters.hid import IncompatibleFirmwareError
+    try:
+        hid.connect()
+        return hid
+    except IncompatibleFirmwareError:
+        if firmware_flasher is _AUTO_FLASH:
+            firmware_flasher = _default_firmware_flasher
+        if firmware_flasher is None:
+            raise
+        # порт перед прошивкой освобождаем: avr109 не откроет занятый COM
+        close = getattr(hid, "close", None)
+        if callable(close):
+            close()
+        firmware_flasher()
+    fresh = HidDevice()
+    fresh.connect()
+    return fresh
+
+
 def create_api(config, *, models_dir="ui_model", assets_dir="assets",
                model_names: Tuple[str, ...] = _MODEL_NAMES,
                screen=None, hid=None, ocr=None,
@@ -371,7 +462,8 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
                rng: Optional[JitterRng] = None,
                clock: Callable[[], float] = time.monotonic,
                sleep: Callable[[float], None] = time.sleep,
-               dry_run: Optional[bool] = None) -> L2CoreAPI:
+               dry_run: Optional[bool] = None,
+               firmware_flasher: Optional[Callable[[], None]] = _AUTO_FLASH) -> L2CoreAPI:
     """Фабрика живой сборки: конфиг (путь или CoreConfig), модели из
     ui_model/, живые адаптеры (MssScreen / HidDevice / TorchOcr /
     PyWin32Gateway) и детекторы 3.3–3.5; вернуть готовый L2CoreAPI.
@@ -408,8 +500,9 @@ def create_api(config, *, models_dir="ui_model", assets_dir="assets",
         if effective_dry_run:
             hid = DryRunHid()
         else:
-            hid = HidDevice(config.paths.arduino_port)
-            hid.connect()   # порт + проверка прошивки (жизненный цикл — у фасада)
+            # порт — авто-поиск платы (VID/PID Leonardo); прошивка устарела —
+            # авто-прошивка штатным flasher'ом и повторное подключение
+            hid = _connect_hid(HidDevice(), firmware_flasher)
     ocr = ocr or create_ocr_client("torch", model_path=config.paths.model)
     if action_logger is None and config.log.enabled:
         action_logger = ActionLogger(

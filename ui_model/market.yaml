@@ -190,9 +190,9 @@ elements:
     # состояние recover_closed; каноническое описание — navigation.yaml.
     role: icon_sample
     hud: true
-    search_area: [1000, 740, 136, 100]
+    search_area: [1000, 740, 160, 100]
     variants:
-      normal: {template: navigation/hamburger.png, click_point: [20, 19]}
+      normal: {template: navigation/hamburger.png, click_point: [20, 18]}
   market_snar_passive:
     rect: [151, 155, 139, 44]
     role: click_target

@@ -140,7 +140,7 @@ class CheckRunner(Protocol):
     """
 
     def __call__(self, checks: Tuple[Check, ...], frame: np.ndarray,
-                 anchor: Anchor) -> CheckReport: ...
+                 anchor: Optional[Anchor]) -> CheckReport: ...
 
 
 @runtime_checkable
@@ -320,12 +320,19 @@ def click_element(
     rng: Optional[JitterRng] = None,
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
+    allow_anchorless_verify: bool = True,
 ) -> ClickResult:
     """Клик по элементу модели: пролог → hover → click → verify → retry →
     on_fail → сигнал recover. Контракт — в докстринге модуля.
 
     verify — обязателен: клики без verify-спецификации запрещены (spec
     action-primitives; guard — tests/test_click.py::TestVerifyContract).
+
+    allow_anchorless_verify — якорь исчез с verify-кадра (клик закрыл/сменил
+    окно, анимация): verify-набор оценивается без якоря (HUD-признаки
+    глобального состояния, окно hud_window модели). Для ПОТЕНЦИАЛЬНО
+    НЕОБРАТИМЫХ действий (start_sell, 5.7) вызывающая сторона передаёт
+    False: окно обязано остаться, потеря якоря — UNKNOWN со стражом.
     """
     element = model.elements.get(element_id)
     if element is None:
@@ -417,6 +424,18 @@ def click_element(
             verify_frame = tx.refresh()
             verify_anchor = find_anchor(verify_frame)
             if verify_anchor is None:
+                # Клик мог закрыть/сменить окно: якорь исчез с verify-кадра
+                # раньше анимации. Verify-наборы таких переходов — HUD-
+                # признаки целевого глобального состояния (recover_closed),
+                # якорь закрытого окна им не нужен — оцениваем без якоря.
+                # Пустой verify без якоря не подтверждает ничего: UNKNOWN
+                # (страж необратимых, 5.7 — пустой набор с якорем истинен
+                # вакуумно, без якоря доверия к кадру нет).
+                if allow_anchorless_verify and verify.checks:
+                    report = run_checks(verify.checks, verify_frame, None)
+                    if report.passed:
+                        return ClickResult(element_id, success=True,
+                                           attempts=attempt)
                 failures.append(f"попытка {attempt}: якорь потерян перед verify")
                 effect_unconfirmed = True  # клик ушёл, подтвердить нельзя
                 continue

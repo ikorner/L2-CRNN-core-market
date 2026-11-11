@@ -164,6 +164,12 @@ UI-модели → Screen/Detector/OcrClient/HidPort → адаптеры
   вендоренная копия OCR-кода (ocr_vendor/), OCR-адаптер (ocr.py),
   сегментация таблицы (table_segmentation/), HidArduino, кейкоды клавиш
   (keycodes.py — вне вендоренного hid.py: KEY_X и словарь KEYCODES).
+  Порт HID в конфиг не задаётся: HidArduino сам ищет плату (VID/PID
+  Leonardo) и при несовместимой прошивке прошивает её штатным flasher'ом
+  L2-CRNN-arduino (авто-поиск репозитория: env L2CRNN_ARDUINO_DIR, соседний
+  каталог; подробности — docs/agents/adapters.md «HID-адаптер»).
+  search_area HUD-элементов навигации — в клиентской области игры (окно
+  не fullscreen): рантайм смещает её на начало клиента (GameWindowFinder).
 - `l2core/config.py` — схема и типизированный загрузчик `config.yaml`.
 - `tests/` — pytest; `ui_model/` — YAML UI-модель (окна + common +
   navigation.yaml); `assets/` — шаблоны и golden-кропы (версионируются

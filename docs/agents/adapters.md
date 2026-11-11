@@ -36,6 +36,21 @@ l2core/ (кроме самого ocr_vendor/), tests/ и tools/; импорт
 исключение — `tests/test_ocr_vendor.py` (guard самого вендора, задача
 4.1), зафиксировано явным allowlist'ом.
 
+## HID-адаптер (HidArduino, вендоринг L2-CRNN-arduino)
+
+`l2core/adapters/hid.py` — замороженная копия транспорта проекта
+L2-CRNN-arduino (шапка файла — коммит-источник; правки только там, с
+перевендориванием). Порт в конфиг НЕ задаётся (контракт проекта
+L2-CRNN-arduino): `HidDevice(None)` сам ищет плату по VID/PID Leonardo
+(`_find_port`). Несовместимая прошивка — авто-прошивка при подключении
+(`create_api(..., firmware_flasher=...)`; по умолчанию — авто-поиск
+репозитория L2-CRNN-arduino: env `L2CRNN_ARDUINO_DIR`, соседний каталог
+репозитория; штатный `flasher.py`, нужен arduino-cli), затем повторное
+подключение. Порт перед прошивкой освобождается (занятый COM avr109 не
+открывает). `firmware_flasher=None` — авто-прошивка отключена,
+несовместимость — исключение на вызывающем. Тесты:
+`tests/test_wiring.py::TestHidAutoflash`.
+
 ## OCR-адаптер (задача 4.2)
 
 `l2core/adapters/ocr.py`: протокол `OcrClient` (`read(region_img) ->

@@ -231,14 +231,14 @@ class TestCreateApiDryRun:
         api = create_api(config, dry_run=False, **patched["kwargs"])
 
         assert not isinstance(api._w.hid, DryRunHid)
-        assert patched["constructed"] == ["COM3"]  # живой HID поднят
+        assert patched["constructed"] == [None]  # живой HID, порт — авто-поиск
         assert api.dry_run is False
 
     def test_default_is_live_hid(self, patched):
         api = create_api(CoreConfig(), **patched["kwargs"])
 
         assert not isinstance(api._w.hid, DryRunHid)
-        assert patched["constructed"] == ["COM3"]
+        assert patched["constructed"] == [None]
 
     def test_explicit_hid_wins_over_dry_run(self, patched):
         class ForeignHid:

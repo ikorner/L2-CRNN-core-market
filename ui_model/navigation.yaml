@@ -7,9 +7,11 @@ elements:
   hamburger_button:
     role: icon_sample
     hud: true
-    search_area: [1000, 740, 136, 100]   # правый нижний угол клиента
+    search_area: [1000, 740, 160, 100]   # правый нижний угол клиента
     variants:
-      normal: {template: navigation/hamburger.png, click_point: [20, 19]}
+      # кроп внутри ромба (три линии на тёмном фоне), не с окружением:
+      # фон/иконки вокруг ромба меняются от состояния игры (2026-11-12)
+      normal: {template: navigation/hamburger.png, click_point: [20, 18]}
   menu_anchor:
     role: icon_sample
     hud: true
@@ -59,25 +61,31 @@ recipes:
   open_market:
     opens: market
     steps:
-      - action: key
-        key: X
-        skip_if: [menu_open]             # X — toggle: не закрыть открытое меню
+      # Гамбургер — первичный путь: X в текущем клиенте меню не открывает
+      # (проверено живьём 2026-11-12), клик по ромбу «Меню» открывает.
+      # skip_if: клик — тоггл; если меню уже открыто (первая попытка
+      # сработала, verify не сошёлся транзиентно), повторный клик ЗАКРОЫЛ
+      # бы меню — живой кейс 2026-11-12.
+      - action: click
+        element: hamburger_button
+        skip_if: [menu_open]
         verify: [menu_open]
-        on_fail: [press_esc]
+        on_fail: [press_esc, click_free_area]
       - action: click
         element: menu_market_icon
         verify:
           - {kind: template, element: market_open_anchor, variant: normal}
         on_fail: [press_esc, click_free_area]
     on_fail: [press_esc, click_free_area]
-    alternate: open_market_via_hamburger
-  open_market_via_hamburger:
+    alternate: open_market_via_menu
+  open_market_via_menu:
     opens: market
     steps:
-      - action: click
-        element: hamburger_button
+      - action: key
+        key: X
+        skip_if: [menu_open]             # X — toggle: не закрыть открытое меню
         verify: [menu_open]
-        on_fail: [press_esc, click_free_area]
+        on_fail: [press_esc]
       - action: click
         element: menu_market_icon
         verify:

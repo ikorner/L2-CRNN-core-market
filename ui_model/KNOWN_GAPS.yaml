@@ -173,7 +173,7 @@ gaps: []
 #    Стало: навигационная модель ui_model/navigation.yaml (элементы меню и
 #    quick-slot по инструментальной досъёмке scr_nav_qs_panel /
 #    scr_nav_menu_open / scr_nav_shop_*_open, сигнатуры menu_open, рецепты
-#    open_market (+alternate open_market_via_hamburger), open_shop_buy,
+#    open_market (+alternate open_market_via_menu), open_shop_buy,
 #    open_shop_sell с нормализацией меню when/skip_if и expect: absent).
 #    market.yaml: market_pic/open_buy_trade/open_sale_trade удалены,
 #    recover_closed пересобран (hamburger_button + quickslot_sell_icon,

@@ -148,3 +148,58 @@ class TestNavEvaluator:
         probe = Check(kind="pixel_probe", points=(
             ProbePoint(at=(5000, 5000), color=(0, 0, 0)),))
         assert not evaluate((probe,), FRAME).passed
+
+
+class TestClientOriginOffset:
+    """search_area — в клиентской области игры (l2core/model/navigation.py):
+    при живом клиенте оценщик смещает область на начало клиентской области
+    окна игры (окно не fullscreen и может стоять не в (0,0) — 2026-11-12).
+
+    Шаблон — не константный: у константного шаблона/кропа нулевая дисперсия
+    и NCC-матчер кваerk даёт 1.0 (проверки позиции бессмысленны)."""
+
+    @staticmethod
+    def _pattern_assets(tmp_path):
+        assets = tmp_path / "assets"
+        (assets / "navigation").mkdir(parents=True)
+        tpl = np.full((8, 8), 255, np.uint8)
+        tpl[2:5, 2:5] = 0
+        cv2.imwrite(str(assets / "navigation" / "anchor.png"), tpl)
+        cv2.imwrite(str(assets / "navigation" / "icon.png"), tpl)
+        return assets
+
+    def test_template_found_with_client_origin(self, tmp_path):
+        from l2core.adapters.template import OpenCvTemplateMatcher
+        nav = _nav(tmp_path)
+        assets = self._pattern_assets(tmp_path)
+        tpl = cv2.imread(str(assets / "navigation" / "anchor.png"),
+                         cv2.IMREAD_GRAYSCALE)
+        frame = np.zeros((400, 400, 3), dtype=np.uint8)
+        # иконка в клиенте с началом (150, 160): клиент (100, 100) -> кадр
+        # (250, 260): внутри смещённой области, ВНЕ абсолютной (10..210)
+        frame[260:268, 250:258, 0] = tpl
+        evaluate = build_nav_evaluator(
+            nav, OpenCvTemplateMatcher(), assets,
+            client_origin=lambda: (150, 160))
+        report = evaluate(
+            (Check(kind="template", element="menu_anchor", variant="normal"),),
+            frame)
+        assert report.passed
+
+    def test_template_absent_outside_offset_area(self, tmp_path):
+        from l2core.adapters.template import OpenCvTemplateMatcher
+        nav = _nav(tmp_path)
+        assets = self._pattern_assets(tmp_path)
+        # шашечный фон вместо нулей (у constant-zero кропа тоже кваerk NCC)
+        bg = (np.indices((300, 300)).sum(axis=0) % 2 * 60).astype(np.uint8)
+        frame = bg[..., None].repeat(3, axis=2)
+        # та же иконка, но на месте БЕЗ учёта смещения — находиться не должна:
+        # search_area ушла вместе с клиентом
+        frame[10:18, 10:18] = 255
+        evaluate = build_nav_evaluator(
+            nav, OpenCvTemplateMatcher(), assets,
+            client_origin=lambda: (50, 60))
+        report = evaluate(
+            (Check(kind="template", element="menu_anchor", variant="normal"),),
+            frame)
+        assert not report.passed

@@ -608,3 +608,52 @@ class TestEvaluateChecks:
             (), np.zeros((300, 400, 3), dtype=np.uint8),
             Anchor("market", 0, 0, 1.0, "template"))
         assert results == ()
+
+
+class TestEvaluateWithoutAnchor:
+    """Verify-наборы переходов «окно закрылось» (recover_closed) — HUD-
+    признаки; после клика по кнопке закрытия якорь исчезает с кадра раньше,
+    чем заканчивается анимация, — evaluate оценивает такие наборы без якоря
+    (живой кейс 2026-11-12). search_area HUD при этом смещается на начало
+    клиентской области окна игры (окно не fullscreen)."""
+
+    def _hud_detector(self, synth, origin=(0, 0)):
+        t_ok = write_template(synth, Path("t/hud.png"), 250)
+        model = make_model(
+            states={},
+            elements={"hud_el": element(
+                "hud_el", None, t_ok, hud=True,
+                search_area=Rect(10, 10, 100, 100))},
+        )
+        return StateDetector({"market": model}, RecordingMatcher(), synth,
+                             client_origin=lambda: origin)
+
+    def test_hud_checks_pass_without_anchor(self, synth):
+        detector = self._hud_detector(synth)
+        results = detector.evaluate(
+            (tpl_check("hud_el"),),
+            np.zeros((300, 400, 3), dtype=np.uint8), None)
+        assert [r.matched for r in results] == [True]
+
+    def test_hud_area_offset_by_client_origin(self, synth):
+        # search_area смещена за пределы кадра при origin (250, 250):
+        # регион [260,360]x[260,360] не влезает в кадр 400x300 -> провал
+        detector = self._hud_detector(synth, origin=(250, 250))
+        results = detector.evaluate(
+            (tpl_check("hud_el"),),
+            np.zeros((300, 400, 3), dtype=np.uint8), None)
+        assert [r.matched for r in results] == [False]
+        assert "вне кадра" in results[0].detail
+
+    def test_window_checks_fail_honestly_without_anchor(self, synth):
+        t_ok = write_template(synth, Path("t/win.png"), 250)
+        model = make_model(
+            states={},
+            elements={"win_el": element("win_el", Rect(5, 5, 8, 8), t_ok)},
+        )
+        detector = StateDetector({"market": model}, RecordingMatcher(), synth)
+        results = detector.evaluate(
+            (tpl_check("win_el"),),
+            np.zeros((300, 400, 3), dtype=np.uint8), None)
+        assert [r.matched for r in results] == [False]
+        assert "якорь" in results[0].detail

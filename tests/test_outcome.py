@@ -94,15 +94,17 @@ class TestOutcomeMapping:
         assert to_outcome(result) is ActionOutcome.OK
 
     def test_click_unknown_anchor_lost_after_click(self):
-        # Клик ушёл в HID, но якорь потерян на кадре verify: эффект мог
-        # свершиться, подтверждения нет — UNKNOWN (не FAILED).
+        # Клик ушёл в HID, но якорь потерян на кадре verify, а anchorless-
+        # проверки целевого состояния не сошлись: эффект мог свершиться,
+        # подтверждения нет — UNKNOWN (не FAILED).
         clock = test_click.FakeClock()
         hid = test_click.ScriptedHid(clock)
         test_click.FakeCursor().track(hid)
         find_anchor = scripted_anchor(
             [test_click.ANCHOR, test_click.ANCHOR, None])
         result = test_click.run_click(
-            hid, clock, test_click.FakeChecker(), find_anchor=find_anchor,
+            hid, clock, test_click.FakeChecker(verify=[False]),
+            find_anchor=find_anchor,
             config=retry0_config(test_click))
         assert result.success is False
         assert result.unconfirmed is True

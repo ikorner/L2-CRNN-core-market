@@ -485,6 +485,10 @@ def start_sell(
         rng=rng,
         clock=clock,
         sleep=sleep,
+        # Необратимое: окно лавки обязано остаться — потеря якоря после
+        # клика не «закрытие окна», anchorless-verify запрещён (UNKNOWN
+        # со стражем, разборки — за стратегией через confirm_after_unknown).
+        allow_anchorless_verify=False,
     )
     if clicked.cancelled:
         return StartSellResult(success=False, outcome=None, reverified=True,

@@ -97,6 +97,17 @@ recover.
   ClickResult(needs_recover=True) — исполнение recover — задача 5.8.
 - Джиттер/hold_ms из behavior-профиля через инъецируемый rng (детерминизм
   с seed, инвариант 7) — вендорный random HidDevice.click не используется.
+- **Якорь потерян перед verify** (клик закрыл/сменил окно, анимация):
+  verify-набор оценивается без якоря (`run_checks(checks, frame, None)` —
+  StateDetector оценивает HUD-проверки по search_area клиентской области,
+  якорно-зависимые проверки честно падают; пустой verify без якоря ничего
+  не подтверждает). Сошёлся — успех; иначе UNKNOWN (5.7), повтор
+  необратимого — за стражом. Для ПОТЕНЦИАЛЬНО НЕОБРАТИМЫХ действий
+  (start_sell) вызывающая сторона передаёт `allow_anchorless_verify=False`:
+  окно обязано остаться, потеря якоря — UNKNOWN со стражем (живой кейс
+  2026-11-12: закрытие «Обзора лавок» уходило в UNKNOWN, хотя окно
+  закрывалось). Тесты: tests/test_click.py::TestAnchorlessVerifyAfterClose,
+  tests/test_states.py::TestEvaluateWithoutAnchor.
 
 ## enter_text / enter_price (задача 5.4, spec action-primitives)
 
@@ -360,5 +371,9 @@ success/cancelled/unconfirmed.
 (build_nav_evaluator): HUD-элементы — template matching по search_area,
 элементы меню — от якоря menu_anchor (1:1, инвариант 3), pixel_probe —
 точки от якоря меню (цвет модели RGB, кадр BGR, допуск на канал).
-Тесты: tests/test_press_key.py, tests/test_recipes.py,
-tests/test_navchecks.py.
+search_area задана в клиентской области игры (окно не fullscreen): при
+живом клиенте оценщик смещает область на начало клиента
+(`client_origin` callable; None — абсолютные координаты, тесты).
+То же смещение применяет `hud_locator` сборки wiring и StateDetector
+(HUD-проверки сигнатур/verify). Тесты: tests/test_press_key.py,
+tests/test_recipes.py, tests/test_navchecks.py.

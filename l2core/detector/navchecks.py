@@ -29,7 +29,7 @@ rect-элементов на кадре неизвестны).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -71,39 +71,57 @@ def _load_templates(nav: NavigationModel, assets_dir) -> Dict[Tuple[str, str], n
 
 def build_nav_evaluator(nav: NavigationModel, matcher: TemplateMatcher,
                         assets_dir, *, nav_threshold: float = 0.9,
-                        probe_tolerance: int = 16) -> EvaluateChecks:
+                        probe_tolerance: int = 16,
+                        client_origin: Optional[Callable[
+                            [], Tuple[int, int]]] = None) -> EvaluateChecks:
     """Собрать оценщик проверок навигационной модели (см. docstring модуля).
 
     nav_threshold — порог NCC template matching'а (по умолчанию 0.9, как
     shop_threshold детектора якоря 3.3); probe_tolerance — допуск
     пиксель-пробы на канал (допущение, как color_tolerance состояний 3.4).
+    client_origin — callable начала клиентской области игры в кадре:
+    search_area HUD-элементов задана в координатах клиента
+    (l2core/model/navigation.py), окно игры не fullscreen и может стоять
+    не в (0,0) — без смещения поиск идёт по экранным координатам и молча
+    промахивается. None — поведение «search_area абсолютна» (тесты,
+    обратная совместимость).
     """
     templates = _load_templates(nav, assets_dir)
+
+    def _area(element) -> Optional[Tuple[int, int, int, int]]:
+        area = element.search_area
+        if area is None:
+            return None
+        ox, oy = client_origin() if client_origin is not None else (0, 0)
+        return (area.x + ox, area.y + oy, area.width, area.height)
 
     def locate(element_id: str, variant: Optional[str],
                gray: np.ndarray) -> Optional[Tuple[int, int, float]]:
         """Абсолютная позиция элемента (левый верхний угол шаблона) или None."""
         element = nav.elements.get(element_id)
-        if element is None or element.search_area is None:
+        if element is None:
+            return None
+        located = _area(element)
+        if located is None:
             return None
         key = (element_id, variant or next(iter(element.variants), None))
         template = templates.get(key)
         if template is None:
             return None
-        area = element.search_area
+        ax, ay, aw, ah = located
         frame_h, frame_w = gray.shape
-        if (area.y < 0 or area.x < 0
-                or area.y + area.height > frame_h
-                or area.x + area.width > frame_w):
+        if (ay < 0 or ax < 0
+                or ay + ah > frame_h
+                or ax + aw > frame_w):
             return None
-        crop = gray[area.y:area.y + area.height, area.x:area.x + area.width]
+        crop = gray[ay:ay + ah, ax:ax + aw]
         h, w = template.shape
         if crop.shape[0] < h or crop.shape[1] < w:
             return None
         match = matcher.match(crop, template)
         if match.score < nav_threshold:
             return None
-        return (area.x + match.x, area.y + match.y, match.score)
+        return (ax + match.x, ay + match.y, match.score)
 
     def evaluate(checks: Tuple[Check, ...],
                  frame: np.ndarray) -> CheckReport:

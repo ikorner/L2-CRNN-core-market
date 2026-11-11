@@ -345,3 +345,29 @@ class TestMultiSupportAnchor:
             assert isinstance(supports, tuple)
             for support in supports:
                 assert isinstance(support, tuple) and len(support) == 2
+
+
+class TestMarketTitleSupport:
+    """Первичная опора якоря market — заголовок окна (window_title): статичный
+    хром с NCC ~0.998 на живых кадрах. Опора из целого окна (market_main_menu)
+    содержит содержимое таблицы, её NCC на живом кадре — 0.22 при пороге 0.18:
+    при смене лотов подтверждение «рамы» проваливается, статус окна дёргается
+    occluded_or_unstable (живой кейс 2026-11-12). Заголовок устойчив к
+    содержимому таблицы; целое окно остаётся запасной опорой."""
+
+    def test_title_is_primary_support(self):
+        supports = DEFAULT_ANCHOR_TEMPLATES["market"]
+        assert supports[0] == ("window_title", "normal")
+        assert ("market_main_menu", "normal") in supports[1:]
+
+    @pytest.mark.parametrize("name", sorted(MARKET_ANCHORS))
+    def test_anchor_found_on_positives(self, name, models, matcher):
+        detector = AnchorDetector.for_windows(models, matcher, ASSETS_DIR)
+        anchor = detector.find_anchor(frame_bgr(name), "market")
+        assert anchor is not None
+        assert (anchor.x, anchor.y) == MARKET_ANCHORS[name]
+
+    @pytest.mark.parametrize("name", MARKET_NEGATIVES)
+    def test_not_found_on_negatives(self, name, models, matcher):
+        detector = AnchorDetector.for_windows(models, matcher, ASSETS_DIR)
+        assert detector.find_anchor(frame_bgr(name), "market") is None

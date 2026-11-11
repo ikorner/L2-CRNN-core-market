@@ -40,7 +40,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Optional, Tuple
+from typing import Callable, Mapping, Optional, Tuple
 
 import numpy as np
 
@@ -142,6 +142,8 @@ class StateDetector:
         ocr_client=None,
         template_threshold: float = 0.9,
         color_tolerance: int = 16,
+        client_origin: Optional[Callable[[], Tuple[int, int]]] = None,
+        hud_window: str = "market",
     ):
         self._models = dict(models)
         self._matcher = matcher
@@ -149,6 +151,14 @@ class StateDetector:
         self._ocr_client = ocr_client
         self._template_threshold = template_threshold
         self._color_tolerance = color_tolerance
+        # search_area HUD-элементов задана в клиентской области игры
+        # (navigation.py): смещение на начало клиента (окно не fullscreen);
+        # None — поведение «search_area абсолютна» (тесты).
+        self._client_origin = client_origin
+        # Окно, чьи HUD-элементы оцениваются без якоря (verify после
+        # закрытия окна: якорь с кадра исчез, целевое состояние — глобальное,
+        # его признаки — HUD-элементы этого окна).
+        self._hud_window = hud_window
         self._templates: dict = {}
         self._load_templates()
 
@@ -244,7 +254,8 @@ class StateDetector:
             rejected = False
             for _, check in ordered:
                 result = self._evaluate(
-                    check, model, anchor, gray, frame, frame_w, frame_h, state_id
+                    check, model, (anchor.x, anchor.y), anchor.window_id,
+                    gray, frame, frame_w, frame_h, state_id
                 )
                 state_results.append(result)
                 if check.kind == "ocr" and result.matched is None:
@@ -306,7 +317,7 @@ class StateDetector:
         )
 
     def evaluate(self, checks: Tuple[Check, ...], frame: np.ndarray,
-                 anchor: Anchor) -> Tuple[SignatureResult, ...]:
+                 anchor: Optional[Anchor]) -> Tuple[SignatureResult, ...]:
         """Публичная оценка произвольного набора проверок (wiring 7.1).
 
         Та же семантика, что у сигнатур состояний (detect): тот же matcher,
@@ -316,13 +327,22 @@ class StateDetector:
         дублирования _evaluate. matched=None — недоступная OCR-проверка
         без клиента (деградация, как в сигнатурах). state_id результата
         пустой: проверки не привязаны к состоянию.
+
+        anchor=None — оценка без якоря окна (verify после закрытия окна:
+        якорь исчез с кадра раньше анимации, а целевое состояние глобальное,
+        его признаки — HUD-элементы окна hud_window): HUD-template-проверки
+        оцениваются по search_area клиентской области; проверки, привязанные
+        к якорю (rect-элементы, пиксель-пробы, OCR-регионы), честно падают
+        с диагностикой «якорь отсутствует».
         """
-        model = self._models[anchor.window_id]
+        window_id = anchor.window_id if anchor is not None else self._hud_window
+        model = self._models[window_id]
         gray = _to_gray(frame)
         frame_h, frame_w = gray.shape
+        origin = (anchor.x, anchor.y) if anchor is not None else None
         return tuple(
-            self._evaluate(check, model, anchor, gray, frame, frame_w, frame_h,
-                           state_id="")
+            self._evaluate(check, model, origin, window_id, gray, frame,
+                           frame_w, frame_h, state_id="")
             for check in checks
         )
 
@@ -369,7 +389,8 @@ class StateDetector:
         for name in sorted(candidates):
             state_id, check = candidates[name]
             result = self._evaluate(
-                check, model, anchor, gray, frame, frame_w, frame_h, state_id)
+                check, model, (anchor.x, anchor.y), anchor.window_id,
+                gray, frame, frame_w, frame_h, state_id)
             if result.matched is True:
                 matched.append(result)
             else:
@@ -382,25 +403,31 @@ class StateDetector:
             skipped=tuple(skipped), ocr_degraded=degraded,
         )
 
-    def _evaluate(self, check: Check, model: UiModel, anchor: Anchor,
+    def _evaluate(self, check: Check, model: UiModel,
+                  origin: Optional[Tuple[int, int]], window_id: str,
                   gray: np.ndarray, frame: np.ndarray,
                   frame_w: int, frame_h: int, state_id: str) -> SignatureResult:
         name = _signature_name(check)
         if check.kind == "pixel_probe":
-            return self._evaluate_probe(check, anchor, frame, state_id, name)
+            return self._evaluate_probe(check, origin, frame, state_id, name)
         if check.kind == "template":
             return self._evaluate_template(
-                check, anchor, gray, frame_w, frame_h, state_id, name)
-        return self._evaluate_ocr(check, model, anchor, frame, state_id, name)
+                check, origin, window_id, gray, frame_w, frame_h, state_id, name)
+        return self._evaluate_ocr(check, model, origin, frame, state_id, name)
 
-    def _evaluate_probe(self, check: Check, anchor: Anchor, frame: np.ndarray,
+    def _evaluate_probe(self, check: Check,
+                        origin: Optional[Tuple[int, int]], frame: np.ndarray,
                         state_id: str, name: str) -> SignatureResult:
         tolerance = self._color_tolerance
         frame_h, frame_w = frame.shape[:2]
+        if origin is None:
+            return SignatureResult(
+                state_id, check.kind, name, False,
+                "якорь окна отсутствует: пиксель-проба невозможна")
         for point in check.points:
             # Точки сигнатуры — от якоря окна, как rect'ы элементов
             # (инвариант 3: абсолютных координат вне слоя якоря нет).
-            x, y = anchor.x + point.at[0], anchor.y + point.at[1]
+            x, y = origin[0] + point.at[0], origin[1] + point.at[1]
             if not (0 <= x < frame_w and 0 <= y < frame_h):
                 return SignatureResult(
                     state_id, check.kind, name, False,
@@ -417,21 +444,29 @@ class StateDetector:
             state_id, check.kind, name, True,
             f"{len(check.points)}/{len(check.points)} точек в допуске")
 
-    def _evaluate_template(self, check: Check, anchor: Anchor, gray: np.ndarray,
-                           frame_w: int, frame_h: int,
+    def _evaluate_template(self, check: Check,
+                           origin: Optional[Tuple[int, int]], window_id: str,
+                           gray: np.ndarray, frame_w: int, frame_h: int,
                            state_id: str, name: str) -> SignatureResult:
         template, element = self._load_template(
-            anchor.window_id, check.element, check.variant,
+            window_id, check.element, check.variant,
             context="проверка перехода")
         h, w = template.shape
         if element.hud:
-            # HUD-элемент: search_area — допустимая область поиска в кадре.
+            # HUD-элемент: search_area — в клиентской области игры
+            # (navigation.py), смещаем на начало клиента (окно не fullscreen);
+            # без client_origin — абсолютные координаты (тесты).
             area = element.search_area
-            x0, y0 = area.x, area.y
+            cx, cy = self._client_origin() if self._client_origin else (0, 0)
+            x0, y0 = area.x + cx, area.y + cy
             region_w, region_h = area.width, area.height
         else:
+            if origin is None:
+                return SignatureResult(
+                    state_id, check.kind, name, False,
+                    "якорь окна отсутствует: проверка элемента невозможна")
             rect = element.rect
-            x0, y0 = anchor.x + rect.x, anchor.y + rect.y
+            x0, y0 = origin[0] + rect.x, origin[1] + rect.y
             region_w, region_h = rect.width, rect.height
         if x0 < 0 or y0 < 0 or x0 + region_w > frame_w or y0 + region_h > frame_h:
             return SignatureResult(
@@ -449,16 +484,20 @@ class StateDetector:
             state_id, check.kind, name, matched,
             f"ncc={score:.3f} (порог {self._template_threshold})")
 
-    def _evaluate_ocr(self, check: Check, model: UiModel, anchor: Anchor,
-                      frame: np.ndarray, state_id: str,
-                      name: str) -> SignatureResult:
+    def _evaluate_ocr(self, check: Check, model: UiModel,
+                      origin: Optional[Tuple[int, int]], frame: np.ndarray,
+                      state_id: str, name: str) -> SignatureResult:
         if self._ocr_client is None:
             return SignatureResult(
                 state_id, check.kind, name, None,
                 "нет OCR-клиента: сигнатура недоступна")
+        if origin is None:
+            return SignatureResult(
+                state_id, check.kind, name, False,
+                "якорь окна отсутствует: OCR-проверка невозможна")
         region = model.ocr_regions[check.region]
         rect = region.rect
-        x0, y0 = anchor.x + rect.x, anchor.y + rect.y
+        x0, y0 = origin[0] + rect.x, origin[1] + rect.y
         crop = frame[y0:y0 + rect.height, x0:x0 + rect.width]
         if crop.size == 0:
             return SignatureResult(

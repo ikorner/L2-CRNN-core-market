@@ -73,7 +73,7 @@ def test_opening_is_recipe_not_a_model_transition():
     nav = load_navigation(UI_MODEL / "navigation.yaml")
     recipe = nav.recipes["open_market"]
     assert recipe.opens == "market"
-    assert recipe.alternate == "open_market_via_hamburger"
+    assert recipe.alternate == "open_market_via_menu"
     checks = {(c.element, c.variant)
               for c in recipe.steps[-1].verify if c.kind == "template"}
     assert checks == {("market_open_anchor", "normal")}

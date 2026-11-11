@@ -74,7 +74,8 @@ class BehaviorConfig:
 class PathsConfig:
     model: str = "retrain/crnn_retrained.pt"  # чекпоинт CRNN (файл вне git):
     # ретрейн 2026-11-11 под новый рендеринг клиента, golden-бенчмарк 24/24
-    arduino_port: str = "COM3"  # порт HID-адаптера arduino
+    # Порт HID в конфиг не задаётся: адаптер сам ищет плату (VID/PID Leonardo)
+    # и при необходимости прошивает её (контракт проекта L2-CRNN-arduino).
 
 
 @dataclass(frozen=True)
@@ -282,9 +283,14 @@ def _build_paths(raw: dict[str, Any]) -> PathsConfig:
     values = {
         key: _nonempty_str(f"paths.{key}", value) for key, value in raw.items()
     }
-    for key in ("model", "arduino_port"):
+    for key in ("model",):
         if key not in values:
             raise ConfigError(f"paths.{key}: обязательный параметр не задан")
+    unknown = set(raw) - {"model"}
+    if unknown:
+        raise ConfigError(
+            f"paths: неизвестные параметры {sorted(unknown)} "
+            "(порт HID в конфиг не задаётся — адаптер сам ищет плату)")
     return PathsConfig(**values)
 
 
