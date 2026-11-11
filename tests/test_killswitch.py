@@ -27,6 +27,7 @@ spec safety: «Аварийная остановка хоткеем», «Тай�
 Детерминизм (инвариант 7): источник клавиш — инъекция, часы — инъекция;
 поток слушателя короткоживущий (poll_interval 0.01), join в каждом тесте.
 """
+import sys
 import threading
 import time
 from types import SimpleNamespace
@@ -695,3 +696,15 @@ class TestWin32HotkeySource:
         assert hasattr(Win32Gateway, "set_cursor_pos")
         sig = inspect.signature(Win32Gateway.set_cursor_pos)
         assert list(sig.parameters) == ["self", "x", "y"]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="живой Win32-канал")
+def test_call_next_hook_accepts_pointer_sized_lparam():
+    """Регрессия живого бага 2026-11-12: у ctypes-прототипа CallNextHookEx
+    без argtypes LPARAM по умолчанию c_int — 64-битный указатель
+    KBDLLHOOKSTRUCT не маршаллился (OverflowError в хуке хоткея, хоткей
+    kill switch не срабатывал). Прототип обязан принимать pointer-sized
+    l_param."""
+    from l2core.adapters.win32 import _call_next_hook
+    # 64-битное значение указателя: с дефолтным c_int маршаллинг падает
+    _call_next_hook(0, 0, 0x00007FF612345678)

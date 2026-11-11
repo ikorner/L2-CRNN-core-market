@@ -99,6 +99,10 @@ class MssScreen(Screen):
     при первом grab() без инъектированного grabber'а. grabber — callable,
     возвращающий кадр BGR uint8; инъекция изолирует недетерминированное
     (живой экран) в тестах и CI.
+
+    mss.MSS() не потокобезопасен: конкурентные grab() движка (поток
+    стратегии + observer, 7.2) ломали захват (битый кадр/BitBlt) — экземпляр
+    mss thread-local, каждый поток получает свой (2026-11-12).
     """
 
     def __init__(self, monitor: int = 1, grabber=None):
@@ -109,7 +113,8 @@ class MssScreen(Screen):
         """
         self._monitor = monitor
         self._grabber = grabber
-        self._sct = None
+        import threading
+        self._local = threading.local()
 
     def grab(self) -> np.ndarray:
         if self._grabber is not None:
@@ -117,7 +122,8 @@ class MssScreen(Screen):
         return _bgra_to_bgr(np.asarray(self._capture()))
 
     def _capture(self):
-        if self._sct is None:
+        sct = getattr(self._local, "sct", None)
+        if sct is None:
             try:
                 import mss
             except ImportError as e:
@@ -125,18 +131,19 @@ class MssScreen(Screen):
                     "mss недоступен: pip install mss (или передайте grabber)"
                 ) from e
             try:
-                self._sct = mss.MSS()
+                sct = self._local.sct = mss.MSS()
             except Exception as e:
                 raise MssError(f"не удалось инициализировать захват экрана: {e}") from e
         try:
-            return self._sct.grab(self._sct.monitors[self._monitor])
+            return sct.grab(sct.monitors[self._monitor])
         except Exception as e:
             raise MssError(f"не удалось захватить монитор {self._monitor}: {e}") from e
 
     def close(self) -> None:
-        if self._sct is not None:
-            self._sct.close()
-            self._sct = None
+        sct = getattr(self._local, "sct", None)
+        if sct is not None:
+            sct.close()
+            self._local.sct = None
 
 
 class FakeScreen(Screen):

@@ -281,3 +281,53 @@ class TestScreenProtocol:
     def test_all_implementations_are_screens(self):
         assert isinstance(MssScreen(grabber=lambda: frame(1)), Screen)
         assert isinstance(FakeScreen([frame(1)]), Screen)
+
+
+class TestMssScreenThreadLocal:
+    """mss.MSS() не потокобезопасен: конкурентные grab() движка (поток
+    стратегии + observer, 7.2) ломали захват (живой битый кадр/BitBlt,
+    2026-11-12). Экземпляр mss — thread-local: каждый поток получает свой."""
+
+    class _FakeMssModule:
+        def __init__(self):
+            self.instances = []
+
+        class _Instance:
+            def __init__(self, outer):
+                self.monitors = [None, (0, 0, 6, 4)]
+                self.outer = outer
+                self.closed = False
+
+            def grab(self, monitor):
+                import numpy as np
+                return np.zeros((monitor[3], monitor[2], 4), dtype=np.uint8)
+
+            def close(self):
+                self.closed = True
+
+        def MSS(self):
+            inst = TestMssScreenThreadLocal._FakeMssModule._Instance(self)
+            self.instances.append(inst)
+            return inst
+
+    def test_concurrent_grabs_use_per_thread_instances(self, monkeypatch):
+        import threading
+        fake = self._FakeMssModule()
+        monkeypatch.setitem(__import__("sys").modules, "mss", fake)
+        screen = MssScreen()
+        threads = [threading.Thread(target=lambda: screen.grab())
+                   for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert len(fake.instances) == 4  # каждому потоку — свой экземпляр
+
+    def test_close_closes_current_thread_instance(self, monkeypatch):
+        fake = self._FakeMssModule()
+        monkeypatch.setitem(__import__("sys").modules, "mss", fake)
+        screen = MssScreen()
+        screen.grab()
+        assert len(fake.instances) == 1
+        screen.close()
+        assert fake.instances[0].closed is True

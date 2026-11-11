@@ -233,6 +233,22 @@ _VK_DIGIT_BASE = 0x30
 _VK_F1 = 0x70
 _MODIFIERS = ("ctrl", "shift", "alt")
 _WH_KEYBOARD_LL = 13
+
+
+def _call_next_hook(code: int, w_param: int, l_param: int) -> int:
+    """Передать событие дальше по цепочке хуков (CallNextHookEx).
+
+    Прототип объявлен явно: у ctypes-функции без argtypes LPARAM по умолчанию
+    c_int — 64-битный указатель KBDLLHOOKSTRUCT не маршаллится (OverflowError
+    на каждом событии клавиатуры, хоткей kill switch молча не срабатывал;
+    живой баг 2026-11-12). WH_KEYBOARD_LL первый аргумент (hhk) игнорируется.
+    """
+    import ctypes
+    user32 = ctypes.windll.user32
+    user32.CallNextHookEx.restype = ctypes.c_size_t
+    user32.CallNextHookEx.argtypes = [ctypes.c_void_p, ctypes.c_int,
+                                      ctypes.c_size_t, ctypes.c_size_t]
+    return int(user32.CallNextHookEx(None, code, w_param, l_param))
 _WM_KEYDOWN = 0x100
 _WM_SYSKEYDOWN = 0x104
 _WM_QUIT = 0x12
@@ -396,7 +412,7 @@ class Win32HotkeySource:
                         ))
                         if mods_ok:
                             pressed.set()
-                return user32.CallNextHookEx(None, code, w_param, l_param)
+                return _call_next_hook(code, w_param, l_param)
 
             callback = callback_type(_hook_proc)
             # HINSTANCE NULL (0) — хук на уровне потока-сообщений,
