@@ -207,3 +207,30 @@ def test_real_screenshot_segmentation(shot, geometry, vendor_state):
             assert c.image.shape[1] <= name_w, (shot, c.meta)
         if c.meta["col"] == "price":
             assert c.image.shape[1] <= price_w, (shot, c.meta)
+
+
+# --- Разделительные линии на кромках строк (живой кейс 2026-11-12) ---
+
+def test_extract_cells_strips_rule_line_at_row_edge(geometry, vendor_state):
+    """Яркая линия-разделитель на верхней кромке строки (y=row_y0, граница
+    заголовка) не должна входить в кроп ячейки: она протяжённая, тянет
+    bbox триммера на всю высоту строки, препроцесс OCR сжимает текст
+    (чтение деградирует до уверенного мусора). Глифы текста не тронуты."""
+    seg = TableSegmentation(geometry)
+    h, w = 700, 1000
+    color = np.full((h, w, 3), (45, 48, 52), np.uint8)
+    # разделитель заголовок/строка 0: яркая линия на всю ширину таблицы
+    color[geometry.row_y0, 117:967] = (200, 200, 200)
+    # текст первой строки: маркер в зоне price
+    pz = geometry.columns["price"].zone
+    y0 = geometry.row_y0 + pz.y
+    color[y0:y0 + 12, 437 + 20:437 + 90] = (230, 230, 230)
+    gray = cv2.cvtColor(color, cv2.COLOR_BGR2GRAY)
+    structure = seg.rows_and_columns(gray, origin=(0, 0))
+    cells = seg.extract_cells(color, structure)
+    row0_price = [c for c in cells
+                  if c.meta["col"] == "price" and c.meta["row"] == 0]
+    assert row0_price, "строка 0 с текстом обязана нарезаться"
+    cell = row0_price[0]
+    # высота кропа — около текста (+pad триммера), а не всей строки с линией
+    assert cell.image.shape[0] <= 24, cell.image.shape

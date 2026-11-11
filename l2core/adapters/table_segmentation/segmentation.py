@@ -59,6 +59,38 @@ HEADER_BAND = 18
 # (обрезка зоны текста без иконки в вендоре привязана к литералу «name»).
 _MODEL_TO_VENDOR_COLUMN = {"item": "name"}
 
+# Покрытие ширины кропа, выше которого строка маски считается линией-
+# разделителем (глифы строки текста покрывают меньше: текст ~10px высотой
+# в строке 56px, даже длинное имя не даёт сплошной строки на всю ширину).
+_RULE_LINE_COVERAGE = 0.8
+# Сколько строк от кромки кропа проверяются на «линейность».
+_RULE_LINE_EDGE = 3
+
+
+def _strip_edge_rule_lines(crop: np.ndarray) -> np.ndarray:
+    """Заливка фоном протяжённых горизонтальных линий на кромках кропа ячейки.
+
+    Линия-разделитель (яркая, на всю ширину ячейки) на верхней/нижней кромке
+    попадает в цветовую маску триммера и тянет bbox на всю высоту кропа —
+    препроцесс OCR тогда сжимает текст при ресайзе (живой кейс 2026-11-12:
+    линия границы заголовка на y=row_y0; чтение строки 0 деградировало до
+    уверенного мусора). Линия заливается медианным фоном; глифы не тронуты.
+    Без линий на кромках возвращает исходный массив (копия не делается).
+    """
+    mask = _vendor._text_mask(crop) > 0
+    coverage = mask.mean(axis=1)
+    h = crop.shape[0]
+    edge_rows = [r for r in range(min(_RULE_LINE_EDGE, h))
+                 if coverage[r] >= _RULE_LINE_COVERAGE]
+    edge_rows += [r for r in range(max(0, h - _RULE_LINE_EDGE), h)
+                  if coverage[r] >= _RULE_LINE_COVERAGE]
+    if not edge_rows:
+        return crop
+    out = crop.copy()
+    bg = np.median(out.reshape(-1, 3), axis=0)
+    out[edge_rows] = bg
+    return out
+
 
 class TableSegmentation:
     """Нарезка таблицы «Обзор лавок» на константах table_geometry модели.
@@ -115,7 +147,21 @@ class TableSegmentation:
 
     def extract_cells(self, img: np.ndarray, structure: dict) -> list:
         """Все ячейки (header + строки x колонки), обрезанные до текстов."""
-        return _vendor.extract_cells(img, structure)
+        cells = _vendor.extract_cells(img, structure)
+        cleaned = []
+        for c in cells:
+            crop = _strip_edge_rule_lines(c.image)
+            if crop is c.image:
+                cleaned.append(c)
+                continue
+            crop, dx, dy = _vendor._trim(crop, pad=4)
+            x0, y0, _, _ = c.meta["rect"]
+            meta = dict(c.meta,
+                        rect=(x0 + dx, y0 + dy,
+                              x0 + dx + crop.shape[1], y0 + dy + crop.shape[0]),
+                        pixel_key=_vendor._pixel_key(crop))
+            cleaned.append(_vendor.Cell(_vendor._cell_key(crop), crop, meta))
+        return cleaned
 
     def trim_to_text(self, crop: np.ndarray, pad: int = 4) -> np.ndarray:
         """Обрезка кропа до bbox текста (+pad); пустой вход — без изменений."""
