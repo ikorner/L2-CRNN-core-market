@@ -13,6 +13,8 @@
 - **WHEN** загружается `ui_model/navigation.yaml`
 - **THEN** элементы гамбургера, якоря меню, иконки обзора в меню и иконок quick-slot доступны исполнителю рецептов
 
+## ADDED Requirements
+
 ### Requirement: recover_closed пересобран без HUD-иконок
 Сигнатуры глобального состояния `recover_closed` модели market SHALL подтверждать «все окна закрыты» без опорных HUD-иконок `market_pic`/`open_buy_trade` (≥ 2 независимых признака, набор — разметчик по сырью `scr_menu_closed` и др.).
 

@@ -57,7 +57,7 @@ def test_defaults_without_file():
     assert config.ocr.reread_count == 2
     assert config.resolution.width == 1920
     assert config.resolution.height == 1080
-    assert config.paths.model == "crnn_best.pt"
+    assert config.paths.model == "retrain/crnn_retrained.pt"
     assert config.paths.arduino_port
     assert config.kill_switch.hotkey
     assert config.timing.wait_default_timeout > 0
@@ -127,7 +127,7 @@ timing:
     assert config.ocr.reread_count == 2
     assert config.timing.verify_interval == 0.2
     assert config.resolution.width == 1920
-    assert config.paths.model == "crnn_best.pt"
+    assert config.paths.model == "retrain/crnn_retrained.pt"
 
 
 def test_empty_file_gives_defaults(tmp_path):

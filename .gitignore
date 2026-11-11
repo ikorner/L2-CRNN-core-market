@@ -21,3 +21,15 @@ venv/
 # IDE
 .idea/
 .vscode/
+
+# Рантайм-логи и диагностика (артефакты прогонов, не версионируются)
+logs/
+
+# Ретрейн OCR: скрипты и разметка версионируются, сгенерированные данные — нет
+retrain/dataset/
+retrain/mixed_dataset/
+retrain/screenshots_new/
+retrain/runs/
+retrain/review_*.png
+retrain/review_index.json
+retrain/preds_new.json

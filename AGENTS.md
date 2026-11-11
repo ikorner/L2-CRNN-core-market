@@ -104,8 +104,16 @@ python -c "from l2core.config import load_config; load_config('config.yaml')"
 python tools/gen_ocr_golden.py
 
 # OCR-бенчмарк на golden-наборе (ручной, вне CI): точность и время на CPU и
-# GPU; без crnn_best.pt — понятная ошибка, код выхода 2
+# GPU; без чекпоинта — понятная ошибка, код выхода 2
 python tools/benchmark_ocr.py --model <путь>/crnn_best.pt
+
+# Ретрейн OCR под смену рендеринга клиента (рецепт 2026-11-11, подробности —
+# docs/agents/adapters.md «Ретрейн OCR»): сегмент_v2 → label_new (псевдо-разметка
+# базовой моделью) → глазная проверка листов → write_fixups → build_mixed →
+# finetune (warm-start, --resume crnn_last.pt для прерванных прогонов);
+# чекпоинт retrain/crnn_retrained.pt (paths.model), приёмка — benchmark_ocr
+cd retrain && python segment_v2.py && python label_new.py && python review_montage.py
+cd retrain && python write_fixups.py && python build_mixed.py && python finetune.py --epochs 120 --lr 1.5e-4
 
 # Живой dry-run прогон (ручной, вне CI; приёмка 9.4): требует запущенную и
 # видимую игру; проба по фасаду (health/get_state/open_market/read_rows/

@@ -72,7 +72,8 @@ class BehaviorConfig:
 
 @dataclass(frozen=True)
 class PathsConfig:
-    model: str = "crnn_best.pt"  # чекпоинт CRNN (файл вне git)
+    model: str = "retrain/crnn_retrained.pt"  # чекпоинт CRNN (файл вне git):
+    # ретрейн 2026-11-11 под новый рендеринг клиента, golden-бенчмарк 24/24
     arduino_port: str = "COM3"  # порт HID-адаптера arduino
 
 
